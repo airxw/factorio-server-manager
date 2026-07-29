@@ -147,6 +147,8 @@ const ADMIN_GROUPS: SidebarLinkGroup[] = [
       { to: '/admin/nodes', label: '节点管理', icon: Server },
       // v4.31.0: 实例管理入口（管理员视角，跨用户查看全部实例）
       { to: '/admin/servers', label: '实例管理', icon: Box },
+      // v4.32.x: 版本管理入口（server_admin 侧边栏可见，链接到 /store/versions）
+      { to: '/store/versions', label: '版本管理', icon: Package },
     ],
   },
   {

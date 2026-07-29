@@ -13,8 +13,6 @@ export { default as Pagination } from './Pagination';
 export { default as SensitiveInput } from './SensitiveInput';
 export { default as Skeleton } from './Skeleton';
 export { default as ListSkeleton } from './ListSkeleton';
-export { default as FormSkeleton } from './FormSkeleton';
-export { default as TabSkeleton } from './TabSkeleton';
 export { ToastProvider, useToast } from '../../context/ToastContext';
 export { ConfirmProvider, useConfirm, type ConfirmOptions } from '../../context/ConfirmContext';
 export {

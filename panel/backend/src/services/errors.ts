@@ -248,7 +248,7 @@ export class PlayerBindingNotFoundError extends AppError {
 
 export class PlayerBindingAlreadyExistsError extends AppError {
   readonly code = 'PLAYER_BINDING_ALREADY_EXISTS';
-  constructor(message = '玩家绑定已存在（同 user_id + game_type 或同 game_player_name + game_type + status）') {
+  constructor(message = '玩家绑定已存在（同 user_id + scope_ref 或同 game_player_name + scope_ref + status）') {
     super(message);
   }
 }
@@ -380,7 +380,7 @@ export class WebhookDeliveryError extends AppError {
   }
 }
 
-// ----- VIP-实例绑定域（user_instance_bindings） -----
+// ----- VIP-实例绑定域（统一 bindings 表，v4.17.0 起） -----
 export class BindingAlreadyExistsError extends AppError {
   readonly code = 'BINDING_ALREADY_EXISTS';
   readonly httpStatus = 409;
