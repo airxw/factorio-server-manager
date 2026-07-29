@@ -1,0 +1,117 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/instance-renewals-schema.json",
+  "title": "Instance Renewals Schema",
+  "description": "instance_renewals 表数据契约。实例续费记录表，审计追踪每次续费操作（续费时长、扣款金额、新旧过期时间、续费类型）。来源：docs/plans/business-logic-system-completion-plan.md §5.1 步骤 3（决策 V6 全可配定价）。\n\n关联契约：\n- server-schema.json（servers.expires_at / expiry_status / expiry_grace_until 联动）\n- user-wallets-schema.json（amount_paid 从钱包余额扣款）\n- vip-permissions-schema.json（VIP 等级影响 renewal_discount_levels）\n\n状态语义：\n- renewal_type=manual：用户主动续费（POST /api/servers/:id/renew）\n- renewal_type=gift：管理员/系统赠送续费（不扣款，amount_paid=0）\n\n定价模型（决策 V6 全可配）：\n- 基础单价：pack.business.instance.pricing.daily_price（每个 Pack 独立配置）\n- 阶梯折扣：pack.business.instance.pricing.tier_discounts（按 duration_days 匹配）\n- VIP 折扣：vip.renewal_discount_levels（按用户 VIP 等级匹配）\n- 最终金额 = daily_price × duration_days × tier_discount × vip_discount\n\nv-economy 扩展（docs/plans/role-permission-economy-system-plan.md §3.2.4，决策 D3/D4）：\n- wallet_source：扣款源。玩家续费=user_wallets（默认）；腐竹续费自有实例=admin_wallets\n- admin_tier_discount_applied：腐竹等级折扣快照（来自 admin_tiers.resource_fee_discount，仅 wallet_source=admin_wallets 时有值）\n- node_source_at_renewal：续费时节点来源快照（审计用）。self_hosted 实例 amount_paid=0（豁免）；platform_managed 按定价模型计费",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "instance_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "续费的实例 ID，引用 servers.id (string UUID)"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "续费操作发起者用户 ID，引用 users.id (string UUID)"
+    },
+    "duration_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 36500,
+      "description": "续费时长（天）。36500=100 年（近似永久）。前端可选 7/30/90/365/36500"
+    },
+    "amount_paid": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "实际扣款点券数。0=免费续费（gift 或 daily_price=0）。已应用所有折扣后的最终金额"
+    },
+    "base_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "基础金额（未应用折扣）= daily_price × duration_days。用于审计折扣效果"
+    },
+    "tier_discount_applied": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "应用的阶梯折扣系数（1.0=无折扣，0.8=8 折）。来自 pack.business.instance.pricing.tier_discounts"
+    },
+    "vip_discount_applied": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "应用的 VIP 折扣系数（1.0=无折扣，0.5=5 折）。来自 vip.renewal_discount_levels"
+    },
+    "vip_level_at_renewal": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "续费时的用户 VIP 等级快照（按实例作用域）。用于审计 VIP 折扣依据"
+    },
+    "renewal_type": {
+      "type": "string",
+      "enum": ["manual", "gift", "auto"],
+      "default": "manual",
+      "description": "续费类型：manual=用户主动续费（扣款）；gift=管理员/系统赠送续费（amount_paid=0，不扣款）；auto=自动续扣（v3-billing 新增，scheduler 触发，沿用上次周期）"
+    },
+    "use_wallet": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否从钱包扣款。true=从钱包扣款（扣哪个钱包由 v-economy 新增的 wallet_source 字段决定：user_wallets=玩家钱包 / admin_wallets=腐竹聚合账户）；false=仅 gift 类型，不扣款"
+    },
+    "old_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "续费前的过期时间（ISO 8601）。null=原为永久实例"
+    },
+    "new_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "续费后的过期时间（ISO 8601）。null=续费为永久（duration_days=36500 视为永久）。计算规则：未过期时 = old_expires_at + duration_days；已过期时 = now + duration_days"
+    },
+    "renewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "续费操作时间（ISO 8601 字符串）"
+    },
+    "wallet_source": {
+      "type": "string",
+      "enum": ["user_wallets", "admin_wallets"],
+      "default": "user_wallets",
+      "description": "[v-economy 新增] 扣款源：user_wallets=玩家钱包（默认，存量记录兼容值）；admin_wallets=腐竹聚合账户（腐竹续费自有实例时）"
+    },
+    "admin_tier_discount_applied": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 1,
+      "default": null,
+      "description": "[v-economy 新增] 应用的腐竹等级折扣系数快照（1.0=无折扣），来自 admin_tiers.resource_fee_discount。仅 wallet_source=admin_wallets 时有值，审计用"
+    },
+    "node_source_at_renewal": {
+      "type": ["string", "null"],
+      "enum": ["platform_managed", "self_hosted", null],
+      "default": null,
+      "description": "[v-economy 新增] 续费时节点的来源标记快照（审计用，便于追溯豁免依据）。self_hosted=自带节点豁免（amount_paid=0）；platform_managed=平台资源（按定价计费）；null=续费发生时尚未接入节点来源体系（存量记录兼容值）"
+    },
+    "billing_cycle_months": {
+      "type": ["integer", "null"],
+      "enum": [1, 3, 6, 12, null],
+      "default": null,
+      "description": "[v3-billing 新增] 计费周期（月）。1=月付/3=季付/6=半年付/12=年付。null=存量按天续费记录（兼容，未接入 VPS 式计费）。来源：docs/plans/instance-billing-rules-plan.md §2.4"
+    },
+    "instance_type_snapshot": {
+      "type": ["string", "null"],
+      "enum": ["micro", "small", "medium", "large", "xlarge", null],
+      "default": null,
+      "description": "[v3-billing 新增] 计费时实例类型快照（审计用）。引用 instance_type_pricing.instance_type。null=存量记录（未接入 VPS 式计费）"
+    }
+  },
+  "required": ["id", "instance_id", "user_id", "duration_days", "amount_paid", "base_amount", "renewal_type", "use_wallet", "new_expires_at", "renewed_at"]
+}

@@ -1,0 +1,25 @@
+{
+  "fixes": [
+    {
+      "fixId": "cleanup_tmp",
+      "script": "fix-disk-full.sh",
+      "args": ["/tmp"],
+      "timeout_ms": 30000,
+      "description": "清理 /tmp 目录下的临时文件释放磁盘空间"
+    },
+    {
+      "fixId": "fix_log_permission",
+      "script": "fix-permission.sh",
+      "args": ["${DEPLOY_ROOT}/logs", "644"],
+      "timeout_ms": 10000,
+      "description": "修复日志目录权限"
+    },
+    {
+      "fixId": "fix_stale_lock",
+      "script": "fix-stale-lock.sh",
+      "args": [],
+      "timeout_ms": 5000,
+      "description": "清理僵尸锁文件"
+    }
+  ]
+}

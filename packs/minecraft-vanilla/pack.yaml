@@ -1,0 +1,466 @@
+# ============================================================================
+# Minecraft Vanilla Pack — GameServer Panel 3.0.0
+# 依据：public/schema/pack-schema.ts（必须通过 zod 校验）
+# 协议：RCON（type=rcon, default_port=25575, auth=password）
+# verified: 2026-07-24 https://minecraft.wiki/w/Item_ID + Mojang version_manifest
+# ============================================================================
+
+pack:
+  id: minecraft-vanilla
+  game: minecraft
+  variant: vanilla
+  display_name: 我的世界 Java版 (原版)
+  version: '1.0'
+
+startup:
+  binary: java
+  args:
+    - '-Xmx{{jvm_xmx}}'
+    - '-Xms{{jvm_xms}}'
+    - '-jar'
+    - 'server.jar'
+    - 'nogui'
+  working_dir: '{{instance_root}}'
+  ready_pattern: 'Done \([\d.]+s\)! For help, type "help"'
+  stop_command: 'stop'
+  stop_timeout: 30
+  # Minecraft Java Edition 默认游戏端口（贴近实际游戏端口）
+  default_game_port: 25565
+  # v4.12.0 步骤8: 端口声明
+  required_ports:
+    - { port: 25565, protocol: tcp, name: game, primary: true }
+    - { port: 25575, protocol: tcp, name: rcon, primary: false }
+  # v4.12.0 步骤9: 停止方法
+  stop_method: rcon
+  failure_pattern: 'FATAL|Failed to start|Exception in thread'
+
+protocol:
+  type: rcon
+  default_port: 25575
+  auth: password
+  encrypt: none
+  config_key:
+    file: server.properties
+    enable_key: enable-rcon
+    port_key: rcon.port
+    password_key: rcon.password
+
+config:
+  format: properties
+  main_file: server.properties
+  schema:
+    - key: server-port
+      type: int
+      label: 服务器端口
+      default: 25565
+      min: 1
+      max: 65535
+      description: Minecraft 服务器监听端口
+    - key: max-players
+      type: int
+      label: 最大玩家数
+      default: 20
+      min: 1
+      max: 100
+      description: 同时在线玩家上限
+    - key: motd
+      type: string
+      label: 服务器描述
+      default: 'A Minecraft Server'
+      description: 显示在服务器列表的 MOTD 文本
+    - key: difficulty
+      type: enum
+      label: 难度
+      default: easy
+      enum_values: [peaceful, easy, normal, hard]
+      description: 游戏难度等级
+    - key: gamemode
+      type: enum
+      label: 游戏模式
+      default: survival
+      enum_values: [survival, creative, adventure, spectator]
+      description: 默认玩家游戏模式
+    - key: pvp
+      type: bool
+      label: 启用 PVP
+      default: true
+      description: 是否允许玩家间互相伤害
+    - key: enable-rcon
+      type: bool
+      label: 启用 RCON
+      default: true
+      description: 启用远程控制协议（Daemon 命令通道）
+      hidden: true
+    - key: rcon.port
+      type: int
+      label: RCON 端口
+      default: 25575
+      min: 1
+      max: 65535
+      description: RCON 协议监听端口
+    - key: level-name
+      type: string
+      label: 世界名称
+      default: 'world'
+      description: 存档目录名
+    - key: view-distance
+      type: int
+      label: 视距
+      default: 10
+      min: 3
+      max: 32
+      description: 服务端发送给客户端的区块半径
+    - key: online-mode
+      type: bool
+      label: 正版验证
+      default: true
+      description: 是否启用 Mojang 账户正版验证
+    - key: white-list
+      type: bool
+      label: 启用白名单
+      default: false
+      description: 仅允许白名单内玩家加入
+    - key: spawn-protection
+      type: int
+      label: 出生点保护半径
+      default: 16
+      min: 0
+      max: 256
+      description: 出生点中心受保护区域半径（方块）
+
+commands:
+  broadcast: 'say {{message}}'
+  give_item: 'give {{player}} {{item}} {{count}}'
+  kick_player: 'kick {{player}} {{reason}}'
+  ban_player: 'ban {{player}} {{reason}}'
+  list_players: 'list'
+  save_world: 'save-all'
+  op_player: 'op {{player}}'
+  set_time: 'time set {{time}}'
+  set_weather: 'weather {{weather}}'
+
+versions:
+  source: mojang
+  manifest_url: https://piston-meta.mojang.com/mc/game/version_manifest.json
+  type: server-jar
+  download_pattern: '{{server_url}}'
+  eula_required: true
+  eula_file: eula.txt
+  # v4.12.0 步骤1: 显式声明 Mojang VersionProvider
+  provider: mojang
+
+# ---- 游戏更新 ----
+# Minecraft 服务端通过 Mojang 官方 version_manifest 获取最新版本
+update:
+  source_url: 'https://piston-meta.mojang.com/mc/game/version_manifest.json'
+  current_version_command: 'java -jar server.jar --version'
+  download_dir: '{{instance_root}}/downloads'
+  install_command: 'cp {{download_path}} {{instance_root}}/server.jar'
+
+backup:
+  world_dir: world
+  # v4.2.0: save-off/save-all/save-on 已迁移至 backupService GAME_BACKUP_PROTOCOLS（通过 sendCommand 发送）
+  pre_backup_commands: []
+  post_backup_commands: []
+
+ui:
+  tabs:
+    # v3.7.0: 对象格式——group/order/require_state
+    # 状态联动规则见 long-term-version-plan-v3.6.0-to-v4.0.0.md §5.3
+    - { tab: console,      group: runtime,  order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: config-files, group: config,   order: 10, require_state: [stopped, starting, running, error] }
+    - { tab: players,      group: runtime,  order: 40, require_state: [stopped, running, stopping, error] }
+    - { tab: saves,        group: ops,      order: 10, require_state: [stopped, error] }
+    - { tab: mods,         group: ops,      order: 20, require_state: [stopped, error] }
+    - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
+    - { tab: shop-admin,   group: business, order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: update,       group: ops,      order: 30, require_state: [stopped, error] }
+
+resources:
+  min_ram: '1G'
+  recommended_ram: '2G'
+  min_disk: '500M'
+
+# ============================================================================
+# 扩展字段（pack-schema-extension.json）
+# 全部 optional，向后兼容。Minecraft 无品质概念：qualities=[], quality_tiers=0
+# ============================================================================
+
+# ---- 物品池配置（Panel shopService / itemSyncService 使用） ----
+# Minecraft 物品数多但无品质概念，此处用 static 模式给出基础物品清单（含资源/工具/武器/防具/食物/方块）
+items:
+  source:
+    type: static                      # static=直接内联在 Pack YAML
+  qualities: []                       # Minecraft 无品质概念
+  quality_tiers: 0                    # 与 qualities 一致：0 级
+  categories: [item, block, tool, armor, weapon, food]
+  static_list:
+    # ---- 资源类(物品 ID 使用 Mojang 官方蛇形命名)----
+    - name: diamond
+      display_name: 钻石
+      category: item
+    - name: iron_ingot
+      display_name: 铁锭
+      category: item
+    - name: gold_ingot
+      display_name: 金锭
+      category: item
+    - name: coal
+      display_name: 煤炭
+      category: item
+    - name: redstone
+      display_name: 红石
+      category: item
+    - name: lapis_lazuli
+      display_name: 青金石
+      category: item
+    - name: emerald
+      display_name: 绿宝石
+      category: item
+    - name: netherite_ingot
+      display_name: 下界合金锭
+      category: item
+    - name: stick
+      display_name: 木棍
+      category: item
+    # ---- 方块类 ----
+    - name: dirt
+      display_name: 泥土
+      category: block
+    - name: cobblestone
+      display_name: 圆石
+      category: block
+    - name: oak_log
+      display_name: 橡木原木
+      category: block
+    - name: oak_planks
+      display_name: 橡木木板
+      category: block
+    - name: glass
+      display_name: 玻璃
+      category: block
+    - name: crafting_table
+      display_name: 工作台
+      category: block
+    - name: furnace
+      display_name: 熔炉
+      category: block
+    - name: torch
+      display_name: 火把
+      category: block
+    # ---- 工具类 ----
+    - name: diamond_pickaxe
+      display_name: 钻石镐
+      category: tool
+    - name: diamond_axe
+      display_name: 钻石斧
+      category: tool
+    - name: diamond_shovel
+      display_name: 钻石铲
+      category: tool
+    # ---- 武器类 ----
+    - name: diamond_sword
+      display_name: 钻石剑
+      category: weapon
+    - name: iron_sword
+      display_name: 铁剑
+      category: weapon
+    - name: bow
+      display_name: 弓
+      category: weapon
+    - name: arrow
+      display_name: 箭
+      category: weapon
+    # ---- 防具类 ----
+    - name: diamond_helmet
+      display_name: 钻石头盔
+      category: armor
+    - name: diamond_chestplate
+      display_name: 钻石胸甲
+      category: armor
+    # ---- 食物类 ----
+    - name: apple
+      display_name: 苹果
+      category: food
+    - name: golden_apple
+      display_name: 金苹果
+      category: food
+    - name: bread
+      display_name: 面包
+      category: food
+    - name: cooked_beef
+      display_name: 熟牛排
+      category: food
+
+# ---- stdout 事件解析规则（Panel chatMonitor / joinHandler 使用） ----
+# Daemon 仅做 stdout 流式转发，不解析；解析在 Panel 端按以下正则进行
+event_parsers:
+  chat:
+    pattern: '^<([^>]+)> (.+)$'       # Minecraft 聊天格式: <player> message
+    groups: [player, message]
+  join:
+    pattern: '^([A-Za-z0-9_]+) joined the game$'
+    player_group: 1
+  leave:
+    pattern: '^([A-Za-z0-9_]+) left the game$'
+    player_group: 1
+
+# ---- 业务能力声明（Panel 业务模块加载器据此实例化业务模块） ----
+# Minecraft 支持 shop/cdk/welcome/players/lists/verify；vote_kick 不支持故缺省
+business:
+  shop:
+    enabled: true
+    give_command: 'give {{player}} {{item}} {{count}}'
+    quality_tiers: 0                  # 与 items.quality_tiers 一致
+    support_quality: false            # Minecraft 不支持品质选择
+
+  cdk:
+    enabled: true
+    redeem_command: 'give {{player}} {{item}} {{count}}'
+
+  chat_enhancement:
+    welcome:
+      enabled: true
+      first_gift_command: 'give {{player}} diamond 1'
+    periodic_messages:
+      enabled: true
+      broadcast_command: 'say {{message}}'
+    response_rules:
+      enabled: false
+
+  players:
+    kick_command: 'kick {{player}} {{reason}}'
+    ban_command: 'ban {{player}} {{reason}}'
+
+  lists:
+    whitelist_add: 'whitelist add {{player}}'
+    banlist_add: 'ban {{player}} {{reason}}'
+
+  verify:
+    enabled: true
+
+# ============================================================================
+# Factorio 集成扩展字段（Task 17 新增，全部 optional）
+# ============================================================================
+
+# ---- 多配置文件（与 config 字段共存，config 标记 deprecated 兼容期）----
+config_files:
+  - name: server-properties
+    path: '{{instance_root}}/server.properties'
+    format: properties
+    group: server
+    schema:
+      server-port:
+        type: integer
+        description: 服务器端口
+      max-players:
+        type: integer
+        description: 最大玩家数
+      motd:
+        type: string
+        description: 服务器描述
+      difficulty:
+        type: string
+        description: 游戏难度
+      gamemode:
+        type: string
+        description: 游戏模式
+      pvp:
+        type: boolean
+        description: 启用 PVP
+      online-mode:
+        type: boolean
+        description: 正版验证
+      white-list:
+        type: boolean
+        description: 启用白名单
+    read_only: false
+
+# ---- 存档管理 ----
+# Minecraft 存档是 world 目录（含 level.dat + region/），无专门创建命令
+saves:
+  dir: '{{instance_root}}/world'
+  extension: '.dat'
+  create_command: 'save-all'
+  activate_command: 'save-on'
+
+# ---- 聊天日志解析 ----
+# Minecraft 控制台聊天行格式: [HH:MM:SS] [Server thread/INFO]: <player> message
+chat_log:
+  pattern: '\[([^\]]+)\] \[Server thread/INFO\]: <([^>]+)> (.+)'
+  storage_enabled: true
+  retention_days: 30
+
+# ---- Mod 管理（Minecraft 也支持 mod，通过 Forge/Fabric 加载 .jar 文件到 mods/ 文件夹） ----
+# Forge mod 元数据位于 jar 内 META-INF/mods.toml；Fabric 位于 fabric.mod.json
+# 这里 mods.list_file 是 Panel 自维护的 mod 清单（用于前端展示 + 启用/禁用切换）
+mods:
+  list_file: '{{instance_root}}/mods/mod-list.json'
+  list_format: json
+  dependency_check: true                 # Forge/Fabric 有强依赖关系，必须检查
+  download_enabled: false                 # P0 不开放自动下载（涉及 CurseForge/Modrinth API key）
+  download_source: 'https://api.modrinth.com/v2/'
+
+# ---- 启动前置引导（首次启动前向导，v4.x 新增）----
+startup_guide:
+  enabled: true
+  steps:
+    - key: world-setup
+      title: 世界设置
+      description: 设置世界名称与种子（种子留空则随机生成）
+      fields:
+        - key: level_name
+          type: world_name
+          label: 世界名称
+          description: 存档目录名（对应 server.properties 的 level-name）
+          required: true
+          default: world
+        - key: level_seed
+          type: seed
+          label: 世界种子
+          description: 留空则随机生成世界种子
+          required: false
+    - key: basic-config
+      title: 基础配置
+      description: 服务器基础参数（写入 server.properties）
+      fields:
+        - key: max_players
+          type: config_ref
+          label: 最大玩家数
+          config_ref:
+            file: server-properties
+            key: max-players
+          required: true
+          default: 20
+          min: 1
+          max: 100
+        - key: difficulty
+          type: config_ref
+          label: 难度
+          config_ref:
+            file: server-properties
+            key: difficulty
+          required: true
+          default: easy
+          enum_values: [peaceful, easy, normal, hard]
+        - key: motd
+          type: config_ref
+          label: 服务器描述
+          config_ref:
+            file: server-properties
+            key: motd
+          required: false
+          default: 'A Minecraft Server'
+  config_writes:
+    - field_key: level_name
+      file: server-properties
+      config_key: level-name
+    - field_key: max_players
+      file: server-properties
+      config_key: max-players
+    - field_key: difficulty
+      file: server-properties
+      config_key: difficulty
+    - field_key: motd
+      file: server-properties
+      config_key: motd

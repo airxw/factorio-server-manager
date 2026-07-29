@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/user-vip-points-schema.json",
+  "title": "User VIP Points Schema",
+  "description": "user_vip_points 表数据契约。用户 VIP 积分表（按实例作用域），积分达标自动升级 VIP 等级。来源：docs/plans/business-logic-system-completion-plan.md §3.1 步骤 4（决策 V1 引入积分制）。\n\n积分规则（决策 V1）：\n- 每消费 1 点券 = 1 积分（shopService.createOrder 成功后埋点）\n- 每日签到 = +10 积分（walletService.claimDailyReward 联动）\n- CDK 兑换 = +5 积分（cdkService.redeem 成功后埋点）\n\n升级规则：\n- 积分达标自动升级 VIP 等级（vipPointService.checkAndUpgradeVip）\n- 积分→VIP 等级映射配置：vip.points_thresholds（system_config）\n  - 默认：{ '1': 100, '2': 500, '3': 2000, '4': 8000, '5': 30000 }\n- 积分只升不降（避免退款/到期产生负向体验）\n- 降级仍由 user_instance_bindings.vip_expires_at 控制（与积分解耦）\n\n与 user_instance_bindings 关系：\n- UNIQUE(user_id, server_id)，与 user_instance_bindings 一一对应\n- 创建绑定时同步创建积分记录（points=0）\n- 解绑时不删除积分记录（保留历史，便于重新绑定继承）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "用户 ID，引用 users.id"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "实例 ID，引用 servers.id。积分按实例作用域独立计算"
+    },
+    "points": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "当前积分（可消耗，但不会因退款/到期扣减）。用于 VIP 等级判定"
+    },
+    "total_earned": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "累计获得积分总量（永不减少）。用于统计与展示"
+    },
+    "last_checkin_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "上次签到时间（ISO 8601）。null=从未签到。防同日重复签到"
+    },
+    "last_checkin_date": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "default": null,
+      "description": "上次签到日期（YYYY-MM-DD）。判断今日是否已签到"
+    },
+    "last_upgrade_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "上次 VIP 等级升级时间（ISO 8601）。null=从未升级"
+    },
+    "highest_vip_level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "default": 0,
+      "description": "历史最高 VIP 等级（积分只升不降，此字段记录峰值）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）。通常与 user_instance_bindings.bound_at 一致"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "user_id", "server_id", "points", "total_earned", "highest_vip_level", "created_at", "updated_at"]
+}

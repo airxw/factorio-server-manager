@@ -1,0 +1,57 @@
+# 环境变量（含密钥，不提交）
+.env
+!.env.example
+panel/backend/.env.bak
+
+# 依赖
+node_modules/
+
+# 构建产物
+dist/
+build/
+
+# 数据库文件
+*.db
+*.sqlite
+
+# v4.16.3: Panel 后端运行时数据目录（含 panel.db、-wal、-shm、备份等）
+# 显式排除整个目录，防止任何运行时文件被 git 跟踪
+panel/backend/data/
+
+# 日志
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# 游戏实例数据（含大文件，不提交）
+daemon/instances/
+
+# 运行时
+.pids/
+
+# 测试产物
+coverage/
+test-results/
+.e2e-tokens.json
+nohup.out
+
+# 部署备份（含大文件，不提交）
+backup/
+
+# 临时文件
+*.tmp
+*.temp

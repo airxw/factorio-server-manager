@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/shop-items-schema.json",
+  "title": "Shop Items Schema",
+  "description": "shop_items 表数据契约（瘦身版）。删除 display_name/category（由 Pack.items 提供），保留 item_name 引用 Pack.items。UNIQUE(server_id, item_name)。来源：scheme-final-merged.md §4.3.3。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)。替代 factorio instance_id"
+    },
+    "item_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-zA-Z0-9_.-]{1,64}$",
+      "description": "物品名（必须存在于当前 server 的 Pack.items）。UNIQUE(server_id, item_name)。允许点号（Rust 物品 shortname 用点分隔，如 metal.fragments）。运行时校验（非 DB 外键，因 Pack.items 是外部同步数据）"
+    },
+    "quality": {
+      "type": "string",
+      "enum": ["normal", "uncommon", "rare", "epic", "legendary"],
+      "default": "normal",
+      "description": "品质。应 ∈ Pack.items.qualities。Pack 无品质概念时强制为 'normal'"
+    },
+    "vip_level_required": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "default": 0,
+      "description": "所需 VIP 等级门槛（与价格系统并存）。0=无限制。VIP 等级不足的用户无法购买此物品，即使余额足够。鼓励升级 VIP"
+    },
+    "price": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "物品定价（点券）。0=免费。购买时从用户钱包余额扣除 price × count"
+    },
+    "daily_limit": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "每日购买限额（按物品数量计）。null=不限。0=禁止购买"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否上架销售。false=下架"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "item_name", "quality", "vip_level_required", "price", "enabled", "created_at", "updated_at"]
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/user-admin-tiers-schema.json",
+  "title": "User Admin Tiers Schema",
+  "description": "user_admin_tiers 表数据契约。用户 ↔ 腐竹等级关联表（一对一），记录腐竹当前等级、分配来源与最近自动评估时间。来源：docs/plans/role-permission-economy-system-plan.md §5.2.2。\n\n设计要点：\n- UNIQUE(user_id)，一个用户至多一条记录；仅 roles 含 instance_admin 的用户应有记录\n- 与 users.admin_tier_id 冗余字段的关系：user_admin_tiers 为主表（含审计字段），users.admin_tier_id 为查询加速冗余，写入时同事务同步\n- 新 instance_admin 用户默认 tier 1（基础腐竹，见方案 §5.3 迁移注意事项）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "用户 ID，引用 users.id (string UUID)。UNIQUE（一对一）"
+    },
+    "tier_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "腐竹等级 ID，引用 admin_tiers.id"
+    },
+    "assigned_by": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "default": null,
+      "description": "分配操作者用户 ID（server_admin）。null=系统自动评估（adminTierEvaluator）"
+    },
+    "assigned_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "本次等级生效时间（ISO 8601 字符串）"
+    },
+    "last_evaluated_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "最近自动评估时间（ISO 8601）。adminTierEvaluator 每日凌晨基于近 30 天指标评估；null=从未自动评估"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "user_id", "tier_id", "assigned_at", "created_at", "updated_at"]
+}

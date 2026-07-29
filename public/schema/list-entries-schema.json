@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/list-entries-schema.json",
+  "title": "List Entries Schema",
+  "description": "list_entries 表数据契约。黑白名单统一管理表，list_type 区分白名单/黑名单。来源：scheme-final-merged.md §4.3.6 P4。新设计表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "list_type": {
+      "type": "string",
+      "enum": ["whitelist", "banlist"],
+      "description": "名单类型：whitelist=白名单；banlist=黑名单。UNIQUE(server_id, list_type, player_name) 防重复"
+    },
+    "player_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+      "description": "游戏内玩家名"
+    },
+    "added_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "添加时间（ISO 8601 字符串）"
+    },
+    "added_by": {
+      "type": "string",
+      "format": "uuid",
+      "description": "添加者用户 ID，引用 users.id (string UUID)"
+    },
+    "reason": {
+      "type": ["string", "null"],
+      "maxLength": 200,
+      "default": null,
+      "description": "添加原因。可空"
+    }
+  },
+  "required": ["id", "server_id", "list_type", "player_name", "added_at", "added_by"]
+}

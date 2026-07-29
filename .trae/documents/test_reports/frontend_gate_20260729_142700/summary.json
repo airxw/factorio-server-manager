@@ -1,0 +1,31 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "PASSED",
+  "state_three_value": "已闭合",
+  "timestamp": "2026-07-29T14:27:55Z",
+  "evidence_path": ".trae/documents/test_reports/frontend_gate_20260729_142700/",
+  "summary": "公开文档页 /docs/* 修复已通过三重闸门：路由单测与构建校验通过，内置浏览器确认线上 6 条二级文档页与首页入口均不再 404，且本次改动无 Mock 交互面并完成依赖排除检查。",
+  "tests": {
+    "test1_unit": {
+      "status": "PASS",
+      "evidence_file": "test1_streamlit.log",
+      "summary": "DocsRoutes.test.tsx 7/7 通过，typecheck/build/verify 全部通过"
+    },
+    "test2_browser": {
+      "status": "PASS",
+      "evidence_file": "test2_browser_check.md",
+      "summary": "内置浏览器核对 /docs 与 6 条二级文档路由，线上均正常渲染且无 404"
+    },
+    "test3_mock": {
+      "status": "PASS",
+      "evidence_file": "test3_mock_checklist.md",
+      "summary": "本次改动为静态公开文档页，无 API 或 Mock 交互面，依赖排除检查无命中"
+    }
+  },
+  "overall_conclusion": "已闭合 — 文档页入口、路由、线上可达性与发布合规性均已验证。",
+  "next_actions": [
+    "后续若继续扩展 /docs 目录，可复用 DocsLayout 新增专题页",
+    "若文档页后续引入动态搜索或推荐内容，需要重新补做 Mock 回归"
+  ],
+  "rerun_entry": "重新执行 DocsRoutes.test.tsx、frontend build/verify，并使用 integrated browser 核对线上页面"
+}

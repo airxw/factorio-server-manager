@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/player-histories-schema.json",
+  "title": "Player Histories Schema",
+  "description": "player_histories 表数据契约。玩家登录历史（加入/离开/IP/会话时长），由 playerTracker 解析 join/leave 事件写入。来源：scheme-final-merged.md §4.2.2 P3。factorio 迁移表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "game_player_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+      "description": "游戏内玩家名（泛化自 factorio_player_name）"
+    },
+    "joined_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "加入时间（ISO 8601 字符串）"
+    },
+    "left_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "离开时间（ISO 8601 字符串）。null=当前仍在线"
+    },
+    "ip_address": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "玩家 IP 地址，可空（部分游戏不暴露 IP）"
+    },
+    "session_duration": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "会话时长（秒）。left_at - joined_at。null=当前仍在线"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "记录创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "game_player_name", "joined_at", "created_at"]
+}

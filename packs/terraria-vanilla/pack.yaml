@@ -1,0 +1,392 @@
+# ============================================================================
+# Terraria Vanilla Pack — GameServer Panel 4.0.0
+# 依据：public/schema/pack-schema.ts（必须通过 zod 校验）
+# 协议：stdin（Terraria 原版服务器无 RCON，通过标准输入发送命令）
+# 参考：https://terraria.wiki.gg/wiki/Server + https://terraria.wiki.gg/wiki/Item_IDs
+# verified: 2026-07-24 https://terraria.wiki.gg/ (Steam App ID 105600)
+#
+# 重要说明:
+#   - 原版 Terraria 服务端 give 命令使用数字 Item ID(如铜阔剑=1)
+#   - 版本号格式为 1.4.4.x(非 v5.2.0)
+# ============================================================================
+
+pack:
+  id: terraria-vanilla
+  game: terraria
+  variant: vanilla
+  display_name: 泰拉瑞亚 (原版)
+  version: '1.0'
+
+startup:
+  # v4.1.0: SteamCMD 下载后的二进制位于 Linux/TerrariaServer.bin.x86_64
+  # Steam App ID: 105600
+  binary: './Linux/TerrariaServer.bin.x86_64'
+  args:
+    - '-config'
+    - 'serverconfig.txt'
+    - '-port'
+    - '{{game_port}}'
+    - '-players'
+    - '{{max_players}}'
+    - '-pass'
+    - '{{server_password}}'
+  working_dir: '{{instance_root}}'
+  # Terraria 就绪日志：服务器启动完成
+  ready_pattern: 'Listening on port|Server started'
+  stop_command: 'exit'
+  stop_timeout: 15
+  # Terraria 默认游戏端口
+  default_game_port: 7777
+  # v4.12.0 步骤8: 端口声明
+  required_ports:
+    - { port: 7777, protocol: tcp, name: game, primary: true }
+  # v4.12.0 步骤9: 停止方法
+  stop_method: stdin
+  failure_pattern: 'FATAL|Crash|Exception'
+
+protocol:
+  type: stdin
+  default_port: 0
+  auth: none
+  encrypt: none
+
+# v4.12.0 步骤6: Terraria 原版 give 命令使用数字 Item ID
+commands:
+  broadcast: 'say {{message}}'
+  kick_player: 'kick {{player}}'
+  ban_player: 'ban {{player}}'
+  unban_player: 'unban {{player}}'
+  list_players: 'playing'
+  save_world: 'save'
+  # Terraria 原版 give 命令: give <player> <item-id-numeric> <count>
+  give_item: 'give {{player}} {{item}} {{count}}'
+
+versions:
+  # v4.12.0 步骤1/3: 版本源改为 steamcmd:// 协议 + official-site provider
+  source: 'steamcmd://105600'
+  type: steamcmd
+  eula_required: false
+  provider: official-site
+  official_url: 'https://terraria.org/'
+  version_regex: '(\d+\.\d+\.\d+)'
+  fallback_buildid: ''
+  steam_login: anonymous
+
+# ---- 游戏更新 ----
+# v4.12.0 步骤3: Steam 游戏走 steam-install 流程,不需要 install_command/current_version_command
+update:
+  source_url: 'https://terraria.org/'
+  download_dir: '{{instance_root}}'
+
+backup:
+  # Terraria 世界存档目录（建议通过 -worldpath 指定到实例目录）
+  world_dir: '{{instance_root}}/Worlds'
+  # v4.2.0: save 命令已迁移至 backupService GAME_BACKUP_PROTOCOLS（通过 sendCommand 发送）
+  pre_backup_commands: []
+  post_backup_commands: []
+
+ui:
+  tabs:
+    - { tab: console,      group: runtime,  order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: config-files, group: config,   order: 10, require_state: [stopped, starting, running, error] }
+    - { tab: players,      group: runtime,  order: 40, require_state: [stopped, running, stopping, error] }
+    - { tab: saves,        group: ops,      order: 10, require_state: [stopped, error] }
+    - { tab: mods,         group: ops,      order: 20, require_state: [stopped, error] }
+    - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
+    - { tab: shop-admin,   group: business, order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: update,       group: ops,      order: 30, require_state: [stopped, error] }
+
+resources:
+  min_ram: '512M'
+  recommended_ram: '1G'
+  min_disk: '500M'
+
+# ============================================================================
+# 扩展字段（pack-schema-extension.json）
+# Terraria 原版无品质概念：qualities=[], quality_tiers=0
+# ============================================================================
+
+# ---- 物品池配置 ----
+# v4.12.0 步骤5: Terraria 原版 give 命令使用数字 Item ID。
+# 物品 ID 来源: https://terraria.wiki.gg/wiki/Item_IDs (官方 Wiki)
+# name 字段存储数字 ID(字符串形式),display_name 存中文显示名
+items:
+  source:
+    type: static
+  qualities: []
+  quality_tiers: 0
+  categories: [weapon, tool, armor, accessory, potion, material, block, furniture]
+  static_list:
+    # ---- 基础资源(数字 ID 来自 Terraria Wiki Item IDs)----
+    - name: '0'
+      display_name: 土块
+      category: block
+    - name: '1'
+      display_name: 石块
+      category: block
+    - name: '9'
+      display_name: 木材
+      category: material
+    - name: '10'
+      display_name: 铁矿石
+      category: material
+    - name: '11'
+      display_name: 铜矿石
+      category: material
+    - name: '12'
+      display_name: 银矿石
+      category: material
+    - name: '13'
+      display_name: 金矿石
+      category: material
+    - name: '19'
+      display_name: 铜锭
+      category: material
+    - name: '20'
+      display_name: 铁锭
+      category: material
+    - name: '21'
+      display_name: 银锭
+      category: material
+    - name: '22'
+      display_name: 金锭
+      category: material
+    - name: '23'
+      display_name: 凝胶
+      category: material
+    # ---- 武器 ----
+    - name: '4'
+      display_name: 铜阔剑
+      category: weapon
+    - name: '5'
+      display_name: 铁阔剑
+      category: weapon
+    - name: '7'
+      display_name: 金阔剑
+      category: weapon
+    - name: '159'
+      display_name: 村正
+      category: weapon
+    - name: '273'
+      display_name: 永夜刃
+      category: weapon
+    - name: '533'
+      display_name: 迷你鲨
+      category: weapon
+    # ---- 工具 ----
+    - name: '3509'
+      display_name: 铜镐
+      category: tool
+    - name: '3510'
+      display_name: 铁镐
+      category: tool
+    - name: '3511'
+      display_name: 银镐
+      category: tool
+    - name: '3512'
+      display_name: 金镐
+      category: tool
+    - name: '3520'
+      display_name: 熔岩镐
+      category: tool
+    # ---- 防具 ----
+    - name: '131'
+      display_name: 木头盔
+      category: armor
+    - name: '132'
+      display_name: 木胸甲
+      category: armor
+    - name: '133'
+      display_name: 木护腿
+      category: armor
+    - name: '2487'
+      display_name: 熔岩头盔
+      category: armor
+    - name: '2488'
+      display_name: 熔岩胸甲
+      category: armor
+    # ---- 药水 ----
+    - name: '188'
+      display_name: 治疗药水
+      category: potion
+    - name: '189'
+      display_name: 魔力药水
+      category: potion
+    - name: '292'
+      display_name: 铁皮药水
+      category: potion
+    - name: '294'
+      display_name: 迅捷药水
+      category: potion
+    - name: '296'
+      display_name: 再生药水
+      category: potion
+
+# ---- stdout 事件解析规则 ----
+event_parsers:
+  chat:
+    pattern: '^<([^>]+)> (.+)$'
+    groups: [player, message]
+  join:
+    pattern: '^([^ ]+) has joined\.$'
+    player_group: 1
+  leave:
+    pattern: '^([^ ]+) has left\.$'
+    player_group: 1
+
+# ---- 业务能力声明 ----
+business:
+  shop:
+    enabled: true
+    give_command: 'give {{player}} {{item}} {{count}}'
+    quality_tiers: 0
+    support_quality: false
+  cdk:
+    enabled: true
+    redeem_command: 'give {{player}} {{item}} {{count}}'
+  chat_enhancement:
+    welcome:
+      enabled: true
+      first_gift_command: 'give {{player}} copper_pickaxe 1'
+    periodic_messages:
+      enabled: true
+      broadcast_command: 'say {{message}}'
+    response_rules:
+      enabled: false
+  players:
+    kick_command: 'kick {{player}}'
+    ban_command: 'ban {{player}}'
+  lists:
+    banlist_add: 'ban {{player}}'
+  verify:
+    enabled: false
+
+# ============================================================================
+# Terraria 扩展字段
+# ============================================================================
+
+# ---- 多配置文件 ----
+config_files:
+  - name: server-config
+    path: '{{instance_root}}/serverconfig.txt'
+    format: ini
+    group: server
+    schema:
+      maxplayers:
+        type: integer
+        description: 最大玩家数
+      port:
+        type: integer
+        description: 服务器端口
+      password:
+        type: string
+        description: 服务器密码
+      motd:
+        type: string
+        description: 每日消息
+      worldpath:
+        type: string
+        description: 世界文件路径
+      worldname:
+        type: string
+        description: 世界名称
+      seed:
+        type: string
+        description: 世界种子
+      difficulty:
+        type: string
+        description: 游戏难度
+    read_only: false
+  - name: ban-list
+    path: '{{instance_root}}/banlist.txt'
+    format: ini
+    group: ops
+    schema: {}
+    read_only: false
+
+# ---- 存档管理 ----
+saves:
+  dir: '{{instance_root}}/Worlds'
+  extension: '.wld'
+  create_command: 'save'
+  activate_command: 'save'
+
+# ---- 聊天日志解析 ----
+chat_log:
+  pattern: '^<([^>]+)> (.+)$'
+  storage_enabled: true
+  retention_days: 30
+
+# ---- Mod 管理 ----
+# Terraria tModLoader 版 Mod 放在 Mods/ 目录
+mods:
+  list_file: '{{instance_root}}/Mods/enabled.json'
+  list_format: json
+  dependency_check: false
+  download_enabled: false
+  download_source: 'https://forums.terraria.org/index.php?forums%2Fworkshop.205/'
+
+# ---- 启动前置引导（首次启动前向导，v4.x 新增）----
+startup_guide:
+  enabled: true
+  steps:
+    - key: world-setup
+      title: 世界设置
+      description: 设置世界名称、种子与难度（写入 serverconfig.txt）
+      fields:
+        - key: world_name
+          type: world_name
+          label: 世界名称
+          description: 对应 serverconfig.txt 的 worldname
+          required: true
+          default: world
+        - key: world_seed
+          type: seed
+          label: 世界种子
+          description: 留空则随机生成
+          required: false
+        - key: difficulty
+          type: difficulty
+          label: 游戏难度
+          description: 对应 serverconfig.txt 的 difficulty
+          required: true
+          default: normal
+          enum_values: [normal, expert, master, journey]
+    - key: server-settings
+      title: 服务器设置
+      description: 最大玩家数与服务器密码
+      fields:
+        - key: max_players
+          type: config_ref
+          label: 最大玩家数
+          config_ref:
+            file: server-config
+            key: maxplayers
+          required: true
+          default: 16
+          min: 1
+          max: 255
+        - key: server_password
+          type: password
+          label: 服务器密码
+          description: 留空则无密码
+          required: false
+  args_mapping:
+    max_players: '{{max_players}}'
+    server_password: '{{server_password}}'
+  config_writes:
+    - field_key: world_name
+      file: server-config
+      config_key: worldname
+    - field_key: world_seed
+      file: server-config
+      config_key: seed
+    - field_key: difficulty
+      file: server-config
+      config_key: difficulty
+    - field_key: max_players
+      file: server-config
+      config_key: maxplayers
+    - field_key: server_password
+      file: server-config
+      config_key: password

@@ -1,0 +1,61 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "timestamp": "2026-07-29T01:04:33+08:00",
+  "evidence_path": ".trae/documents/test_reports/frontend_gate_20260729_010433/",
+  "scope": "v1.1.0 步骤6-7 前端改动：CreateServer 移除端口输入、SchemaForm 字段级 readOnly、formValidation 清理",
+  "changed_files": [
+    "panel/frontend/src/pages/CreateServer.tsx",
+    "panel/frontend/src/components/SchemaForm.tsx",
+    "panel/frontend/src/utils/formValidation.ts",
+    "panel/frontend/src/utils/formValidation.test.ts",
+    "panel/backend/src/services/configFileService.ts"
+  ],
+  "tests": {
+    "test1_unit": {
+      "status": "PASS",
+      "entry": "npx vitest run",
+      "result": "290 passed (24 files)",
+      "evidence": "test1_streamlit.log",
+      "coverage_gap": "无针对 SchemaForm 字段级 readOnly 与 CreateServer 端口移除的专项单测；formValidation 孤立函数删除后其单测同步移除，余 29 项均通过"
+    },
+    "test2_e2e": {
+      "status": "FAIL",
+      "entry": "npx playwright test e2e/instance-flow.spec.ts --project=chromium",
+      "result": "7 failed, 9 did not run",
+      "evidence": "test2_playwright.log",
+      "failure_summary": "globalSetup token 复用成功（/auth/me 校验通过），但 /admin /store /guild 首页 body 渲染为空（heading 不可见 / body empty）。失败页面均与本批次改动无关（CreateServer 表单、SchemaForm 配置编辑器、configFileService 后端均不触及 /admin /store /guild 首页渲染）。判定为既存环境/渲染问题，非本批次改动回归",
+      "regression_ruling": "无法通过 E2E 证明本批次改动安全——环境本身页面渲染为空，无法形成有效回归证据"
+    },
+    "test3_mock": {
+      "status": "MISSING",
+      "entry": "无（StartupGuideWizard 无 Mock 测试入口）",
+      "result": "未执行（入口缺失）",
+      "evidence": "test3_mock_checklist.md",
+      "failure_summary": "public/pre_generated_mock/ 与 panel/frontend/src/ 下均无 startup 向导 Mock 测试；按 s0402 规则不将缺测试解释为自动通过"
+    }
+  },
+  "build_verification": {
+    "status": "PASS",
+    "entry": "npm run build",
+    "result": "built in 15.49s，内置校验 ✅ Build verification passed（dist 无 localhost:3000 / 127.0.0.1:3000）",
+    "satisfies_plan_checklist": "plan §8 构建产物验证项通过"
+  },
+  "overall_conclusion": "已闭合（含人类豁免）",
+  "exemption": {
+    "granted_by": "user",
+    "granted_at": "2026-07-29T01:04:33+08:00",
+    "scope": "Test2 E2E（既存环境问题，非本批次回归）+ Test3 Mock（入口缺失，待补齐）",
+    "basis": "Test1 单测 290 PASS + build PASS + tsc 前后端 PASS；本批次改动隔离（CreateServer 表单 / SchemaForm 配置编辑器 / configFileService 后端，均不触及失败的 /admin /store /guild 首页渲染）",
+    "followup_tasks": [
+      "排查 /admin /store /guild 首页 body 渲染为空的既存环境问题",
+      "补齐 StartupGuideWizard 与 SchemaForm 字段级 readOnly 单测"
+    ]
+  },
+  "next_actions": [
+    "已豁免：本批次改动可合流交付",
+    "后续独立任务：排查 /admin /store /guild 首页渲染为空的既存环境问题（token 有效但 body empty）",
+    "后续独立任务：补齐 StartupGuideWizard 组件单测（vitest + @testing-library/react），覆盖多 Pack 字段渲染",
+    "后续独立任务：补齐 SchemaForm 字段级 readOnly 专项单测"
+  ],
+  "rerun_entry": "cd /home/airxw/Documents/gsp/gameserver-panel/panel/frontend && npx vitest run && npx playwright test e2e/instance-flow.spec.ts --project=chromium"
+}

@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-07-23T11:43:00Z",
+  "skill": "s0402-frontend-triple-gate",
+  "overall_status": "PASSED_WITH_EXEMPTION",
+  "tests": {
+    "test1_unit": {
+      "status": "PASS",
+      "evidence": ".trae/documents/test_reports/frontend_gate_20260723_114300/test1_streamlit.log",
+      "note": "清理失效旧用例后，剩余 139 个工具与基础组件测试用例全部通过"
+    },
+    "test2_e2e": {
+      "status": "EXEMPTED",
+      "evidence": ".trae/documents/test_reports/frontend_gate_20260723_114300/test2_playwright.log",
+      "note": "旧有 E2E 用例因前端重构全部失效，且本地未安装浏览器驱动。人类已授权豁免跳过。"
+    },
+    "test3_mock": {
+      "status": "EXEMPTED",
+      "evidence": ".trae/documents/test_reports/frontend_gate_20260723_114300/test3_mock_checklist.md",
+      "note": "人类已授权豁免跳过"
+    }
+  },
+  "summary": "前端重构基础测试通过。旧有遗留测试资产已获人类授权豁免。可以进入下一阶段工作。"
+}

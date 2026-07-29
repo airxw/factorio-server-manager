@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/chat-settings-schema.json",
+  "title": "Chat Settings Schema",
+  "description": "chat_settings 表数据契约。聊天全局配置表，每服务器一条记录。来源：scheme-final-merged.md §4.2.2 P3。factorio 迁移表，instance_id → server_id 命名替换。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)。UNIQUE 约束（每服务器一条配置）。替代 factorio instance_id"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用聊天增强（总开关）。false=关闭所有聊天增强功能（P1-P4）"
+    },
+    "settings_json": {
+      "type": "string",
+      "description": "聊天增强详细配置（JSON 字符串）。包含 P1-P4 各子功能开关、阈值等。具体结构由 chatMonitor/joinHandler/voteService/periodicMessageService 约定"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "enabled", "settings_json", "updated_at"]
+}

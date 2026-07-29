@@ -1,0 +1,417 @@
+# ============================================================================
+# ARK: Survival Evolved Vanilla Pack — GameServer Panel 3.0.0
+# 依据：public/schema/pack-schema.ts（必须通过 zod 校验）
+# 协议：RCON（ARK RCON 协议，TCP）
+# 参考：https://ark.wiki.gg/wiki/Dedicated_Server_Setup + ARK Console Commands
+# verified: 2026-07-24 https://ark.wiki.gg/wiki/Dedicated_Server_Setup
+# ============================================================================
+
+pack:
+  id: ark-vanilla
+  game: ark
+  variant: vanilla
+  display_name: 方舟：生存进化 (原版)
+  version: '1.0'
+
+startup:
+  # ARK 服务端二进制（Steam App ID: 376030）
+  binary: './ShooterGame/Binaries/Linux/ShooterGameServer'
+  args:
+    - '{{map}}'
+    - '?SessionName={{server_name}}'
+    - '?Port={{game_port}}'
+    - '?QueryPort=27015'
+    - '?RCONPort={{rcon_port}}'
+    - '?MaxPlayers=70'
+    - '?ServerAdminPassword={{rcon_password}}'
+    - '?listen'
+  working_dir: '{{instance_root}}'
+  # ARK 就绪日志：Primal Game Data 加载完成
+  ready_pattern: 'Primal Game Data loaded|Setting breakpad minidump AppType=Server'
+  # stop_command 单命令限制：最终 quit 停止进程；存档保存由 backupService 在备份前发送 SaveWorld。
+  # 如需停服前手动保存，建议通过控制台先执行 SaveWorld 再停止。
+  stop_command: 'quit'
+  stop_timeout: 60
+  stop_method: rcon
+  # ARK 默认游戏端口（UDP，贴近实际游戏端口）
+  default_game_port: 7777
+  # ARK 端口声明：游戏端口（UDP 7777）+ 查询端口（UDP 27015）+ RCON 端口（TCP 27020）
+  required_ports:
+    - { port: 7777,  protocol: udp, name: game,  primary: true }
+    - { port: 27015, protocol: udp, name: query, primary: false }
+    - { port: 27020, protocol: tcp, name: rcon,  primary: false }
+
+protocol:
+  type: rcon
+  # ARK RCON 默认端口（贴近实际游戏端口，与游戏端口不同段）
+  default_port: 27020
+  auth: password
+  encrypt: none
+  config_key:
+    file: ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini
+    enable_key: RCONEnabled
+    port_key: RCONPort
+    password_key: ServerAdminPassword
+
+# ARK 不使用旧版 config 字段，用 config_files 代替
+commands:
+  broadcast: 'broadcast {{message}}'
+  # ARK GiveItem 命令：GiveItem <BlueprintPath> <Quantity> <Quality> <Force>
+  # 给当前执行命令的玩家（管理员自己），无 player 参数；物品用 Blueprint 路径（含空格/特殊字符，带引号）
+  give_item: 'GiveItem "{{item}}" {{count}} {{quality}} 0'
+  kick_player: 'KickPlayer {{player}}'
+  ban_player: 'BanPlayer {{player}}'
+  list_players: 'ListPlayers'
+  save_world: 'SaveWorld'
+  whitelist_add: 'AllowPlayerToJoinNoCheck {{player}}'
+
+# ---- 版本源 ----
+# ARK 服务端通过 SteamCMD 更新（App ID 376030）。
+# provider=official-site 配合 official_url + version_regex 提取人类可读版本号；
+# 失败时按 Steam 游戏多源回退链自动降级（official-site → github-release → steamcmd-buildid → static）。
+# SteamCMD 实际下载由 daemon steam-install 流程接管（按 depot buildid 下载）。
+versions:
+  source: 'steamcmd://376030'
+  type: steamcmd
+  provider: official-site
+  official_url: 'https://ark.wiki.gg/wiki/Dedicated_Server_Setup'
+  # 从 wiki 页面提取 x.y 格式版本号；未匹配时走回退链（steamcmd-buildid 读取 appmanifest buildid）
+  version_regex: '(\d+\.\d+)'
+  steam_login: anonymous
+  eula_required: true
+
+# ---- 游戏更新 ----
+# ARK 走 SteamCMD：current_version_command/install_command 省略（Steam 游戏读 appmanifest buildid，
+# 由 daemon steam-install 流程接管下载+安装+校验）。source_url 仅作 URL 格式占位，
+# 实际版本获取由 versions.provider 链处理（provider 存在时 updateService 不 fetch source_url）。
+update:
+  source_url: 'https://ark.wiki.gg/wiki/Dedicated_Server_Setup'
+  download_dir: '{{instance_root}}'
+
+backup:
+  world_dir: ShooterGame/Saved/SavedArks
+  # v4.2.0: SaveWorld 已迁移至 backupService GAME_BACKUP_PROTOCOLS（通过 sendCommand 发送）
+  pre_backup_commands: []
+  post_backup_commands: []
+
+ui:
+  tabs:
+    # v3.7.0: 对象格式——group/order/require_state
+    - { tab: console,      group: runtime,  order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: config-files, group: config,   order: 10, require_state: [stopped, starting, running, error] }
+    - { tab: players,      group: runtime,  order: 40, require_state: [stopped, running, stopping, error] }
+    - { tab: saves,        group: ops,      order: 10, require_state: [stopped, error] }
+    - { tab: mods,         group: ops,      order: 20, require_state: [stopped, error] }
+    - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
+    - { tab: shop-admin,   group: business, order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: update,       group: ops,      order: 30, require_state: [stopped, error] }
+
+resources:
+  min_ram: '6G'
+  recommended_ram: '12G'
+  min_disk: '20G'
+
+# ============================================================================
+# 扩展字段（pack-schema-extension.json）
+# ARK 物品有品质概念：quality 0-5（0=Primitive 原始 / 1=Ramshackle 粗糙 / 2=Apprentice 精良 /
+# 3=Journeyman 优秀 / 4=Mastercraft 史诗 / 5=Ascendant 泰克），通过 special_attributes 声明
+# ============================================================================
+
+# ---- 物品池配置 ----
+# ARK 物品 Blueprint 路径参考：https://ark.wiki.gg/wiki/Item_IDs
+# Blueprint 路径过长，static_list 使用简化形式（Panel 展示用），发放时由前端/命令模板组装
+items:
+  source:
+    type: static
+  qualities: []
+  quality_tiers: 5
+  categories: [resource, weapon, tool, armor, food, ammo, structure, saddle]
+  # ARK 品质特殊属性声明：quality 0-5 对应 Primitive → Ascendant，全版本适用
+  special_attributes:
+    - name: quality
+      display_name: 品质
+      # applicable_versions 省略 = 全版本适用
+      default_value: '0'
+      fallback_behavior: default
+      values: ['0', '1', '2', '3', '4', '5']
+      description: 品质等级 0-5（原始/粗糙/精良/优秀/史诗/泰克）
+      command_template_key: '{{quality}}'
+  static_list:
+    # ---- 基础资源 ----
+    - name: thatch
+      display_name: 茅草
+      category: resource
+    - name: wood
+      display_name: 木材
+      category: resource
+    - name: stone
+      display_name: 石头
+      category: resource
+    - name: metal
+      display_name: 金属
+      category: resource
+    - name: metal-ingot
+      display_name: 金属锭
+      category: resource
+    - name: flint
+      display_name: 燧石
+      category: resource
+    - name: fiber
+      display_name: 纤维
+      category: resource
+    - name: hide
+      display_name: 兽皮
+      category: resource
+    - name: chitin
+      display_name: 甲壳
+      category: resource
+    - name: keratin
+      display_name: 角质
+      category: resource
+    - name: obsidian
+      display_name: 黑曜石
+      category: resource
+    - name: crystal
+      display_name: 水晶
+      category: resource
+    - name: cementing-paste
+      display_name: 水泥
+      category: resource
+    - name: gunpowder
+      display_name: 火药
+      category: resource
+    # ---- 工具 ----
+    - name: stone-pickaxe
+      display_name: 石镐
+      category: tool
+    - name: stone-hatchet
+      display_name: 石斧
+      category: tool
+    - name: metal-pickaxe
+      display_name: 金属镐
+      category: tool
+    - name: metal-hatchet
+      display_name: 金属斧
+      category: tool
+    # ---- 武器 ----
+    - name: bow
+      display_name: 弓
+      category: weapon
+    - name: stone-arrow
+      display_name: 石箭
+      category: ammo
+    - name: tranq-arrow
+      display_name: 麻醉箭
+      category: ammo
+    - name: rifle
+      display_name: 长步枪
+      category: weapon
+    - name: simple-rifle-ammo
+      display_name: 简易步枪子弹
+      category: ammo
+    - name: rocket-launcher
+      display_name: 火箭筒
+      category: weapon
+    # ---- 防具 ----
+    - name: cloth-helmet
+      display_name: 布头盔
+      category: armor
+    - name: cloth-shirt
+      display_name: 布衬衫
+      category: armor
+    - name: hide-armor
+      display_name: 兽皮护甲
+      category: armor
+    - name: flak-armor
+      display_name: 铁甲
+      category: armor
+    # ---- 食物 ----
+    - name: raw-meat
+      display_name: 生肉
+      category: food
+    - name: cooked-meat
+      display_name: 熟肉
+      category: food
+    - name: berries
+      display_name: 浆果
+      category: food
+    - name: cooked-meat-jerky
+      display_name: 肉干
+      category: food
+    # ---- 鞍具（ARK 特色）----
+    - name: trike-saddle
+      display_name: 三角龙鞍
+      category: saddle
+    - name: raptor-saddle
+      display_name: 迅猛龙鞍
+      category: saddle
+    - name: rex-saddle
+      display_name: 霸王龙鞍
+      category: saddle
+
+# ---- stdout 事件解析规则 ----
+event_parsers:
+  chat:
+    pattern: '^\[CHAT\] ([^:]+): (.+)$'
+    groups: [player, message]
+  join:
+    pattern: '^([^ ]+) joined the game$'
+    player_group: 1
+  leave:
+    pattern: '^([^ ]+) left the game$'
+    player_group: 1
+
+# ---- 业务能力声明 ----
+# ARK GiveItem 给当前管理员自己，无 player 参数；物品发放走管理员在线模式
+business:
+  shop:
+    enabled: true
+    give_command: 'GiveItem "{{item}}" {{count}} {{quality}} 0'
+    quality_tiers: 5                  # 0-5 对应 Primitive → Ascendant
+    support_quality: true             # ARK 支持品质选择
+  cdk:
+    enabled: true
+    redeem_command: 'GiveItem "{{item}}" {{count}} 0 0'
+  chat_enhancement:
+    welcome:
+      enabled: true
+      first_gift_command: 'GiveItem "stone" 50 0 0'
+    periodic_messages:
+      enabled: true
+      broadcast_command: 'broadcast {{message}}'
+    response_rules:
+      enabled: false
+  players:
+    kick_command: 'KickPlayer {{player}}'
+    ban_command: 'BanPlayer {{player}}'
+  lists:
+    whitelist_add: 'AllowPlayerToJoinNoCheck {{player}}'
+    banlist_add: 'BanPlayer {{player}}'
+  verify:
+    enabled: true
+
+# ============================================================================
+# ARK 扩展字段（Factorio 集成扩展字段，全部 optional）
+# ============================================================================
+
+# ---- 多配置文件 ----
+# ARK 主配置：GameUserSettings.ini（INI 格式）
+config_files:
+  - name: game-user-settings
+    path: '{{instance_root}}/ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini'
+    format: ini
+    group: server
+    schema:
+      ServerName:
+        type: string
+        description: 服务器名称
+      MaxPlayers:
+        type: integer
+        description: 最大玩家数
+      ServerPassword:
+        type: string
+        description: 服务器密码
+      ServerAdminPassword:
+        type: string
+        description: 管理员密码
+      SessionName:
+        type: string
+        description: 会话名称
+      MaxStructuresInRange:
+        type: integer
+        description: 范围内最大建筑数
+      DifficultyOffset:
+        type: number
+        description: 难度偏移
+      RCONEnabled:
+        type: boolean
+        description: 启用 RCON
+      RCONPort:
+        type: integer
+        description: RCON 端口
+      ActiveMods:
+        type: string
+        description: 启用的 Mod ID 列表（逗号分隔）
+    read_only: false
+
+# ---- 存档管理 ----
+# ARK 存档目录：ShooterGame/Saved/SavedArks/*.ark
+saves:
+  dir: '{{instance_root}}/ShooterGame/Saved/SavedArks'
+  extension: '.ark'
+  create_command: 'SaveWorld'
+  activate_command: 'SaveWorld'
+
+# ---- 聊天日志解析 ----
+chat_log:
+  pattern: '^\[CHAT\] ([^:]+): (.+)$'
+  storage_enabled: true
+  retention_days: 30
+
+# ---- Mod 管理 ----
+# ARK mod 通过 Steam Workshop 安装到 ShooterGame/Content/Mods/
+# ActiveMods 在 GameUserSettings.ini 配置，ModIds 在启动参数 ?GameModIds= 中
+mods:
+  list_file: '{{instance_root}}/ShooterGame/Saved/Config/LinuxServer/GameUserSettings.ini'
+  list_format: ini
+  dependency_check: true                # ARK mod 有依赖关系
+  download_enabled: false               # 涉及 Steam Workshop API
+  download_source: 'https://steamcommunity.com/app/346110/workshop/'
+
+# ---- 启动前置引导（首次启动前向导，v4.x 新增）----
+startup_guide:
+  enabled: true
+  steps:
+    - key: map-selection
+      title: 地图选择
+      description: 选择服务器启动地图（对应启动参数第一位）
+      fields:
+        - key: map
+          type: map
+          label: 游戏地图
+          description: ARK 服务端启动地图标识
+          required: true
+          default: TheIsland
+          options:
+            - value: TheIsland
+              display_name: 孤岛
+              description: 原版起始地图
+            - value: ScorchedEarth_P
+              display_name: 焦土
+              description: 沙漠地图
+            - value: Aberration_P
+              display_name: 畸变
+              description: 地下洞穴地图
+            - value: Ragnarok
+              display_name: 仙境
+              description: 大型社区地图
+    - key: server-settings
+      title: 服务器设置
+      description: 服务器名称与最大玩家数
+      fields:
+        - key: server_name
+          type: server_name
+          label: 服务器名称
+          description: 显示在服务器列表的会话名称
+          required: true
+          default: 'ARK Server'
+        - key: max_players
+          type: config_ref
+          label: 最大玩家数
+          config_ref:
+            file: game-user-settings
+            key: MaxPlayers
+          required: true
+          default: 70
+          min: 1
+          max: 127
+  args_mapping:
+    map: '{{map}}'
+    server_name: '{{server_name}}'
+  config_writes:
+    - field_key: max_players
+      file: game-user-settings
+      config_key: MaxPlayers
+    - field_key: server_name
+      file: game-user-settings
+      config_key: SessionName

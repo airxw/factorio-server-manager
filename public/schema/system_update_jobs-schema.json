@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/system_update_jobs-schema.json",
+  "title": "System Update Jobs Schema",
+  "description": "系统更新任务表数据契约。记录每次系统更新/回滚的执行过程与状态。来源：s0103 融合定稿 v3.4.0 §互斥点① B 蓝绿为主 + A git 可选。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "任务主键 UUID"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "发起任务的用户 ID（FK → users.id）"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["git_pull", "tar_blue_green"],
+      "description": "更新类型。git_pull=A 方案 git pull（可选路径）；tar_blue_green=B 方案 tar 蓝绿切换（主路径）"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "downloading", "verifying", "migrating", "switching", "smoke_testing", "succeeded", "failed", "rolled_back"],
+      "description": "任务状态机。pending→downloading→verifying→migrating→switching→smoke_testing→succeeded/failed；rollback 路径：failed→rolled_back"
+    },
+    "step": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "当前步骤人类可读描述（如 'downloading manifest', 'running migration 20260718000000'）"
+    },
+    "progress": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 0,
+      "description": "进度百分比 0-100"
+    },
+    "target_version": {
+      "type": ["string", "null"],
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "default": null,
+      "description": "目标版本号（语义版本）。回滚任务时为被回滚到的版本"
+    },
+    "is_rollback": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为回滚任务"
+    },
+    "rollback_from_job_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "default": null,
+      "description": "若为回滚任务，指向原更新任务 ID"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "任务开始时间"
+    },
+    "finished_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "任务完成时间（succeeded/failed/rolled_back 时设置）"
+    },
+    "error_message": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "失败时的错误消息"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "记录创建时间"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "记录更新时间"
+    }
+  },
+  "required": ["id", "user_id", "type", "status", "progress", "started_at", "created_at", "updated_at"]
+}

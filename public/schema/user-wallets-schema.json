@@ -1,0 +1,66 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/user-wallets-schema.json",
+  "title": "User Wallets Schema",
+  "description": "user_wallets 表数据契约。按实例作用域的用户点券钱包，记录余额/累计获得/累计消费/每日领取状态。UNIQUE(user_id, server_id)。来源：经济系统改造需求（2026-07-15）。\n\nv4.x 关联说明（business-logic-v1-contracts）：\n- 关联子 schema：wallet-refund-orders-schema.json（退款申请表，通过 user_id + server_id 关联）\n- 关联子 schema：wallet-daily-snapshots-schema.json（每日快照表，通过 user_id + server_id 关联）\n- 退款流程：wallet_refund_orders.status='approved' 时调用 walletService.refund 加款到 user_wallets.balance\n- 快照流程：wallet_daily_snapshots 每日 1 点冗余存储 user_wallets.balance / total_earned / total_spent\n- user_wallets 表本身无字段变更，仅扩展业务关系",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "用户 ID，引用 users.id (string UUID)"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)。钱包按实例作用域独立"
+    },
+    "balance": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "当前点券余额。购买商品时从此余额扣除"
+    },
+    "total_earned": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "累计获得点券总量（含每日领取 + 充值 + 赠送）"
+    },
+    "total_spent": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "累计消费点券总量"
+    },
+    "last_daily_claim_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "上次每日领取时间戳（ISO 8601）。null=从未领取"
+    },
+    "last_daily_claim_date": {
+      "type": ["string", "null"],
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "default": null,
+      "description": "上次每日领取日期（YYYY-MM-DD）。用于判断今日是否已领取，避免同一天重复领取"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "user_id", "server_id", "balance", "total_earned", "total_spent", "created_at", "updated_at"]
+}

@@ -1,0 +1,60 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/mod-records-schema.json",
+  "title": "Mod Records Schema",
+  "description": "mod_records 表数据契约。Mod 管理记录表，存储服务器已安装/启用的 Mod 列表。来源：scheme-final-merged.md §4.3.6 P4。新设计表（factorio 用文件系统，本表为 gameserver-panel 统一管理设计）。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "mod_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Mod 名称。UNIQUE(server_id, mod_name, version)"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "description": "Mod 版本号，如 '1.2.3'"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用此 Mod"
+    },
+    "source_url": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "default": null,
+      "description": "Mod 下载源 URL，可空"
+    },
+    "installed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "Mod 安装到服务器的时间（ISO 8601 字符串），可空"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "记录创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "记录更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "mod_name", "version", "enabled", "created_at", "updated_at"]
+}

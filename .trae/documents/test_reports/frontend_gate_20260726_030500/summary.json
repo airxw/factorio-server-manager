@@ -1,0 +1,48 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "timestamp": "2026-07-26T03:08:00+08:00",
+  "status": "当前不可判定",
+  "evidence_path": "/home/airxw/Documents/gsp/gameserver-panel/.trae/documents/test_reports/frontend_gate_20260726_030500",
+  "summary": "Test1 单测 29/29 通过；Test3 Mock 回归通过（含已知缺口登记）；Test2 E2E 因当前 sub-agent 上下文无运行中的 Panel 后端 + Daemon 服务，且既有 setup-wizard.spec.ts 未覆盖 v4.22.0 Step 3 三模式流程，无法形成浏览器级证据链。前端三重闸门总体处于「当前不可判定」，本地代码质量与契约一致性已通过 Test1+Test3 验证，浏览器级端到端验证留作部署后手动回归或后续扩展 E2E spec。",
+  "tests": {
+    "test1": {
+      "status": "PASS",
+      "file": "test1_streamlit.log",
+      "details": [
+        "DaemonNodeStep.test.tsx 29/29 用例通过（vitest run）",
+        "覆盖默认渲染（local 模式）3 用例 + 模式切换 3 用例 + local 模式 6 用例 + multi 模式 7 用例 + skip 模式 2 用例 + parseDaemonImportLink 7 用例",
+        "执行时长 2.77s"
+      ]
+    },
+    "test2": {
+      "status": "当前不可判定",
+      "file": "test2_playwright.log",
+      "failed_cases": [
+        "E2E 未执行：sub-agent 上下文无运行中的 Panel 后端服务（/api/init/test-daemon 不可达）",
+        "E2E 未执行：sub-agent 上下文无运行中的 Daemon 服务（127.0.0.1:8080/health 不可达）",
+        "setup-wizard.spec.ts 现有覆盖范围仅 Step 0 preflight 渲染，未覆盖 v4.22.0 Step 3 三模式 + 测试连接 + 导入链接解析"
+      ]
+    },
+    "test3": {
+      "status": "PASS",
+      "file": "test3_mock_checklist.md",
+      "details": [
+        "public/schema/panel-api-types.ts 新增 DaemonNodeImportPayload / TestDaemonConnectionRequest / TestDaemonConnectionResponse 三个类型，契约层合规",
+        "MSW handlers 未引入破坏性变更，既有 /api/init/* mock 保持原契约",
+        "DaemonNodeStep.test.tsx 通过 vi.fn() 隔离回调，未触发真实 API 调用，无 Mock 漂移风险",
+        "已知缺口登记：/api/init/test-daemon 未在默认 handlers.ts 中提供 mock fixture，后续扩展 SetupWizard 端到端单测时需补齐"
+      ]
+    }
+  },
+  "failed_cases": [
+    "Test2 未执行：sub-agent 上下文缺少 Panel 后端 + Daemon 服务的运行环境，setup-wizard.spec.ts 也未覆盖 v4.22.0 Step 3 新场景"
+  ],
+  "failure_summary": "前端三重闸门未达「已闭合」，阻断点仅在 Test2 E2E 缺执行环境与 spec 覆盖，Test1 单测与 Test3 Mock 回归均已通过，本地代码质量与契约一致性已验证。",
+  "next_actions": [
+    "在具备完整运行环境（Panel 后端 + Daemon 同机部署）后，扩展 setup-wizard.spec.ts 覆盖 Step 3 三模式关键路径（local 模式测试连接、multi 模式导入链接解析、模式切换）",
+    "使用 MSW 在 E2E 层拦截 /api/init/test-daemon，返回固定 { ok: true, latency_ms: 50, daemon_version: '4.22.0' } 验证 UI 流程",
+    "在生产验证模式（E2E_BASE_URL=https://gsp.ecsrz.com:3001）下，手动浏览器回归 Step 3：模式切换 + 测试连接按钮 + 导入链接解析 + 节点列表渲染",
+    "在默认 handlers.ts 中补 http.post('/api/init/test-daemon', ...) handler，为后续单测扩展做准备"
+  ],
+  "rerun_entry": "前置条件：Panel 后端 + Daemon 均已启动；cd panel/frontend && npx playwright test setup-wizard.spec.ts --project=chromium"
+}

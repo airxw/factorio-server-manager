@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/system-config-schema.json",
+  "title": "System Config Schema",
+  "description": "system_config 表数据契约。系统配置 KV 表，存储全局可调参数。来源：scheme-final-merged.md §4.2.2 P1。factorio 迁移表，直接迁移。key 作为主键（非自增整数）。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-zA-Z0-9_.-]{1,128}$",
+      "description": "配置键（主键）。字母数字下划线点短横线，1-128 字符。如 'shop.default_daily_limit' / 'vote.threshold_default'"
+    },
+    "value": {
+      "type": "string",
+      "description": "配置值（字符串形式存储，调用方按需类型转换）。复杂值用 JSON 字符串"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "配置项描述，便于运维理解。可空"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["key", "value", "updated_at"]
+}

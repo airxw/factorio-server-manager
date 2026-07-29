@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/recharge-cdks-schema.json",
+  "title": "Recharge CDKs Schema",
+  "description": "recharge_cdks 表数据契约。充值卡 CDK 表（卡商机制），用户兑换后点券入账 user_wallets.balance。来源：docs/plans/business-logic-system-completion-plan.md §4.1 步骤 1（决策 V2 卡商充值 CDK 机制）。\n\n机制说明（决策 V2）：\n- 不接入第三方支付，通过卡商机制实现充值闭环\n- 系统管理员批量生成充值 CDK（指定面值/数量/过期时间）\n- 卡商线下向平台付费购买 CDK 批次，转卖给玩家\n- 玩家在钱包页输入 CDK 码，校验后点券入账\n\n状态机（乐观锁，与 cdk_codes 一致）：\n- unused → claiming（乐观锁抢占）→ used（成功，点券已入账）\n- unused → claiming → unused（回滚，超时 5 分钟）\n- unused → expired（超过 expires_at 未兑换）\n\n与 cdk_codes 的区别：\n- cdk_codes：兑换游戏内物品（下发 RCON 命令）\n- recharge_cdks：兑换点券（调用 walletService.credit 加款）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "code": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9]{8,32}$",
+      "description": "充值 CDK 兑换码。UNIQUE 约束。仅字母数字（避免卡商转卖歧义），最小 8 位防爆破。玩家在钱包页输入兑换"
+    },
+    "face_value": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000,
+      "description": "面值（点券数）。兑换成功后加到 user_wallets.balance。100=1 元等价（与 shop_orders.total_price 单位一致）"
+    },
+    "batch_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "所属批次 ID，引用 recharge_cdk_batches.id。批次便于卡商对账"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["unused", "claiming", "used", "expired"],
+      "default": "unused",
+      "description": "CDK 状态机（乐观锁）：unused=未使用；claiming=兑换中（已锁定，防并发）；used=已兑换（点券已入账）；expired=已过期。状态转换：unused→claiming（乐观锁抢占）→used（成功）/unused（回滚）；unused→expired（超时）"
+    },
+    "claimed_by": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "default": null,
+      "description": "兑换者用户 ID（claiming 时锁定），引用 users.id。null=未兑换"
+    },
+    "claimed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "兑换完成时间（ISO 8601 字符串），仅 status=used 时有值"
+    },
+    "claiming_locked_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "进入 claiming 状态的锁定时间（ISO 8601）。用于超时回滚判定：claiming_locked_at + 5min < now 则回滚为 unused"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "CDK 过期时间（ISO 8601 字符串）。超过此时间未兑换则自动 expired。由批次过期时间决定（取 min(batch.expires_at, 此字段)）"
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid",
+      "description": "创建者用户 ID（系统管理员），引用 users.id"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "code", "face_value", "batch_id", "status", "expires_at", "created_by", "created_at"]
+}

@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/settlement-rules-schema.json",
+  "title": "Settlement Rules Schema",
+  "description": "settlement_rules 表数据契约。平台 → 腐竹分账规则配置表，支持按 instance / game_type / global 三级作用域 + admin_tier 维度细化分成比例。来源：docs/plans/role-permission-economy-system-plan.md §4.2.2（决策 D2 平台收钱再分账）。\n\n规则匹配算法（按优先级从高到低，见方案 §4.2.2）：\n1. scope_type=instance + scope_ref=具体实例ID + admin_tier=具体等级\n2. scope_type=game_type + scope_ref=具体游戏类型 + admin_tier=具体等级\n3. scope_type=global + admin_tier=具体等级\n4. scope_type=instance + scope_ref=具体实例ID（不限等级）\n5. scope_type=game_type + scope_ref=具体游戏类型（不限等级）\n6. scope_type=global（不限等级）\n多规则同时命中时取 priority 最高者；未匹配到任何规则时默认 platform_share=1.0（不分账）。\n\n约束：platform_share + admin_share = 1.0（应用层校验，误差容忍 1e-9）。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "rule_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "规则名（如 'Minecraft 标准腐竹'），运营可读"
+    },
+    "scope_type": {
+      "type": "string",
+      "enum": ["instance", "game_type", "global"],
+      "description": "作用域类型：instance=指定实例；game_type=指定游戏类型；global=全局兜底"
+    },
+    "scope_ref": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "作用域引用：scope_type=instance 时为 servers.id (UUID)；scope_type=game_type 时为游戏类型标识（如 'minecraft'）；scope_type=global 时必须为 null"
+    },
+    "admin_tier": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "maximum": 4,
+      "default": null,
+      "description": "适用腐竹等级。null=不限等级"
+    },
+    "platform_share": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "平台分成比例（0-1）。platform_share + admin_share 必须 = 1.0"
+    },
+    "admin_share": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "腐竹分成比例（0-1）。建议区间 0.7-0.9（方案 §6.3-2：平台抽取 10-30%，自带节点腐竹可上调至 0.9）"
+    },
+    "min_settlement_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "最低结算金额（点券）。单笔分账低于此值时累计到下次结算，避免碎单"
+    },
+    "settlement_delay_hours": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 720,
+      "default": 168,
+      "description": "结算延迟/冻结期（小时）。默认 168h=7 天，覆盖玩家退款窗口；冻结期内资金入 admin_wallets.pending_balance，不可消费/提现"
+    },
+    "effective_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "生效时间（ISO 8601 字符串）"
+    },
+    "effective_until": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "失效时间（ISO 8601）。null=永久有效"
+    },
+    "priority": {
+      "type": "integer",
+      "default": 0,
+      "description": "优先级（整数，越大越高）。多规则匹配时取最高优先级"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "rule_name", "scope_type", "platform_share", "admin_share", "min_settlement_amount", "settlement_delay_hours", "effective_from", "priority", "created_at", "updated_at"]
+}

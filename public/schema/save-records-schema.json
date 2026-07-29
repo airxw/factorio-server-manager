@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/save-records-schema.json",
+  "title": "Save Records Schema",
+  "description": "save_records 表数据契约。存档记录表，记录服务器所有存档文件信息。来源：scheme-final-merged.md §4.3.6 P4。新设计表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "save_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "存档名（文件名或标识）。UNIQUE(server_id, save_name)"
+    },
+    "file_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "存档文件绝对路径（Daemon 端文件系统路径）"
+    },
+    "size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "存档文件大小（字节）"
+    },
+    "modified_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "存档文件最后修改时间（ISO 8601 字符串）"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为当前活动存档（服务器正在使用的存档）。每服务器仅一条为 true"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "记录创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "save_name", "file_path", "size_bytes", "modified_at", "is_active", "created_at"]
+}

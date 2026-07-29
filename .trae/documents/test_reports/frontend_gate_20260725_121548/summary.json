@@ -1,0 +1,21 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "PASSED",
+  "timestamp": "2026-07-25T12:20:00+08:00",
+  "evidence_path": ".trae/documents/test_reports/frontend_gate_20260725_121548",
+  "tests": {
+    "test1_unit_vitest": {
+      "status": "PASS",
+      "log": "test1_streamlit.log"
+    },
+    "test2_e2e_playwright": {
+      "status": "PASS",
+      "log": "test2_playwright.log",
+      "notes": "E2E_BASE_URL=https://gsp.ecsrz.com:3001；67 passed, 19 skipped"
+    },
+    "test3_mock_regression": {
+      "status": "PASS",
+      "log": "test3_mock_checklist.md"
+    }
+  }
+}

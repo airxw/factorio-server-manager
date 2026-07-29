@@ -1,0 +1,56 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/monitor-snapshots-schema.json",
+  "title": "Monitor Snapshots Schema",
+  "description": "monitor_snapshots 表数据契约。监控快照时序数据表，存储 Daemon 上报的 CPU/内存/Tick/玩家数等。来源：scheme-final-merged.md §4.3.6 P4。新设计表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "快照时间（ISO 8601 字符串）。INDEX(server_id, timestamp) 用于时序查询"
+    },
+    "cpu_percent": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "maximum": 100,
+      "default": null,
+      "description": "CPU 使用率百分比 0-100。null=未采集"
+    },
+    "memory_mb": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "内存使用量（MB）。null=未采集"
+    },
+    "tick_rate": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "游戏 Tick 速率（TPS）。null=未采集或游戏不支持"
+    },
+    "player_count": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "在线玩家数。null=未采集"
+    },
+    "json_extra": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "额外监控数据（JSON 字符串），存储游戏专属指标。可空"
+    }
+  },
+  "required": ["id", "server_id", "timestamp"]
+}

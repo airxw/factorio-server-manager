@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/admin-tiers-schema.json",
+  "title": "Admin Tiers Schema",
+  "description": "admin_tiers 表数据契约。腐竹（instance_admin）等级配置表，承载权限分级维度（实例上限/玩家上限/资源费折扣/分账比例/高级功能/API 密钥数）。来源：docs/plans/role-permission-economy-system-plan.md §2.2（决策 D1：不新增角色，在 instance_admin 上叠加 admin_tier 维度）。\n\n设计要点：\n- tier 0-4 共 5 级，种子数据由 migration 初始化（见方案 §2.2.1 推荐配置）\n- 与玩家 VIP（bindings.vip_level + vip_permissions）完全解耦：vip_permissions 专为玩家品质购买设计，不复用\n- 升降级：自动（近 30 天日均活跃玩家 + 月度分账流水双指标，adminTierEvaluator 每日评估）+ 手动（server_admin 分配）\n- 降级超限处理：禁止创建新实例（已有保留），30 天未升级则冻结超额实例（不删除）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "tier": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 4,
+      "description": "腐竹等级（UNIQUE）：0=试用 / 1=基础 / 2=标准 / 3=专业 / 4=旗舰"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "展示名（如 '基础腐竹'）"
+    },
+    "max_instances": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "实例数上限。null=不限。推荐值：tier0=1 / tier1=3 / tier2=10 / tier3=50 / tier4=null"
+    },
+    "max_players_per_instance": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "单实例玩家上限。null=不限。超限禁止新玩家绑定（已有玩家保留）"
+    },
+    "resource_fee_discount": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 1.0,
+      "description": "资源费折扣系数（1.0=无折扣，0.7=7 折）。续费 platform_managed 实例时应用，写入 instance_renewals.admin_tier_discount_applied 快照"
+    },
+    "settlement_share": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "腐竹分账比例（如 0.7=70%）。默认值，实际分账以 settlement_rules 匹配结果为准（规则可按 instance/game_type/global + admin_tier 细化）"
+    },
+    "advanced_features": {
+      "type": "string",
+      "description": "高级功能列表（JSON 数组字符串），可选值：cross_server_vote / cross_server_chat / cloud_backup / analytics_dashboard / self_hosted_node / priority_support。tier≥2 解锁基础高级功能，tier≥3 解锁云备份与优先支持"
+    },
+    "max_api_keys": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "API 密钥数上限。null=不限，0=不可用"
+    },
+    "instant_settlement": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否支持即时分账结算（跳过 T+7 冻结期，收取手续费，见配置契约 economy.config.schema.json instant_settlement_fee_rate）。推荐仅 tier 4 开放"
+    },
+    "description": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "等级描述（运营文案）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "tier", "display_name", "resource_fee_discount", "settlement_share", "advanced_features", "instant_settlement", "created_at", "updated_at"]
+}

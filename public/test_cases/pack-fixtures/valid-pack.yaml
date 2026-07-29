@@ -1,0 +1,99 @@
+pack:
+  id: minecraft-vanilla
+  game: minecraft
+  variant: vanilla
+  display_name: Minecraft Java (Vanilla)
+  version: '1.0'
+
+startup:
+  binary: java
+  args:
+    - '-Xmx{{jvm_xmx}}'
+    - '-Xms{{jvm_xms}}'
+    - '-jar'
+    - 'server.jar'
+    - 'nogui'
+  working_dir: '{{instance_root}}'
+  ready_pattern: 'Done \([\d.]+s\)! For help, type "help"'
+  stop_command: 'stop'
+  stop_timeout: 30
+
+protocol:
+  type: rcon
+  default_port: 25575
+  auth: password
+  encrypt: none
+  config_key:
+    file: server.properties
+    enable_key: enable-rcon
+    port_key: rcon.port
+    password_key: rcon.password
+
+config:
+  format: properties
+  main_file: server.properties
+  schema:
+    - key: motd
+      type: string
+      label: 服务器描述
+      default: 'A Minecraft Server'
+    - key: max-players
+      type: int
+      label: 最大玩家数
+      default: 20
+      min: 1
+      max: 100
+    - key: difficulty
+      type: enum
+      label: 难度
+      default: easy
+      enum_values: [peaceful, easy, normal, hard]
+    - key: pvp
+      type: bool
+      label: 启用PVP
+      default: true
+    - key: enable-rcon
+      type: bool
+      label: 启用RCON
+      default: true
+
+commands:
+  broadcast: 'say {{message}}'
+  give_item: 'give {{player}} {{item}} {{count}}'
+  kick_player: 'kick {{player}} {{reason}}'
+  op_player: 'op {{player}}'
+  deop_player: 'deop {{player}}'
+  set_time: 'time set {{value}}'
+  set_weather: 'weather {{type}}'
+
+versions:
+  source: mojang
+  manifest_url: https://piston-meta.mojang.com/mc/game/version_manifest.json
+  type: server-jar
+  download_pattern: 'https://piston-data.mojang.com/v1/objects/{{sha1}}/server.jar'
+  eula_required: true
+  eula_file: eula.txt
+
+backup:
+  world_dir: world
+  pre_backup_commands:
+    - 'save-off'
+    - 'save-all'
+  post_backup_commands:
+    - 'save-on'
+
+ui:
+  tabs:
+    - console
+    - config
+    - players
+    - backups
+    - monitor
+    - logs
+    - shop-admin
+    - cdk-admin
+
+resources:
+  min_ram: '1G'
+  recommended_ram: '4G'
+  min_disk: '2G'

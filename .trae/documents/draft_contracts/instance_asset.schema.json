@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InstanceAsset",
+  "description": "实例管理员重写或自定义的资产契约",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "实例资产唯一标识"
+    },
+    "instance_id": {
+      "type": "string",
+      "description": "所属实例标识"
+    },
+    "global_asset_id": {
+      "type": ["string", "null"],
+      "description": "继承的全局资产ID（若为完全自定义则为null）"
+    },
+    "is_ugc": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否为服主完全自定义的资产"
+    },
+    "override_price": {
+      "type": ["number", "null"],
+      "minimum": 0,
+      "description": "服主重写的价格"
+    },
+    "override_name": {
+      "type": ["string", "null"],
+      "description": "服主重写的显示名称"
+    },
+    "override_is_active": {
+      "type": ["boolean", "null"],
+      "description": "服主重写的上下架状态"
+    },
+    "custom_execution_logic": {
+      "type": ["string", "null"],
+      "description": "服主自定义的底层逻辑（仅 is_ugc=true 时有效）"
+    }
+  },
+  "required": ["id", "instance_id", "is_ugc"]
+}

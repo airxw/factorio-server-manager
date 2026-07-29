@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/settlement-records-schema.json",
+  "title": "Settlement Records Schema",
+  "description": "settlement_records 表数据契约。分账结算记录表，记录每笔玩家消费（商城订单/实例续费）按规则拆分后的平台与腐竹分成，承载 T+7 冻结期状态机（pending → released / reversed）。来源：docs/plans/role-permission-economy-system-plan.md §4.2.4。\n\n状态机：\n- pending：已结算未释放（冻结期内，资金在 admin_wallets.pending_balance）\n- released：冻结期满已释放（资金迁移 pending_balance → balance）\n- reversed：已冲正（退款触发；冻结期内扣回 pending_balance，冻结期外扣 balance 不足记 owed_amount）\n\n设计要点：\n- rule_snapshot 冗余存储结算时规则全文，防规则后续修改导致追溯失真\n- settlementRunner（每小时）写入 pending 记录；pendingBalanceReleaser（每小时）释放到期记录；退款流程触发 reversed",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "admin_user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "腐竹用户 ID，引用 users.id (string UUID)。由 source 单据的 instance_id 反查 servers.owner_user_id 确定"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["shop_order", "instance_renewal"],
+      "description": "来源单据类型：shop_order=商城订单（shop_orders.id）；instance_renewal=实例续费记录（instance_renewals.id，wallet_source=user_wallets 的玩家续费）"
+    },
+    "source_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "来源单据 ID（shop_orders.id 或 instance_renewals.id 的字符串形式）"
+    },
+    "instance_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "实例 ID，引用 servers.id (string UUID)。分账归属判定依据"
+    },
+    "order_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "订单总金额（点券）。= platform_share_amount + admin_share_amount（应用层校验）"
+    },
+    "platform_share_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "平台分成金额（点券）"
+    },
+    "admin_share_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "腐竹分成金额（点券）。低于 settlement_rules.min_settlement_amount 时累计到下次结算"
+    },
+    "rule_id": {
+      "type": ["integer", "null"],
+      "description": "应用的分账规则 ID，引用 settlement_rules.id。null=未匹配到规则（默认 platform_share=1.0 全归平台）"
+    },
+    "rule_snapshot": {
+      "type": "string",
+      "description": "规则快照（JSON 字符串）。结算时规则全文冗余，防规则后续修改导致追溯失真；未匹配规则时存 '{\"default\":true,\"platform_share\":1.0}'"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "released", "reversed"],
+      "default": "pending",
+      "description": "结算状态：pending=冻结中；released=已释放（入 admin_wallets.balance）；reversed=已冲正（退款触发）"
+    },
+    "settled_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "结算时间（ISO 8601 字符串，settlementRunner 写入时刻）"
+    },
+    "released_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "释放时间（ISO 8601）。释放判定：settled_at + settlement_delay_hours < now"
+    },
+    "reversed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "冲正时间（ISO 8601）。null=未冲正"
+    },
+    "reversed_reason": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "冲正原因（如 'refund:wallet_refund_orders.id=123'）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "admin_user_id", "source_type", "source_ref", "instance_id", "order_amount", "platform_share_amount", "admin_share_amount", "rule_snapshot", "status", "settled_at", "created_at"]
+}

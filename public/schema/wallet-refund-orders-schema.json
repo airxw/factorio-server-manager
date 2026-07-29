@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/wallet-refund-orders-schema.json",
+  "title": "Wallet Refund Orders Schema",
+  "description": "wallet_refund_orders 表数据契约。用户发起的退款申请表，独立于 shop_orders 的乐观锁流程。来源：docs/plans/business-logic-system-completion-plan.md §4.1 步骤 3。\n\n退款流程：\n1. 用户在钱包页发起退款（关联某 shop_orders.id 或直接申请余额退款）\n2. 管理员审批：approve → walletService.refund 加款 / reject → 关闭申请\n3. 审批通过后联动 vipPointService 扣减对应积分（若已实现）\n\n退款限制：\n- 仅未领取订单（shop_orders.status='pending'）可退款\n- 已领取订单需走'补偿发放'流程（不在此表）\n- 系统内置账号不可发起退款\n\n状态机：\n- pending → approved → completed（退款成功，点券已退回）\n- pending → rejected（管理员拒绝）\n- pending → cancelled（用户主动撤销）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "退款申请人用户 ID，引用 users.id"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "实例 ID，引用 servers.id。退款按实例作用域（钱包按实例独立）"
+    },
+    "order_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "default": null,
+      "description": "关联订单 ID（可空），引用 shop_orders.id。null=直接申请余额退款（无具体订单）"
+    },
+    "amount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000,
+      "description": "退款金额（点券数）。approve 后通过 walletService.refund 加到 user_wallets.balance"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "退款原因（用户填写）。管理员审批参考"
+    },
+    "admin_note": {
+      "type": ["string", "null"],
+      "maxLength": 512,
+      "default": null,
+      "description": "管理员备注（审批时填写）。记录审批依据、特殊处理等"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "approved", "rejected", "completed", "cancelled"],
+      "default": "pending",
+      "description": "退款状态机：pending=待审批；approved=已批准（待执行退款）；completed=已完成（点券已退回）；rejected=已拒绝；cancelled=已撤销（用户主动撤销）。状态转换：pending→approved→completed；pending→rejected；pending→cancelled"
+    },
+    "requested_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "退款申请时间（ISO 8601 字符串）"
+    },
+    "processed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "处理时间（ISO 8601），approve/reject/cancel 时填写"
+    },
+    "processed_by": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "default": null,
+      "description": "处理者用户 ID（管理员），引用 users.id。null=未处理或用户自行撤销"
+    },
+    "completed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "退款完成时间（点券已退回），仅 status=completed 时有值"
+    }
+  },
+  "required": ["id", "user_id", "server_id", "amount", "reason", "status", "requested_at"]
+}

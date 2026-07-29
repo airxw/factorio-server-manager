@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/admin-wallets-schema.json",
+  "title": "Admin Wallets Schema",
+  "description": "admin_wallets 表数据契约。腐竹（instance_admin）跨实例聚合账户，记录可提现余额/冻结中分账余额/欠款/累计收支。UNIQUE(admin_user_id)，一个腐竹一个账户。来源：docs/plans/role-permission-economy-system-plan.md §3.3（决策 D2 平台收钱再分账 / D3 双向计费）。\n\n设计要点：\n- 与 user_wallets（玩家钱包，按 user_id+server_id 作用域）物理隔离，禁止互转（防洗钱，见方案 §4.3.2）\n- balance=可用余额（可消费/可提现）；pending_balance=分账冻结中余额（T+7 冻结期内不可消费/不可提现）\n- owed_amount=欠款（退款时已分账资金不足，由后续分账自动抵扣）\n- 余额变更必须 DB 事务 + 行锁防并发超扣；所有流水写入 admin_wallet_transactions 并同步 audit_logs",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "admin_user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "腐竹用户 ID，引用 users.id (string UUID)。UNIQUE，一个腐竹一个账户。仅 roles 含 instance_admin 的用户可持有"
+    },
+    "balance": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "当前可用余额（点券）。可消费（支付平台资源费/功能订阅费）与可提现。balance + pending_balance 不可为负"
+    },
+    "pending_balance": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "待结算分账余额（点券）。冻结期内（settlement_rules.settlement_delay_hours，默认 168h）不可消费/不可提现，冻结期满由调度任务迁移至 balance"
+    },
+    "owed_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "欠款金额（点券）。退款时已分账资金不足部分记入此字段，由后续分账自动抵扣（优先从 pending_balance 抵扣，再从 balance 抵扣）；超 30 天未清零由 server_admin 介入"
+    },
+    "total_earned": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "累计分账收入（点券，含平台分账 + 腐竹充值 + 平台赠送 + 退款回滚）"
+    },
+    "total_spent": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "累计资源费支出（点券，续费 platform_managed 实例 + 功能订阅费 + 手续费）"
+    },
+    "total_withdrawn": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "累计提现金额（点券，仅统计审批通过的提现单）"
+    },
+    "settlement_cycle": {
+      "type": "string",
+      "enum": ["daily", "weekly", "monthly"],
+      "default": "daily",
+      "description": "结算周期。daily=每日凌晨自动结算；weekly/monthly 按周期结算。tier 4 可申请即时结算（instant_settlement，手续费另计）"
+    },
+    "last_settled_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "上次结算时间（ISO 8601）。null=从未结算"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）。instance_admin 用户首次访问腐竹工作台时自动创建钱包（balance=0）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "admin_user_id", "balance", "pending_balance", "owed_amount", "total_earned", "total_spent", "total_withdrawn", "settlement_cycle", "created_at", "updated_at"]
+}

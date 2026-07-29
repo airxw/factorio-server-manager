@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/config_template/economy.config.schema.json",
+  "title": "Economy System Configuration Schema",
+  "description": "v4.28.0 腐竹经济体系可调参数配置契约。控制分账冻结期、提现限额、即时结算手续费、等级自动评估阈值等。来源：docs/plans/role-permission-economy-system-plan.md §3.2 / §4.2 / §4.4 / §6.3（决策 D2/D3）。所有定价参数化，禁止硬编码到业务实现（rules-3 §3.1）。配置加载时按 default 自动补齐缺失字段（zod default）。system_config key 前缀：economy.*",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "settlement_delay_hours": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 720,
+      "default": 168,
+      "description": "分账冻结期（小时），默认 168=7 天。玩家充值后 7 天内退款可逆，超过则进入腐竹可提现余额。settlement_rules.settlement_delay_hours 可按规则覆盖本默认值"
+    },
+    "settlement_scan_interval_cron": {
+      "type": "string",
+      "default": "0 * * * *",
+      "description": "SETTLEMENT_RUNNER / PENDING_BALANCE_RELEASER 调度 cron 表达式，默认每小时整点"
+    },
+    "min_settlement_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 1000,
+      "description": "全局最低结算金额（点券），低于此值累计到下次结算。settlement_rules.min_settlement_amount 可覆盖。100 点券=1 元"
+    },
+    "default_admin_share": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0.7,
+      "description": "默认腐竹分账比例（migration 初始化 global 兜底规则用）。未匹配任何规则时实际为 platform_share=1.0 不分账；本值仅用于种子规则"
+    },
+    "withdrawal_min_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 10000,
+      "description": "腐竹提现最低金额（点券），默认 10000=100 元。低于此值抛 WITHDRAWAL_BELOW_MIN_AMOUNT"
+    },
+    "instant_settlement_fee_rate": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 0.5,
+      "default": 0.05,
+      "description": "即时结算手续费率（tier 4 专属，跳过 T+7 冻结期）。默认 0.05=5%。仅 admin_tiers.instant_settlement=true 的等级可用"
+    },
+    "owed_amount_max_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365,
+      "default": 30,
+      "description": "欠款（owed_amount）自动抵扣宽限天数。退款时已分账资金不足部分记 owed_amount，由后续分账自动抵扣；超期 server_admin 介入"
+    },
+    "tier_evaluator_cron": {
+      "type": "string",
+      "default": "30 2 * * *",
+      "description": "ADMIN_TIER_EVALUATOR 调度 cron 表达式，默认每日凌晨 2:30"
+    },
+    "tier_eval_metrics_window_days": {
+      "type": "integer",
+      "minimum": 7,
+      "maximum": 90,
+      "default": 30,
+      "description": "等级自动评估指标窗口（天）。基于近 N 天日均活跃玩家数 + 月度分账流水双指标"
+    },
+    "tier_upgrade_thresholds": {
+      "type": "string",
+      "default": "{\"1\":{\"daily_active_players\":10,\"monthly_settlement\":3000},\"2\":{\"daily_active_players\":50,\"monthly_settlement\":10000},\"3\":{\"daily_active_players\":200,\"monthly_settlement\":50000},\"4\":{\"daily_active_players\":500,\"monthly_settlement\":200000}}",
+      "description": "等级自动升级阈值（JSON 字符串）：key=目标 tier，value={ daily_active_players, monthly_settlement }。双指标需同时达到。初始值为建议值，待运营数据积累后调参（方案 §7.2-4）"
+    },
+    "tier_downgrade_inactive_days": {
+      "type": "integer",
+      "minimum": 7,
+      "maximum": 180,
+      "default": 30,
+      "description": "连续未活跃降级天数。超过 N 天未活跃自动降一级（最低 tier 0）"
+    },
+    "tier_downgrade_owed_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 90,
+      "default": 7,
+      "description": "欠费降级天数。欠费（owed_amount>0 或实例过期未补缴）超过 N 天自动降一级"
+    },
+    "excess_instance_freeze_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 180,
+      "default": 30,
+      "description": "降级超限实例冻结宽限天数。降级导致实例数超限时，禁止创建新实例（已有保留）；N 天内未升级则冻结超额实例（不删除数据）"
+    },
+    "self_hosted_max_instances_per_node": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "default": 10,
+      "description": "单个自带节点实例数上限（防滥用为他人提供算力）。null=不限（不推荐）。同时受 admin_tiers.max_instances 总量约束"
+    }
+  },
+  "required": [
+    "settlement_delay_hours",
+    "withdrawal_min_amount",
+    "instant_settlement_fee_rate",
+    "default_admin_share"
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/role-permission-templates-schema.json",
+  "title": "Role Permission Templates Schema",
+  "description": "v4.17.0 角色权限模板数据契约。role 退化为'权限模板'，模板定义该角色默认拥有的权限点集合。用户实际权限 = active_role 对应模板的权限点集合。来源：docs/plans/binding-unification-multi-role-plan.md §3.3。\n\n[v4.28.0] 新增 9 个腐竹经济域权限点的角色关联（种子关联见 definitions.recommended_seed_associations，来源 docs/plans/role-permission-economy-system-plan.md §1.3）。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": ["user", "instance_admin", "server_admin"],
+      "description": "角色（PK 复合-1）。三角色与 users.roles 数组元素一致。user=普通用户；instance_admin=实例管理员；server_admin=服务器管理员"
+    },
+    "permission_code": {
+      "type": "string",
+      "pattern": "^[a-z_]+\\.[a-z_]+(\\.[a-z_]+)?$",
+      "maxLength": 64,
+      "description": "权限点代码（PK 复合-2），引用 permission_points.code。ON DELETE CASCADE"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["role", "permission_code", "created_at"],
+  "definitions": {
+    "recommended_seed_associations": {
+      "type": "object",
+      "description": "v4.28.0 新增权限点的角色关联种子清单（文档参考用，实际落库由 migration 种子脚本执行）。来源：docs/plans/role-permission-economy-system-plan.md §1.3。",
+      "properties": {
+        "instance_admin": {
+          "type": "array",
+          "description": "腐竹默认新增关联（4 项）",
+          "items": { "type": "string" },
+          "value": [
+            "admin_wallet.view",
+            "admin_wallet.withdraw",
+            "recharge_cdk_batch.audit",
+            "node.self_hosted.manage"
+          ]
+        },
+        "server_admin": {
+          "type": "array",
+          "description": "平台方默认新增关联（全部 9 项）",
+          "items": { "type": "string" },
+          "value": [
+            "admin_wallet.view",
+            "admin_wallet.withdraw",
+            "admin_wallet.settle",
+            "admin_tier.assign",
+            "recharge_cdk_batch.create",
+            "recharge_cdk_batch.audit",
+            "platform_fee.collect",
+            "platform_fee.exempt",
+            "node.self_hosted.manage"
+          ]
+        },
+        "user": {
+          "type": "array",
+          "description": "普通玩家无新增关联（0 项）",
+          "items": { "type": "string" },
+          "value": []
+        }
+      }
+    }
+  }
+}

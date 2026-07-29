@@ -1,0 +1,47 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "FAILED",
+  "state": "未闭合",
+  "timestamp": "2026-07-23T21:01:00+08:00",
+  "evidence_path": "/home/airxw/Documents/gsp/gameserver-panel/.trae/documents/test_reports/frontend_gate_20260723_210056",
+  "summary": "Landing 首页已完成改版、部署并通过正式入口浏览器核验，但现有 Playwright E2E 配置固定依赖 localhost:5173 与 npm run dev，和项目端口规则冲突，因此三重闸门尚未完全闭合。",
+  "tests": {
+    "test1": {
+      "status": "PASS",
+      "evidence": "test1_streamlit.log",
+      "details": [
+        "npm run typecheck 通过",
+        "npm run test -- Landing.test.tsx 通过",
+        "生产构建通过且未发现禁用地址引用"
+      ]
+    },
+    "test2": {
+      "status": "FAIL",
+      "evidence": "test2_playwright.log",
+      "failed_cases": [
+        "现有 Playwright 配置强依赖 localhost:5173",
+        "webServer 固定执行 npm run dev，与部署规则冲突"
+      ]
+    },
+    "test3": {
+      "status": "PASS",
+      "evidence": "test3_mock_checklist.md",
+      "details": [
+        "首页改版未破坏既有 mock 资产",
+        "Landing 单测仍可通过 mock auth 验证页面结构"
+      ]
+    }
+  },
+  "failed_test_type": "Test2 E2E",
+  "failure_summary": "E2E 入口存在，但当前配置不能在不违反项目规则的前提下执行。",
+  "next_actions": [
+    "新增面向 https://gsp.ecsrz.com:3001 的 Playwright 生产验证配置",
+    "避免在任何浏览器验证链路中使用 5173/5174",
+    "补跑正式入口 E2E 后重新生成前端闸门证据"
+  ],
+  "rerun_entry": [
+    "npm run typecheck",
+    "npm run test -- Landing.test.tsx",
+    "使用正式入口版 Playwright 配置执行 npm run test:e2e"
+  ]
+}

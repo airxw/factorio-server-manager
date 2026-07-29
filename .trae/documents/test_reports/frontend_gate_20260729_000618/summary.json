@@ -1,0 +1,61 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "未闭合",
+  "timestamp": "2026-07-29T00:10:00+08:00",
+  "evidence_path": ".trae/documents/test_reports/frontend_gate_20260729_000618/",
+  "change_scope": {
+    "files": [
+      "panel/frontend/src/pages/ServerDetail.tsx",
+      "panel/frontend/src/styles.css"
+    ],
+    "summary": "桌面端实例详情页 tab 分组导航从垂直堆叠三个可折叠卡片重构为横向单行 inline 分组条，释放控制台垂直空间"
+  },
+  "tests": {
+    "test1_unit": {
+      "status": "PASS",
+      "entry": "npx vitest run src/pages/__tests__/ServerDetail.test.tsx",
+      "result": "4 passed (4)",
+      "evidence": "test1_streamlit.log"
+    },
+    "test2_e2e": {
+      "status": "FAIL",
+      "entry": "npx playwright test e2e/store-server-detail.spec.ts --project=chromium",
+      "result": "1 failed, 1 skipped",
+      "failed_cases": [
+        "[chromium] /store/servers/:id 结构回归 › 桌面端显示 store 嵌入态结构与产品化字段"
+      ],
+      "failure_type": "环境问题 (非代码问题)",
+      "failure_summary": "失败在 openStoreServerAsInstanceAdmin 登录流程 (spec.ts:33 waitForURL 超时), 早于 tab 渲染断言点 (spec.ts:62-83). 本地后端缺 instance_admin demo 账号或实例数据导致登录后未跳转.",
+      "evidence": "test2_playwright.log"
+    },
+    "test3_mock": {
+      "status": "入口缺失",
+      "entry": "无 (前端无运行时 Mock 模式)",
+      "failure_summary": "前端 panel/frontend 无 VITE_MOCK/useMock/global_mock/pre_generated_mock 等 Mock 模式入口. 本次改动不涉及 Mock 路径 (仅渲染层+样式).",
+      "evidence": "test3_mock_checklist.md"
+    }
+  },
+  "supplementary_evidence": {
+    "typescript_check": "PASS (npx tsc --noEmit 退出码 0)",
+    "vite_build": "PASS (built in 24.21s, ServerDetail chunk 正常)",
+    "browser_visual_verification": "PASS (横向单行布局生效, 组名 inline 标签可见, 组间竖线分隔符可见, 垂直高度紧凑约1行)"
+  },
+  "failed_test_type": ["test2_e2e", "test3_mock"],
+  "next_actions": [
+    "选项A: 豁免 E2E 环境失败 + Mock 入口缺失 (基于单测+tsc+build+视觉验证证据, 改动为纯布局优化不涉及功能逻辑)",
+    "选项B: 修复本地 E2E 环境 (配置 instance_admin demo 账号 + 实例数据) 后重跑 Test2",
+    "选项C: 使用生产验证模式重跑 E2E: E2E_BASE_URL=https://gsp.ecsrz.com:3001 npx playwright test (需先部署改动到生产)"
+  ],
+  "rerun_entry": {
+    "test1": "cd panel/frontend && npx vitest run src/pages/__tests__/ServerDetail.test.tsx",
+    "test2": "cd panel/frontend && npx playwright test e2e/store-server-detail.spec.ts --project=chromium",
+    "test2_prod": "cd panel/frontend && E2E_BASE_URL=https://gsp.ecsrz.com:3001 npx playwright test e2e/store-server-detail.spec.ts"
+  },
+  "overall_conclusion": "改动本身验证充分 (单测+tsc+build+视觉验证均 PASS), E2E 失败为环境问题 (登录流程, 非代码), Mock 入口缺失 (前端无 Mock 模式). 按 s0402 规则客观状态为未闭合, 需人类裁决.",
+  "human_decision": {
+    "timestamp": "2026-07-29T00:12:00+08:00",
+    "decision": "豁免并接受完成",
+    "rationale": "用户基于单测(4/4)+tsc+build+浏览器视觉验证(布局生效,分隔符可见)证据, 豁免 E2E 环境失败和 Mock 入口缺失. 改动为纯布局优化, 不涉及功能逻辑.",
+    "final_status": "已闭合 (人类显式豁免 E2E 环境失败 + Mock 入口缺失)"
+  }
+}

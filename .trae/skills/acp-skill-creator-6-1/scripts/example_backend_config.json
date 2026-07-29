@@ -1,0 +1,18 @@
+{
+  "description": "Example backend configuration file",
+  "note": "This is an example - copy and modify as needed",
+  
+  "claude_example": {
+    "type": "claude",
+    "model": "claude-3-5-sonnet-20241022",
+    "timeout": 300
+  },
+  
+  "openai_compatible_example": {
+    "type": "openai_compatible",
+    "model": "gpt-4-turbo",
+    "api_key": "your-api-key-here",
+    "base_url": "https://api.openai.com/v1",
+    "timeout": 300
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/audit-logs-schema.json",
+  "title": "Audit Logs Schema",
+  "description": "audit_logs 表数据契约。审计日志表，记录所有关键操作（用户/服务器/商店/CDK 等）便于追溯。来源：scheme-final-merged.md §4.3.7 P5。新设计表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "default": null,
+      "description": "服务器 ID，引用 servers.id (string UUID)。null=非服务器维度操作（如用户登录）"
+    },
+    "user_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "default": null,
+      "description": "操作者用户 ID，引用 users.id (string UUID)。null=系统自动操作"
+    },
+    "action": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "操作标识。如 'user.login' / 'server.start' / 'shop.order.create' / 'cdk.redeem' / 'vote.kick' 等"
+    },
+    "target_type": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 32,
+      "default": null,
+      "description": "操作目标类型。如 'user' / 'server' / 'shop_order' / 'cdk_code' / 'vote' 等。null=无明确目标"
+    },
+    "target_id": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "操作目标 ID（字符串形式）。null=无明确目标"
+    },
+    "details_json": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "操作详情（JSON 字符串），存储操作前后状态、参数等。可空"
+    },
+    "ip_address": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "操作者 IP 地址。可空（如系统自动操作）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "操作时间（ISO 8601 字符串）。INDEX(created_at) 用于时间范围查询"
+    }
+  },
+  "required": ["id", "action", "created_at"]
+}

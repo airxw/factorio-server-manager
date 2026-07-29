@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/bindings-schema.json",
+  "title": "Bindings Schema",
+  "description": "v4.17.0 统一绑定数据契约。合并旧三套表（user_instance_bindings / player_bindings / player_verify_codes）为单一 bindings 表，通过 binding_type + scope_type + scope_ref 多态引用作用域。来源：docs/plans/binding-unification-multi-role-plan.md §2.1。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "所属用户 ID，引用 users.id (UUID)。ON DELETE CASCADE"
+    },
+    "binding_type": {
+      "type": "string",
+      "enum": ["account", "player"],
+      "description": "绑定类型：account=账户级（用户↔实例的VIP/钱包）；player=游戏角色级（用户↔游戏内玩家名）"
+    },
+    "scope_type": {
+      "type": "string",
+      "enum": ["instance", "game_type", "global"],
+      "description": "作用域类型：instance=实例级；game_type=游戏类型级（跨实例全局）；global=全局（scope_ref 为 NULL）"
+    },
+    "scope_ref": {
+      "type": ["string", "null"],
+      "description": "作用域引用：scope_type='instance' 时为 server_id；scope_type='game_type' 时为 game_type 字符串；scope_type='global' 时为 NULL"
+    },
+    "player_name": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+      "description": "游戏内玩家名（仅 binding_type='player' 有值；binding_type='account' 为 NULL）"
+    },
+    "vip_level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "default": 0,
+      "description": "VIP 等级 0-5（仅 binding_type='account' 有意义；binding_type='player' 恒为 0）"
+    },
+    "wallet_id": {
+      "type": ["integer", "null"],
+      "description": "钱包外键（仅 binding_type='account' 可有值），引用 user_wallets.id。ON DELETE SET NULL"
+    },
+    "verify_status": {
+      "type": "string",
+      "enum": ["pending", "verified", "expired", "revoked"],
+      "default": "pending",
+      "description": "验证状态：pending=待验证（verify_code 有值）；verified=已验证（verified_at 有值，verify_code 为 NULL）；expired=验证码过期；revoked=已撤销（含旧表 unbound/rejected）"
+    },
+    "verify_code": {
+      "type": ["string", "null"],
+      "minLength": 4,
+      "maxLength": 32,
+      "description": "验证码（仅 verify_status='pending' 时有值；其他状态为 NULL）"
+    },
+    "verify_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "验证码过期时间（ISO 8601 字符串），仅 verify_status='pending' 时有值"
+    },
+    "verified_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "验证完成时间（ISO 8601 字符串），仅 verify_status='verified' 时有值"
+    },
+    "metadata": {
+      "type": "string",
+      "description": "扩展字段（JSON 字符串），存储游戏特有属性、来源标记等。默认 '{}'。如：{\"source\":\"migration_from_user_instance_bindings\",\"legacy_status\":\"active\"}",
+      "default": "{}"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "user_id", "binding_type", "scope_type", "vip_level", "verify_status", "metadata", "created_at", "updated_at"],
+  "allOf": [
+    {
+      "description": "语义完整性约束 CHECK（应用层 + DB CHECK 双轨校验）：player 类型必须有非 null 的 player_name",
+      "if": {
+        "properties": { "binding_type": { "const": "player" } }
+      },
+      "then": {
+        "required": ["player_name"],
+        "properties": {
+          "player_name": { "type": "string" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": { "binding_type": { "const": "account" } }
+      },
+      "then": {
+        "properties": { "scope_type": { "const": "instance" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "scope_type": { "const": "global" } }
+      },
+      "then": {
+        "properties": { "scope_ref": { "type": "null" } }
+      }
+    },
+    {
+      "if": {
+        "properties": { "scope_type": { "enum": ["instance", "game_type"] } }
+      },
+      "then": {
+        "required": ["scope_ref"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "verify_status": { "const": "pending" } }
+      },
+      "then": {
+        "required": ["verify_code", "verify_expires_at"]
+      }
+    },
+    {
+      "if": {
+        "properties": { "verify_status": { "const": "verified" } }
+      },
+      "then": {
+        "required": ["verified_at"],
+        "properties": { "verify_code": { "type": "null" } }
+      }
+    }
+  ]
+}

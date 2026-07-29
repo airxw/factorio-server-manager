@@ -1,0 +1,148 @@
+/* ============================================================================
+ * Tailwind v4 入口 — CSS-first 配置
+ * 通过 @theme 将现有 CSS 变量映射为 Tailwind 主题 token + shadcn/ui 标准 token。
+ * 渐进式替换：现有 styles.css 继续生效，新代码可使用 Tailwind 工具类 + shadcn 组件。
+ * ========================================================================== */
+
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* 关闭 Tailwind preflight 中与现有 styles.css 冲突的全局重置，
+   保留 utilities 与 theme。现有 styles.css 的 *{box-sizing} 与 body 样式继续生效。 */
+@layer base {
+  /* 保留空 base 层，避免覆盖现有 styles.css 的全局样式 */
+}
+
+@theme {
+  /* === 字体 token === */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+
+  /* === 颜色 token — 映射 styles.css 的 CSS 变量 === */
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-border: #e2e5ea;
+  --color-text: #1f2933;
+  --color-text-muted: #6b7280;
+
+  --color-primary: #2563eb;
+  --color-primary-hover: #1d4ed8;
+  --color-success: #16a34a;
+  --color-success-hover: #15803d;
+  --color-warning: #ea8a0c;
+  --color-warning-hover: #c2690a;
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-ghost: #6b7280;
+
+  /* === shadcn/ui 标准 token（浅色主题，HSL 格式）=== */
+  --background: 0 0% 100%;
+  --foreground: 222 12% 18%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 12% 18%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 12% 18%;
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 12% 18%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%;
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 12% 18%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 221 83% 53%;
+  --radius: 0.5rem;
+
+  /* === 圆角 token === */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* === 阴影 token（升级版，更深更有层次）=== */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 10px 25px rgba(15, 23, 42, 0.1);
+  --shadow-primary: 0 4px 14px rgba(37, 99, 235, 0.25);
+
+  /* === 设计 token 扩展（spacing + font-size scale）=== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 15px;
+  --text-lg: 16px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+
+  /* 暗色模式预留（本次不启用，仅声明结构，便于后续扩展）
+  [data-theme="dark"] {
+    --background: 222 47% 11%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 222 47% 11%;
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 224 76% 48%;
+  }
+  */
+}
+
+/* ============================================================================
+ * shadcn/ui 工具类映射（Tailwind v4 CSS-first 模式下手动映射）
+ * 让 bg-background / text-foreground / bg-primary 等工具类可用
+ * ========================================================================== */
+@layer utilities {
+  .bg-background { background-color: hsl(var(--background)); }
+  .bg-card { background-color: hsl(var(--card)); }
+  .bg-popover { background-color: hsl(var(--popover)); }
+  .bg-primary { background-color: hsl(var(--primary)); }
+  .bg-secondary { background-color: hsl(var(--secondary)); }
+  .bg-muted { background-color: hsl(var(--muted)); }
+  .bg-accent { background-color: hsl(var(--accent)); }
+  .bg-destructive { background-color: hsl(var(--destructive)); }
+
+  .text-background { color: hsl(var(--background)); }
+  .text-foreground { color: hsl(var(--foreground)); }
+  .text-card-foreground { color: hsl(var(--card-foreground)); }
+  .text-popover-foreground { color: hsl(var(--popover-foreground)); }
+  .text-primary { color: hsl(var(--primary)); }
+  .text-primary-foreground { color: hsl(var(--primary-foreground)); }
+  .text-secondary-foreground { color: hsl(var(--secondary-foreground)); }
+  .text-muted-foreground { color: hsl(var(--muted-foreground)); }
+  .text-accent-foreground { color: hsl(var(--accent-foreground)); }
+  .text-destructive { color: hsl(var(--destructive)); }
+  .text-destructive-foreground { color: hsl(var(--destructive-foreground)); }
+
+  .border-border { border-color: hsl(var(--border)); }
+  .border-input { border-color: hsl(var(--input)); }
+  .border-primary { border-color: hsl(var(--primary)); }
+  .border-destructive { border-color: hsl(var(--destructive)); }
+
+  .ring-ring { --tw-ring-color: hsl(var(--ring)); }
+
+  .rounded-radius { border-radius: var(--radius); }
+}

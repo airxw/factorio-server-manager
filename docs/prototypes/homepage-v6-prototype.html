@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GSP · 游戏服务器运营中台</title>
+<style>
+:root {
+  --bg: #FBFBFD;
+  --bg2: #F5F5F7;
+  --bg3: #EDEDF0;
+  --blue: #007AFF;
+  --blue2: #0051D5;
+  --blue-light: #5AC8FA;
+  --blue-soft: rgba(0,122,255,0.08);
+  --green: #34C759;
+  --orange: #FF9500;
+  --red: #FF3B30;
+  --purple: #AF52DE;
+  --t1: #1D1D1F;
+  --t2: #6E6E73;
+  --t3: #86868B;
+  --div: rgba(0,0,0,0.06);
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'Noto Sans SC', sans-serif;
+  --mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+  --pad: clamp(16px, 4vw, 48px);
+  --max: 1440px;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { font-family: var(--font); color: var(--t1); background: var(--bg); overflow-x: hidden; line-height: 1.5; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+ul { list-style: none; }
+
+.build { position: fixed; top: 0; left: 0; right: 0; z-index: 9999; text-align: center; font-family: var(--mono); font-size: 10px; color: var(--blue-light); letter-spacing: 0.08em; padding: 3px 0; background: rgba(251,251,253,0.96); pointer-events: none; height: 20px; }
+.prog { position: fixed; top: 20px; left: 0; height: 2px; z-index: 9998; background: linear-gradient(90deg, var(--blue), var(--blue-light)); width: 0; transition: width 0.1s linear; }
+
+.nav { position: fixed; top: 32px; left: var(--pad); right: var(--pad); z-index: 100; background: rgba(251,251,253,0.72); backdrop-filter: saturate(180%) blur(16px); -webkit-backdrop-filter: saturate(180%) blur(16px); border-radius: 16px; border: 1px solid rgba(0,0,0,0.06); box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.04); transition: all 0.35s cubic-bezier(.16,1,.3,1); }
+.nav.scrolled { top: 20px; left: 0; right: 0; border-radius: 0; border: none; border-bottom: 1px solid var(--div); background: rgba(251,251,253,0.92); box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+.nav-inner { max-width: var(--max); margin: 0 auto; height: 48px; padding: 0 clamp(16px,3vw,28px); display: flex; align-items: center; justify-content: space-between; }
+.logo { font-size: 20px; font-weight: 800; letter-spacing: -0.04em; display: flex; align-items: center; gap: 8px; }
+.logo-ic { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--blue), var(--blue-light)); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px; }
+.nav-links { display: flex; gap: clamp(20px,3vw,36px); }
+.nav-links a { font-size: 14px; color: var(--t2); font-weight: 500; transition: color 0.2s; }
+.nav-links a:hover { color: var(--t1); }
+.nav-cta { padding: 8px 20px; border-radius: 999px; background: var(--blue); color: #fff; font-size: 14px; font-weight: 600; transition: transform 0.15s, box-shadow 0.2s, background 0.2s; }
+.nav-cta:hover { transform: scale(1.04); background: var(--blue2); box-shadow: 0 4px 20px rgba(0,122,255,0.4); }
+
+.hero { min-height: 100vh; min-height: 100dvh; padding: 130px var(--pad) 0; display: flex; flex-direction: column; align-items: center; position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; top: -20%; left: 50%; transform: translateX(-50%); width: 1200px; height: 1200px; border-radius: 50%; background: radial-gradient(circle, rgba(0,122,255,0.10) 0%, rgba(90,200,250,0.04) 40%, transparent 70%); pointer-events: none; z-index: 0; }
+.hero-tag { display: inline-flex; align-items: center; gap: 8px; padding: 6px 16px; border-radius: 999px; background: var(--blue-soft); font-size: 13px; font-weight: 600; color: var(--blue); margin-bottom: clamp(28px,5vw,48px); position: relative; z-index: 1; letter-spacing: -0.01em; }
+.hero-tag .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.85)} }
+.hero h1 { font-size: clamp(3rem, 9vw + 0.5rem, 7.5rem); font-weight: 900; letter-spacing: -0.05em; line-height: 1.02; text-align: center; margin-bottom: clamp(20px,3vw,32px); position: relative; z-index: 1; }
+.hero h1 .grad { background: linear-gradient(135deg, var(--blue) 0%, var(--blue-light) 50%, #30D158 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.hero h1 .line2 { display: block; }
+.hero-sub { font-size: clamp(1.15rem, 2.2vw + 0.2rem, 1.55rem); color: var(--t2); font-weight: 400; line-height: 1.35; text-align: center; max-width: 680px; margin: 0 auto clamp(32px,5vw,52px); letter-spacing: -0.015em; position: relative; z-index: 1; }
+.hero-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; margin-bottom: clamp(40px,6vw,72px); }
+.btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: clamp(14px,2vw,18px) clamp(32px,4vw,48px); border-radius: 999px; background: linear-gradient(135deg, var(--blue), var(--blue2)); color: #fff; font-size: clamp(15px,1.8vw,18px); font-weight: 700; letter-spacing: -0.01em; box-shadow: 0 8px 32px rgba(0,122,255,0.35), 0 0 80px rgba(0,122,255,0.12); transition: transform 0.15s, box-shadow 0.3s; }
+.btn-primary:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 48px rgba(0,122,255,0.45), 0 0 120px rgba(0,122,255,0.18); }
+.btn-secondary { display: inline-flex; align-items: center; gap: 8px; padding: clamp(13px,2vw,17px) clamp(30px,4vw,46px); border-radius: 999px; background: rgba(0,0,0,0.03); color: var(--t1); font-size: clamp(15px,1.8vw,18px); font-weight: 600; transition: all 0.2s; }
+.btn-secondary:hover { background: rgba(0,0,0,0.07); }
+
+.hero-preview { width: 100%; max-width: calc(var(--max) + 160px); margin: 0 auto; position: relative; z-index: 1; padding: 0 clamp(0px,2vw,40px); }
+.preview-frame { background: #fff; border-radius: clamp(16px,2vw,24px); overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 12px 40px rgba(0,0,0,0.08), 0 40px 120px rgba(0,122,255,0.10); transform: perspective(1200px) rotateX(4deg); transform-origin: bottom center; transition: transform 0.6s cubic-bezier(.16,1,.3,1); }
+.preview-frame:hover { transform: perspective(1200px) rotateX(0deg); }
+.preview-chrome { display: flex; align-items: center; gap: 8px; padding: 14px 20px; background: var(--bg2); }
+.preview-dot { width: 12px; height: 12px; border-radius: 50%; }
+.preview-dot.r { background: #FF5F57; } .preview-dot.y { background: #FEBC2E; } .preview-dot.g { background: #28C840; }
+.preview-url { flex: 1; margin-left: 16px; padding: 6px 16px; border-radius: 8px; background: rgba(0,0,0,0.04); font-family: var(--mono); font-size: 12px; color: var(--t3); }
+.preview-body { display: grid; grid-template-columns: clamp(160px,18vw,220px) 1fr; min-height: clamp(280px,40vw,420px); }
+.preview-side { padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; background: #fff; }
+.preview-nav { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; font-size: 13px; color: var(--t2); font-weight: 500; transition: background 0.15s, color 0.15s; }
+.preview-nav.on { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+.preview-nav .ic { font-size: 16px; width: 22px; text-align: center; }
+.preview-main { padding: clamp(16px,2vw,24px); display: flex; flex-direction: column; gap: clamp(10px,1.5vw,16px); background: var(--bg); }
+.preview-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(8px,1vw,14px); }
+.stat { padding: clamp(12px,1.5vw,18px) clamp(12px,1.5vw,20px); border-radius: clamp(10px,1.2vw,16px); background: #fff; }
+.stat-l { font-size: 11px; color: var(--t3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; font-weight: 600; }
+.stat-v { font-size: clamp(18px,2.5vw,26px); font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stat-v.gr { color: var(--green); } .stat-v.bl { color: var(--blue); } .stat-v.or { color: var(--orange); }
+.preview-chart { flex: 1; border-radius: clamp(10px,1.2vw,16px); background: #fff; padding: clamp(14px,1.8vw,20px); display: flex; flex-direction: column; min-height: clamp(100px,15vw,160px); }
+.chart-t { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.preview-ticker { display: flex; gap: 8px; overflow: hidden; padding: 6px 0; position: relative; }
+.preview-ticker::before, .preview-ticker::after { content:''; position:absolute; top:0;bottom:0; width:60px; z-index:1; pointer-events:none; }
+.preview-ticker::before { left:0; background: linear-gradient(90deg, var(--bg), transparent); }
+.preview-ticker::after { right:0; background: linear-gradient(-90deg, var(--bg), transparent); }
+.ticker-track { display: flex; gap: 8px; animation: scroll-x 30s linear infinite; }
+.ticker-item { flex-shrink: 0; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ticker-item.j { background: rgba(52,199,89,0.1); color: var(--green); }
+.ticker-item.b { background: rgba(0,122,255,0.1); color: var(--blue); }
+.ticker-item.v { background: rgba(255,149,0,0.1); color: var(--orange); }
+.ticker-item.g { background: rgba(175,82,220,0.1); color: var(--purple); }
+@keyframes scroll-x { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+.hero-fade { height: clamp(60px,10vw,140px); background: linear-gradient(180deg, transparent 0%, var(--bg2) 100%); margin-top: clamp(-40px,-6vw,-80px); position: relative; z-index: 2; }
+
+.sec-pad { padding: clamp(60px,10vw,140px) var(--pad); }
+.sec-inner { max-width: var(--max); margin: 0 auto; }
+.sec-label { font-family: var(--mono); font-size: clamp(11px,1.2vw,13px); font-weight: 700; color: var(--blue); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: clamp(12px,2vw,20px); }
+.sec-title { font-size: clamp(2.2rem, 5vw + 0.3rem, 4rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.08; margin-bottom: clamp(14px,2vw,20px); }
+.sec-desc { font-size: clamp(16px,1.8vw,20px); color: var(--t2); max-width: 600px; line-height: 1.4; letter-spacing: -0.01em; font-weight: 400; }
+.band-dark { background: var(--bg2); }
+
+/* ==========================================================================
+   DEMO THEATRE v6 — Story-driven with virtual cursor, typewriter, dual-view
+   ========================================================================== */
+.demo-band { background: var(--bg2); padding: clamp(60px,10vw,140px) 0; }
+.demo-head { max-width: var(--max); margin: 0 auto clamp(32px,5vw,56px); padding: 0 var(--pad); }
+.demo-view-switch { display: flex; gap: 6px; margin-top: clamp(20px,2.5vw,28px); background: rgba(0,0,0,0.04); padding: 4px; border-radius: 999px; width: fit-content; }
+.view-btn { padding: 8px 20px; border-radius: 999px; font-size: 13px; font-weight: 600; color: var(--t2); transition: all 0.25s cubic-bezier(.16,1,.3,1); }
+.view-btn.active { background: #fff; color: var(--blue); box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+/* Theatre stage */
+.theatre-wrap { max-width: min(var(--max), 1100px); margin: 0 auto; padding: 0 var(--pad); }
+.theatre { position: relative; background: #fff; border-radius: clamp(16px,2vw,24px); overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 8px 32px rgba(0,0,0,0.06), 0 24px 80px rgba(0,0,0,0.08); }
+.theatre-chrome { display: flex; align-items: center; gap: 8px; padding: 14px 20px; background: var(--bg2); border-bottom: 1px solid var(--div); }
+.theatre-dot { width: 12px; height: 12px; border-radius: 50%; }
+.theatre-dot.r { background: #FF5F57; } .theatre-dot.y { background: #FEBC2E; } .theatre-dot.g { background: #28C840; }
+.theatre-url { flex: 1; margin-left: 16px; padding: 6px 16px; border-radius: 8px; background: rgba(0,0,0,0.04); font-family: var(--mono); font-size: 12px; color: var(--t3); transition: all 0.4s ease; }
+.theatre-url.player-view { color: var(--blue); }
+.theatre-url.owner-view { color: var(--orange); }
+.theatre-role-badge { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 999px; letter-spacing: 0.03em; transition: all 0.4s ease; }
+.theatre-role-badge.player { background: rgba(0,122,255,0.1); color: var(--blue); }
+.theatre-role-badge.owner { background: rgba(255,149,0,0.1); color: var(--orange); }
+.theatre-role-badge.dual { background: linear-gradient(90deg, rgba(0,122,255,0.1), rgba(255,149,0,0.1)); color: var(--purple); }
+
+.theatre-stage { position: relative; min-height: clamp(380px,50vw,520px); overflow: hidden; background: var(--bg); }
+
+/* Virtual cursor */
+.vcursor { position: absolute; width: 20px; height: 24px; z-index: 50; pointer-events: none; transition: none; will-change: transform; }
+.vcursor::before { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 0; border-left: 10px solid var(--blue); border-bottom: 16px solid transparent; border-right: 4px solid transparent; border-top: 4px solid transparent; filter: drop-shadow(0 2px 8px rgba(0,122,255,0.5)); }
+.vcursor::after { content: ''; position: absolute; top: 2px; left: 2px; width: 0; height: 0; border-left: 6px solid #fff; border-bottom: 10px solid transparent; border-right: 2px solid transparent; border-top: 2px solid transparent; }
+.vcursor.clicking::before { transform: scale(0.85) translate(-2px, 1px); filter: drop-shadow(0 1px 4px rgba(0,122,255,0.6)); }
+@media (max-width: 768px) { .vcursor { display: none; } }
+
+/* Ripple effect */
+.ripple { position: absolute; border-radius: 50%; background: rgba(0,122,255,0.25); width: 0; height: 0; transform: translate(-50%,-50%); animation: ripple-anim 0.6s ease-out forwards; pointer-events: none; z-index: 5; }
+@keyframes ripple-anim { 0%{width:0;height:0;opacity:1} 100%{width:120px;height:120px;opacity:0} }
+
+/* Scenes */
+.scene-container { position: absolute; inset: 0; opacity: 0; visibility: hidden; transition: opacity 0.35s ease, visibility 0.35s; }
+.scene-container.active { opacity: 1; visibility: visible; }
+
+/* Scene 1: Player join game */
+.scene-join { display: grid; grid-template-columns: 1fr 240px; gap: 24px; height: 100%; padding: clamp(20px,3vw,40px); }
+.chat-area { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.chat-msg { padding: 10px 16px; border-radius: 14px; font-size: clamp(13px,1.3vw,15px); line-height: 1.4; opacity: 0; transform: translateY(10px); transition: all 0.35s cubic-bezier(.16,1,.3,1); max-width: 85%; }
+.chat-msg.show { opacity: 1; transform: translateY(0); }
+.chat-msg.system { background: var(--blue-soft); color: var(--blue); align-self: flex-start; border-bottom-left-radius: 4px; font-weight: 500; }
+.chat-msg.success { background: rgba(52,199,89,0.1); color: #248A3D; align-self: flex-start; border-bottom-left-radius: 4px; font-weight: 600; }
+.chat-msg.player { background: #fff; color: var(--t1); align-self: flex-start; border-bottom-left-radius: 4px; border: 1px solid var(--div); }
+.chat-msg .tag { font-weight: 700; margin-right: 4px; }
+.gift-area { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.gift-popup { position: relative; top: auto; right: auto; transform: scale(0.8) translateY(20px); opacity: 0; width: 100%; max-width: 200px; padding: clamp(16px,2vw,24px); background: linear-gradient(135deg, #fff, #FFF8F0); border-radius: 20px; box-shadow: 0 8px 40px rgba(255,149,0,0.2); text-align: center; transition: all 0.6s cubic-bezier(.16,1,.3,1); border: 1px solid rgba(255,149,0,0.15); }
+.gift-popup.show { transform: scale(1) translateY(0); opacity: 1; }
+.gift-popup .icon { font-size: 48px; margin-bottom: 8px; animation: bounce 1s ease-in-out infinite; }
+@keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+.gift-popup h4 { font-size: 18px; font-weight: 800; color: var(--orange); margin-bottom: 6px; letter-spacing: -0.02em; }
+.gift-popup .items { font-size: 13px; color: var(--t2); line-height: 1.6; }
+.player-join-hint { position: absolute; bottom: clamp(12px,1.5vw,18px); left: 50%; transform: translateX(-50%); font-size: 12px; color: var(--t3); font-family: var(--mono); }
+
+/* Scene 2: Shop purchase */
+.scene-shop { display: grid; grid-template-columns: 1fr 1fr; height: 100%; }
+.shop-items { padding: clamp(16px,2vw,28px); display: flex; flex-direction: column; gap: 8px; }
+.shop-header { font-size: 11px; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+.shop-item { display: flex; align-items: center; gap: 12px; padding: 14px; background: #fff; border-radius: 14px; border: 2px solid transparent; transition: all 0.3s; cursor: pointer; opacity: 0; transform: translateX(-20px); }
+.shop-item.show { opacity: 1; transform: translateX(0); }
+.shop-item.highlight { border-color: var(--blue); box-shadow: 0 4px 20px rgba(0,122,255,0.15); }
+.shop-item .sic { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+.shop-item .sin { flex: 1; }
+.shop-item .sin .n { font-size: 14px; font-weight: 700; }
+.shop-item .sin .p { font-size: 13px; color: var(--orange); font-weight: 700; }
+.shop-item .sib { padding: 6px 14px; border-radius: 999px; background: var(--blue); color: #fff; font-size: 12px; font-weight: 700; opacity: 0; transition: opacity 0.3s; }
+.shop-item.highlight .sib { opacity: 1; }
+.shop-item.purchased .sib { background: var(--green); }
+.shop-result { padding: clamp(16px,2vw,28px); display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--bg); }
+.pay-qr { width: 120px; height: 120px; background: #fff; border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 48px; box-shadow: 0 4px 20px rgba(0,0,0,0.06); opacity: 0; transform: scale(0.8); transition: all 0.4s cubic-bezier(.16,1,.3,1); }
+.pay-qr.show { opacity: 1; transform: scale(1); }
+.success-check { width: 80px; height: 80px; border-radius: 50%; background: var(--green); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; opacity: 0; transform: scale(0.5); transition: all 0.5s cubic-bezier(.16,1,.3,1); }
+.success-check.show { opacity: 1; transform: scale(1); }
+.result-text { margin-top: 16px; font-size: 18px; font-weight: 800; opacity: 0; transition: opacity 0.4s 0.2s; text-align: center; }
+.result-text.show { opacity: 1; }
+.result-sub { font-size: 13px; color: var(--t2); margin-top: 4px; opacity: 0; transition: opacity 0.4s 0.4s; }
+.result-sub.show { opacity: 1; }
+.vip-badge { display: inline-flex; align-items: center; gap: 4px; margin-top: 12px; padding: 4px 12px; border-radius: 999px; background: linear-gradient(135deg, #FFD60A, #FF9500); color: #fff; font-size: 12px; font-weight: 700; opacity: 0; transition: opacity 0.4s 0.6s; }
+.vip-badge.show { opacity: 1; }
+
+/* Scene 3: Vote kick */
+.scene-vote { padding: clamp(20px,3vw,40px); display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; }
+.vote-title { font-size: clamp(18px,2.2vw,26px); font-weight: 800; letter-spacing: -0.03em; margin-bottom: 8px; opacity: 0; transform: translateY(10px); transition: all 0.4s; }
+.vote-title.show { opacity: 1; transform: translateY(0); }
+.vote-sub { font-size: 13px; color: var(--t3); margin-bottom: 28px; opacity: 0; transition: opacity 0.4s 0.2s; }
+.vote-sub.show { opacity: 1; }
+.vote-progress-container { width: min(400px, 90%); margin-bottom: 20px; }
+.vote-bar { height: 40px; background: var(--bg3); border-radius: 20px; overflow: hidden; position: relative; }
+.vote-fill { height: 100%; background: linear-gradient(90deg, var(--green), #30D158); border-radius: 20px; width: 0%; transition: width 0.8s cubic-bezier(.16,1,.3,1); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 14px; font-weight: 700; }
+.vote-counts { display: flex; gap: 60px; margin-top: 20px; margin-bottom: 24px; }
+.vote-count { text-align: center; opacity: 0; transform: scale(0.8); transition: all 0.4s; }
+.vote-count.show { opacity: 1; transform: scale(1); }
+.vote-count .num { font-size: 40px; font-weight: 900; }
+.vote-count.yes .num { color: var(--green); }
+.vote-count.no .num { color: var(--t3); }
+.vote-count .lbl { font-size: 12px; color: var(--t3); margin-top: 2px; }
+.vote-result { padding: 12px 28px; border-radius: 999px; font-size: 15px; font-weight: 700; opacity: 0; transform: scale(0.8); transition: all 0.5s cubic-bezier(.16,1,.3,1); }
+.vote-result.pass { background: rgba(255,59,48,0.1); color: var(--red); }
+.vote-result.show { opacity: 1; transform: scale(1); }
+.chat-mini { position: absolute; bottom: 16px; left: 20px; display: flex; flex-direction: column; gap: 4px; max-width: 260px; }
+
+/* Scene 4: Transition narrator */
+.scene-narrator { display: flex; align-items: center; justify-content: center; height: 100%; background: linear-gradient(135deg, rgba(0,122,255,0.03), rgba(52,199,89,0.03)); text-align: center; padding: 40px; }
+.narrator-text h3 { font-size: clamp(24px,3.5vw,42px); font-weight: 900; letter-spacing: -0.04em; line-height: 1.1; margin-bottom: 16px; opacity: 0; transform: translateY(20px); transition: all 0.6s cubic-bezier(.16,1,.3,1); }
+.narrator-text h3.show { opacity: 1; transform: translateY(0); }
+.narrator-text h3 .grad { background: linear-gradient(135deg, var(--blue), var(--orange)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.narrator-text p { font-size: clamp(15px,1.8vw,20px); color: var(--t2); max-width: 480px; margin: 0 auto; opacity: 0; transition: opacity 0.6s 0.4s; line-height: 1.4; }
+.narrator-text p.show { opacity: 1; }
+
+/* Scene 5: Owner Dashboard */
+.scene-dashboard { display: flex; height: 100%; }
+.dash-sidebar { width: clamp(140px,16vw,200px); background: #fff; padding: 16px 10px; border-right: 1px solid var(--div); display: flex; flex-direction: column; gap: 2px; opacity: 0; transform: translateX(-20px); transition: all 0.5s cubic-bezier(.16,1,.3,1); }
+.dash-sidebar.show { opacity: 1; transform: translateX(0); }
+.dash-nav { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; font-size: 13px; color: var(--t2); font-weight: 500; }
+.dash-nav.active { background: rgba(255,149,0,0.08); color: var(--orange); font-weight: 700; }
+.dash-main { flex: 1; padding: clamp(16px,2vw,28px); overflow: hidden; }
+.dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(8px,1vw,14px); margin-bottom: clamp(12px,1.5vw,20px); }
+.dash-stat { padding: clamp(12px,1.5vw,20px); background: #fff; border-radius: clamp(10px,1.2vw,16px); opacity: 0; transform: translateY(16px); transition: all 0.5s cubic-bezier(.16,1,.3,1); }
+.dash-stat.show { opacity: 1; transform: translateY(0); }
+.dash-stat .dl { font-size: 11px; color: var(--t3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; font-weight: 600; }
+.dash-stat .dv { font-size: clamp(20px,2.8vw,32px); font-weight: 900; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.dash-chart { background: #fff; border-radius: clamp(10px,1.2vw,16px); padding: clamp(14px,1.8vw,20px); height: clamp(80px,12vw,140px); opacity: 0; transform: translateY(16px); transition: all 0.5s cubic-bezier(.16,1,.3,1) 0.2s; }
+.dash-chart.show { opacity: 1; transform: translateY(0); }
+.dash-chart .ct { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.chart-line { stroke-dasharray: 1000; stroke-dashoffset: 1000; animation: drawLine 1.5s ease-out forwards; }
+@keyframes drawLine { to { stroke-dashoffset: 0; } }
+.dash-event-list { position: absolute; right: clamp(12px,1.5vw,20px); top: clamp(12px,1.5vw,20px); display: flex; flex-direction: column; gap: 6px; width: clamp(180px,20vw,240px); }
+.dash-event { padding: 10px 14px; background: #fff; border-radius: 12px; font-size: 12px; box-shadow: 0 2px 12px rgba(0,0,0,0.04); opacity: 0; transform: translateX(20px); transition: all 0.4s cubic-bezier(.16,1,.3,1); border-left: 3px solid var(--blue); }
+.dash-event.show { opacity: 1; transform: translateX(0); }
+.dash-event .amt { color: var(--green); font-weight: 700; }
+.dash-event.vip { border-left-color: var(--orange); }
+.dash-event.gift { border-left-color: var(--purple); }
+
+/* Scene 6: Dual view (player + owner sync) */
+.scene-dual { display: grid; grid-template-columns: 1fr 1fr; height: 100%; }
+.dual-pane { padding: clamp(16px,2vw,28px); overflow: hidden; position: relative; }
+.dual-pane.player { background: rgba(0,122,255,0.02); border-right: 1px solid var(--div); }
+.dual-pane.owner { background: rgba(255,149,0,0.02); }
+.dual-label { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 12px; opacity: 0; transition: opacity 0.4s; }
+.dual-pane.player .dual-label { color: var(--blue); }
+.dual-pane.owner .dual-label { color: var(--orange); }
+.dual-label.show { opacity: 1; }
+.dual-action { padding: 10px 14px; background: #fff; border-radius: 12px; margin-bottom: 6px; font-size: clamp(12px,1.2vw,14px); opacity: 0; transform: translateY(8px); transition: all 0.35s cubic-bezier(.16,1,.3,1); box-shadow: 0 1px 6px rgba(0,0,0,0.04); }
+.dual-action.show { opacity: 1; transform: translateY(0); }
+.dual-action.player { border-left: 3px solid var(--blue); }
+.dual-action.owner { border-left: 3px solid var(--orange); }
+.sync-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: linear-gradient(180deg, transparent, var(--purple), transparent); opacity: 0; transition: opacity 0.5s; z-index: 2; }
+.sync-line.show { opacity: 0.5; }
+.sync-pulse { position: absolute; left: 50%; width: 10px; height: 10px; background: var(--purple); border-radius: 50%; transform: translateX(-50%); box-shadow: 0 0 12px var(--purple); opacity: 0; z-index: 3; }
+.sync-pulse.show { animation: syncPulse 2s ease-in-out infinite; opacity: 1; }
+@keyframes syncPulse { 0%{top:10%;opacity:1} 50%{opacity:0.8} 100%{top:90%;opacity:0} }
+
+/* Theatre controls */
+.theatre-ctrl { display: flex; align-items: center; justify-content: space-between; padding: clamp(12px,1.5vw,18px) clamp(20px,2.5vw,32px); border-top: 1px solid var(--div); background: #fff; }
+.ctrl-left { display: flex; align-items: center; gap: 6px; }
+.ctrl-btn { width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg2); color: var(--t2); font-size: 13px; transition: all 0.15s; }
+.ctrl-btn:hover { background: var(--blue-soft); color: var(--blue); }
+.scene-progress { flex: 1; display: flex; gap: 4px; margin: 0 clamp(12px,1.5vw,20px); }
+.prog-seg { height: 3px; flex: 1; border-radius: 2px; background: var(--bg3); overflow: hidden; cursor: pointer; }
+.prog-seg-fill { height: 100%; background: var(--blue); width: 0%; border-radius: 2px; transition: width 0.1s linear; }
+.prog-seg.done .prog-seg-fill { width: 100%; background: var(--green); }
+.scene-name { font-size: clamp(12px,1.2vw,14px); font-weight: 600; color: var(--t2); min-width: 140px; text-align: right; }
+
+/* FEATURES */
+.feat-layout { display: grid; grid-template-columns: 1fr 2fr; gap: clamp(40px,6vw,80px); align-items: start; }
+.feat-side { position: sticky; top: 100px; }
+.feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: clamp(24px,3vw,40px) clamp(28px,4vw,56px); }
+.feat-ic { width: clamp(44px,4vw,56px); height: clamp(44px,4vw,56px); border-radius: clamp(12px,1.4vw,16px); margin-bottom: clamp(14px,1.8vw,20px); display: flex; align-items: center; justify-content: center; font-size: clamp(20px,2.2vw,26px); }
+.feat-ic.bl { background: rgba(0,122,255,0.08); } .feat-ic.or { background: rgba(255,149,0,0.08); }
+.feat-ic.gr { background: rgba(52,199,89,0.08); } .feat-ic.pp { background: rgba(175,82,220,0.08); }
+.feat-ic.rd { background: rgba(255,59,48,0.08); }
+.feat h3 { font-size: clamp(18px,2vw,24px); font-weight: 800; letter-spacing: -0.03em; margin-bottom: clamp(8px,1vw,12px); }
+.feat p { font-size: clamp(14px,1.4vw,16px); color: var(--t2); line-height: 1.55; letter-spacing: -0.01em; }
+.feat-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: clamp(12px,1.5vw,18px); }
+.tag { padding: 5px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--bg2); color: var(--t3); }
+.tag.bl { background: rgba(0,122,255,0.08); color: var(--blue); }
+.tag.or { background: rgba(255,149,0,0.08); color: var(--orange); }
+.tag.gr { background: rgba(52,199,89,0.08); color: var(--green); }
+
+.games-head { margin-bottom: clamp(28px,4vw,48px); }
+.games-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: clamp(20px,2.5vw,28px); }
+.chip { padding: 8px 20px; border-radius: 999px; font-size: 14px; font-weight: 600; background: rgba(0,0,0,0.04); color: var(--t2); transition: all 0.15s; }
+.chip.on, .chip:hover { background: var(--blue-soft); color: var(--blue); }
+.games-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(clamp(110px,12vw,160px), 1fr)); gap: clamp(8px,1vw,16px); }
+.game { border-radius: clamp(14px,1.8vw,22px); padding: clamp(18px,2.2vw,28px) clamp(12px,1.5vw,18px); text-align: center; transition: all 0.25s cubic-bezier(.16,1,.3,1); background: transparent; }
+.game:hover { transform: translateY(-4px); background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+.game-ic { width: clamp(40px,4.5vw,56px); height: clamp(40px,4.5vw,56px); margin: 0 auto 10px; border-radius: clamp(10px,1.2vw,14px); display: flex; align-items: center; justify-content: center; font-size: clamp(20px,2.4vw,28px); }
+.game-nm { font-size: clamp(12px,1.2vw,14px); font-weight: 700; letter-spacing: -0.01em; }
+.game-st { font-size: 11px; color: var(--green); margin-top: 3px; font-weight: 600; }
+.game.add { color: var(--t3); } .game.add .game-ic { background: var(--bg3); }
+
+.nums-band { text-align: center; padding: clamp(80px,12vw,160px) var(--pad); }
+.nums-grid { max-width: 1100px; margin: clamp(40px,6vw,72px) auto 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(16px,3vw,40px); }
+.num-v { font-size: clamp(3.2rem, 8vw, 6rem); font-weight: 900; letter-spacing: -0.05em; line-height: 1; background: linear-gradient(135deg, var(--blue), var(--blue-light)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-variant-numeric: tabular-nums; margin-bottom: clamp(8px,1vw,14px); }
+.num-l { font-size: clamp(14px,1.4vw,17px); color: var(--t2); font-weight: 500; letter-spacing: -0.01em; }
+
+.cta-band { padding: clamp(80px,14vw,180px) var(--pad); text-align: center; position: relative; overflow: hidden; background: linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%); }
+.cta-band::before { content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: clamp(500px,80vw,1000px); height: clamp(500px,80vw,1000px); border-radius: 50%; background: radial-gradient(circle, rgba(0,122,255,0.12) 0%, rgba(90,200,250,0.05) 40%, transparent 65%); pointer-events: none; }
+.cta-band h2 { font-size: clamp(2.8rem, 7vw, 5.5rem); font-weight: 900; letter-spacing: -0.05em; line-height: 1.03; margin-bottom: clamp(16px,2vw,24px); position: relative; z-index: 1; }
+.cta-band p { font-size: clamp(17px,2vw,22px); color: var(--t2); max-width: 540px; margin: 0 auto clamp(36px,5vw,56px); line-height: 1.4; position: relative; z-index: 1; font-weight: 400; }
+.cta-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; margin-bottom: clamp(40px,6vw,64px); }
+.cta-steps { display: flex; align-items: center; justify-content: center; gap: clamp(8px,1.2vw,14px); flex-wrap: wrap; position: relative; z-index: 1; }
+.step { display: flex; align-items: center; gap: 9px; padding: clamp(8px,1.2vw,12px) clamp(14px,1.8vw,22px); background: #fff; border-radius: 999px; font-size: clamp(12px,1.2vw,14px); font-weight: 600; color: var(--t2); box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+.step-n { width: 24px; height: 24px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; }
+.arr { color: var(--t3); font-size: 18px; }
+
+.footer { background: var(--bg2); padding: clamp(48px,7vw,80px) var(--pad) clamp(28px,4vw,48px); }
+.footer-inner { max-width: var(--max); margin: 0 auto; display: grid; grid-template-columns: 2fr repeat(4,1fr); gap: clamp(24px,4vw,48px); }
+.footer-brand .logo { margin-bottom: 14px; }
+.footer-d { font-size: 13px; color: var(--t3); line-height: 1.5; max-width: 280px; }
+.footer-col h4 { font-size: 11px; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+.footer-col a { display: block; font-size: 13px; color: var(--t2); padding: 5px 0; font-weight: 500; transition: color 0.15s; }
+.footer-col a:hover { color: var(--blue); }
+.footer-bot { max-width: var(--max); margin: clamp(32px,5vw,56px) auto 0; padding-top: clamp(16px,2vw,24px); border-top: 1px solid var(--div); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--t3); }
+
+.reveal { opacity: 0; transform: translateY(40px); transition: opacity .8s cubic-bezier(.16,1,.3,1), transform .8s cubic-bezier(.16,1,.3,1); }
+.reveal.on { opacity: 1; transform: translateY(0); }
+.stagger > * { opacity: 0; transform: translateY(24px); transition: opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1); }
+.stagger.on > *:nth-child(1) { transition-delay: 0ms; } .stagger.on > *:nth-child(2) { transition-delay: 80ms; }
+.stagger.on > *:nth-child(3) { transition-delay: 160ms; } .stagger.on > *:nth-child(4) { transition-delay: 240ms; }
+.stagger.on > *:nth-child(5) { transition-delay: 320ms; } .stagger.on > *:nth-child(6) { transition-delay: 400ms; }
+.stagger.on > *:nth-child(7) { transition-delay: 480ms; } .stagger.on > *:nth-child(8) { transition-delay: 560ms; }
+.stagger.on > * { opacity: 1; transform: translateY(0); }
+
+@media (max-width: 900px) {
+  .feat-layout { grid-template-columns: 1fr; gap: 32px; } .feat-side { position: static; }
+  .feat-grid { grid-template-columns: repeat(2, 1fr); }
+  .nums-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .footer-inner { grid-template-columns: 1fr 1fr; gap: 28px; } .footer-brand { grid-column: 1/-1; }
+  .scene-shop { grid-template-columns: 1fr; } .shop-result { min-height: 200px; }
+  .scene-dashboard .dash-event-list { display: none; }
+}
+@media (max-width: 768px) {
+  .nav-links { display: none; } .nav { top: 28px; } .nav.scrolled { top: 20px; }
+  .hero { padding-top: 100px; }
+  .hero-ctas { flex-direction: column; align-items: center; width: 100%; }
+  .btn-primary, .btn-secondary { width: 100%; max-width: 320px; justify-content: center; }
+  .preview-body { grid-template-columns: 1fr; }
+  .preview-side { flex-direction: row; overflow-x: auto; padding: 10px 12px; gap: 4px; }
+  .preview-nav { white-space: nowrap; flex-shrink: 0; }
+  .preview-stats { grid-template-columns: repeat(2, 1fr); }
+  .preview-frame { transform: none; border-radius: 16px; }
+  .theatre-stage { min-height: 420px; }
+  .scene-join { padding: 16px; grid-template-columns: 1fr; gap: 12px; }
+  .gift-area { display: flex; flex-direction: row; justify-content: center; }
+  .gift-popup { width: 200px; max-width: 100%; }
+  .scene-vote { padding: 16px; }
+  .vote-counts { gap: 40px; }
+  .scene-dashboard { flex-direction: column; }
+  .dash-sidebar { width: 100%; flex-direction: row; overflow-x: auto; padding: 8px; border-right: none; border-bottom: 1px solid var(--div); }
+  .dash-sidebar.show { transform: translateY(0); }
+  .dash-nav { white-space: nowrap; flex-shrink: 0; }
+  .dash-stats { grid-template-columns: repeat(3, 1fr); }
+  .scene-dual { grid-template-columns: 1fr; }
+  .dual-pane.player { border-right: none; border-bottom: 1px solid var(--div); }
+  .sync-line { display: none; }
+  .feat-grid { grid-template-columns: 1fr; gap: 28px; }
+  .nums-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .cta-steps { flex-direction: column; } .arr { transform: rotate(90deg); }
+  .footer-bot { flex-direction: column; gap: 8px; text-align: center; }
+  .games-grid { grid-template-columns: repeat(3, 1fr); }
+  .scene-name { display: none; }
+}
+@media (max-width: 420px) {
+  .games-grid { grid-template-columns: repeat(2, 1fr); }
+  .nums-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
+}
+@media (min-width: 1600px) { :root { --pad: 64px; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  .reveal, .stagger > * { opacity: 1; transform: none; }
+  .ticker-track { animation: none; } .preview-frame { transform: none; }
+  .vcursor { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="build">BUILD: 20260725-PROTO-V6.1</div>
+<div class="prog" id="prog"></div>
+
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <div class="logo"><div class="logo-ic">🎮</div>GSP</div>
+    <div class="nav-links">
+      <a href="#feat">能力</a>
+      <a href="#games">游戏</a>
+      <a href="#demo">演示</a>
+      <a href="#cta">开始</a>
+    </div>
+    <a href="#cta" class="nav-cta">免费开始 →</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-tag reveal"><span class="dot"></span>游戏服务器运营中台 · AGPL-3.0 开源</div>
+  <h1 class="reveal">把开服<span class="line2">从<em style="font-style:normal">技术活</em></span><span class="line2">变成<span class="grad">运营活</span></span></h1>
+  <p class="hero-sub reveal">获客 → 内容 → 秩序 → 赞助，全链路可插拔标准件。不挑游戏类型，一个面板撑起整个玩家运营体系。</p>
+  <div class="hero-ctas reveal">
+    <button class="btn-primary" onclick="go('demo')">▶ 观看自动演示</button>
+    <button class="btn-secondary" onclick="go('cta')">5 分钟开服 →</button>
+  </div>
+  <div class="hero-preview reveal">
+    <div class="preview-frame">
+      <div class="preview-chrome">
+        <div class="preview-dot r"></div><div class="preview-dot y"></div><div class="preview-dot g"></div>
+        <div class="preview-url" id="prevUrl">https://panel.gsp.ecsrz.com/dashboard</div>
+      </div>
+      <div class="preview-body">
+        <div class="preview-side">
+          <div class="preview-nav on"><span class="ic">📊</span>仪表盘</div>
+          <div class="preview-nav"><span class="ic">🖥</span>服务器</div>
+          <div class="preview-nav"><span class="ic">💎</span>商城</div>
+          <div class="preview-nav"><span class="ic">👥</span>玩家</div>
+          <div class="preview-nav"><span class="ic">🎫</span>CDK</div>
+          <div class="preview-nav"><span class="ic">🗳</span>投票</div>
+        </div>
+        <div class="preview-main">
+          <div class="preview-stats">
+            <div class="stat"><div class="stat-l">在线玩家</div><div class="stat-v gr"><span class="live-num" data-target="47">0</span><span style="font-size:14px;color:var(--t3);font-weight:400">/50</span></div></div>
+            <div class="stat"><div class="stat-l">CPU</div><div class="stat-v bl"><span class="live-num" data-target="23" data-suffix="%">0</span></div></div>
+            <div class="stat"><div class="stat-l">今日流水</div><div class="stat-v or">¥<span class="live-num" data-target="328">0</span></div></div>
+            <div class="stat"><div class="stat-l">状态</div><div class="stat-v gr">运行中</div></div>
+          </div>
+          <div class="preview-chart">
+            <div class="chart-t">玩家在线趋势</div>
+            <svg viewBox="0 0 400 80" preserveAspectRatio="none" style="flex:1;width:100%;min-height:60px">
+              <defs><linearGradient id="cg" x1="0"y1="0"x2="0"y2="1"><stop offset="0%" stop-color="rgba(0,122,255,0.12)"/><stop offset="100%" stop-color="rgba(0,122,255,0)"/></linearGradient></defs>
+              <path d="M0,65 L30,55 L60,58 L90,45 L120,35 L150,40 L180,28 L210,25 L240,32 L270,20 L300,18 L330,25 L360,14 L400,18 L400,80 L0,80 Z" fill="url(#cg)"/>
+              <path d="M0,65 L30,55 L60,58 L90,45 L120,35 L150,40 L180,28 L210,25 L240,32 L270,20 L300,18 L330,25 L360,14 L400,18" fill="none" stroke="#007AFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="chart-line"/>
+            </svg>
+          </div>
+          <div class="preview-ticker">
+            <div class="ticker-track">
+              <span class="ticker-item j">👤 Steve 加入了服务器</span>
+              <span class="ticker-item b">💎 Alex 购买 VIP · ¥30</span>
+              <span class="ticker-item g">🎁 新手礼包已发放</span>
+              <span class="ticker-item v">🗳 投票通过 · 踢出作弊者</span>
+              <span class="ticker-item j">👤 Alex 加入了服务器</span>
+              <span class="ticker-item b">💰 日流水 ¥328</span>
+              <span class="ticker-item j">👤 Steve 加入了服务器</span>
+              <span class="ticker-item b">💎 Alex 购买 VIP · ¥30</span>
+              <span class="ticker-item g">🎁 新手礼包已发放</span>
+              <span class="ticker-item v">🗳 投票通过 · 踢出作弊者</span>
+              <span class="ticker-item j">👤 Alex 加入了服务器</span>
+              <span class="ticker-item b">💰 日流水 ¥328</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="hero-fade"></div>
+
+<!-- DEMO THEATRE v6 -->
+<section class="demo-band" id="demo">
+  <div class="demo-head">
+    <div class="sec-label reveal">02 · 互动演示</div>
+    <h2 class="sec-title reveal">看看它是怎么工作的</h2>
+    <p class="sec-desc reveal">无需注册、无需安装。页面自动讲述完整故事——从玩家进服到服主变现，35秒看懂全链路。</p>
+    <div class="demo-view-switch reveal">
+      <button class="view-btn active" data-view="full">🔄 完整故事</button>
+      <button class="view-btn" data-view="player">👤 玩家视角</button>
+      <button class="view-btn" data-view="owner">👑 服主视角</button>
+    </div>
+  </div>
+  <div class="theatre-wrap">
+    <div class="theatre reveal">
+      <div class="theatre-chrome">
+        <div class="theatre-dot r"></div><div class="theatre-dot y"></div><div class="theatre-dot g"></div>
+        <div class="theatre-url player-view" id="theatreUrl">https://play.gsp.ecsrz.com/join</div>
+        <div class="theatre-role-badge player" id="roleBadge">👤 玩家视角</div>
+      </div>
+      <div class="theatre-stage" id="stage">
+        <div class="vcursor" id="vcursor"></div>
+
+        <!-- Scene 1: Player Join -->
+        <div class="scene-container active" id="scene0">
+          <div class="scene-join">
+            <div class="chat-area" id="chat1">
+              <div class="chat-msg system" data-delay="500"><span class="tag">[系统]</span> 连接服务器中...</div>
+              <div class="chat-msg system" data-delay="2000"><span class="tag">[系统]</span> 已连接到 mc.yourserver.com</div>
+              <div class="chat-msg system" data-delay="3800"><span class="tag">[欢迎]</span> 欢迎 Steve 加入服务器！</div>
+              <div class="chat-msg success" data-delay="5800"><span class="tag">🎁 礼包</span> 新手礼包已自动发放！</div>
+              <div class="chat-msg player" data-delay="7800">Steve: 哇！刚进来就有装备？太爽了！</div>
+            </div>
+            <div class="gift-area">
+              <div class="gift-popup" id="giftPop">
+                <div class="icon">🎁</div>
+                <h4>新手礼包</h4>
+                <div class="items">
+                  ⚔️ 钻石剑 ×1<br>
+                  🍎 金苹果 ×5<br>
+                  🧪 经验瓶 ×10
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scene 2: Shop -->
+        <div class="scene-container" id="scene1">
+          <div class="scene-shop">
+            <div class="shop-items" id="shopList">
+              <div class="shop-header">🛒 玩家商城</div>
+              <div class="shop-item" data-delay="200" id="shop1">
+                <div class="sic" style="background:linear-gradient(135deg,#FFD60A,#FF9500)">💎</div>
+                <div class="sin"><div class="n">VIP 月卡</div><div class="p">¥30/月</div></div>
+                <div class="sib" id="buy1Btn">购买</div>
+              </div>
+              <div class="shop-item" data-delay="500">
+                <div class="sic" style="background:linear-gradient(135deg,#AF52DE,#D45BDE)">👑</div>
+                <div class="sin"><div class="n">SVIP 永久</div><div class="p">¥198</div></div>
+                <div class="sib">购买</div>
+              </div>
+              <div class="shop-item" data-delay="800">
+                <div class="sic" style="background:linear-gradient(135deg,#34C759,#30D158)">⚡</div>
+                <div class="sin"><div class="n">飞行权限</div><div class="p">¥10</div></div>
+                <div class="sib">购买</div>
+              </div>
+              <div class="shop-item" data-delay="1100">
+                <div class="sic" style="background:linear-gradient(135deg,#FF3B30,#FF6969)">🗡</div>
+                <div class="sin"><div class="n">神装礼包</div><div class="p">¥68</div></div>
+                <div class="sib">购买</div>
+              </div>
+            </div>
+            <div class="shop-result" id="shopResult">
+              <div class="pay-qr" id="qr">📱</div>
+              <div class="success-check" id="check">✓</div>
+              <div class="result-text" id="resText">购买成功！</div>
+              <div class="result-sub" id="resSub">VIP 权限已自动激活</div>
+              <div class="vip-badge" id="vipBadge">👑 VIP 黄金会员</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scene 3: Vote -->
+        <div class="scene-container" id="scene2">
+          <div class="scene-vote">
+            <div class="vote-title" id="voteT">🗳 投票：踢出 Hacker123？</div>
+            <div class="vote-sub" id="voteS">举报人: Steve · 原因: 疑似使用飞行外挂</div>
+            <div class="vote-progress-container">
+              <div class="vote-bar"><div class="vote-fill" id="voteFill">0/5</div></div>
+            </div>
+            <div class="vote-counts">
+              <div class="vote-count yes" id="voteY"><div class="num" data-target="5">0</div><div class="lbl">赞成</div></div>
+              <div class="vote-count no" id="voteN"><div class="num" data-target="0">0</div><div class="lbl">反对</div></div>
+            </div>
+            <div class="vote-result pass" id="voteR">✓ 投票通过 · Hacker123 已被踢出</div>
+            <div class="chat-mini" id="voteChat"></div>
+          </div>
+        </div>
+
+        <!-- Scene 4: Narrator -->
+        <div class="scene-container" id="scene3">
+          <div class="scene-narrator">
+            <div class="narrator-text">
+              <h3 id="narH">这一切，服主<span class="grad">都不用在线</span></h3>
+              <p id="narP">礼包自动发、购买自动到账、投票自动执行<br>GSP 在后台默默运转，你只需要看数据</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scene 5: Owner Dashboard -->
+        <div class="scene-container" id="scene4">
+          <div class="scene-dashboard">
+            <div class="dash-sidebar" id="dashSide">
+              <div class="dash-nav active"><span>📊</span> 仪表盘</div>
+              <div class="dash-nav"><span>🖥</span> 服务器</div>
+              <div class="dash-nav"><span>💎</span> 商城</div>
+              <div class="dash-nav"><span>👥</span> 玩家</div>
+              <div class="dash-nav"><span>💰</span> 流水</div>
+            </div>
+            <div class="dash-main">
+              <div class="dash-stats">
+                <div class="dash-stat" data-delay="200"><div class="dl">在线玩家</div><div class="dv" style="color:var(--green)"><span class="dnum" data-target="48">0</span>/50</div></div>
+                <div class="dash-stat" data-delay="400"><div class="dl">今日流水</div><div class="dv" style="color:var(--orange)">¥<span class="dnum" data-target="358">0</span></div></div>
+                <div class="dash-stat" data-delay="600"><div class="dl">今日订单</div><div class="dv" style="color:var(--blue)"><span class="dnum" data-target="14">0</span></div></div>
+              </div>
+              <div class="dash-chart" data-delay="800">
+                <div class="ct">📈 今日流水趋势</div>
+                <svg viewBox="0 0 400 60" preserveAspectRatio="none" style="width:100%;height:40px">
+                  <defs><linearGradient id="cg2" x1="0"y1="0"x2="0"y2="1"><stop offset="0%" stop-color="rgba(255,149,0,0.15)"/><stop offset="100%" stop-color="rgba(255,149,0,0)"/></linearGradient></defs>
+                  <path d="M0,50 L50,45 L100,48 L150,35 L200,30 L250,35 L300,20 L350,12 L400,8 L400,60 L0,60 Z" fill="url(#cg2)"/>
+                  <path d="M0,50 L50,45 L100,48 L150,35 L200,30 L250,35 L300,20 L350,12 L400,8" fill="none" stroke="#FF9500" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="chart-line"/>
+                </svg>
+              </div>
+            </div>
+            <div class="dash-event-list" id="dashEvents"></div>
+          </div>
+        </div>
+
+        <!-- Scene 6: Dual View -->
+        <div class="scene-container" id="scene5">
+          <div class="sync-line" id="syncLine"></div>
+          <div class="sync-pulse" id="syncPulse"></div>
+          <div class="scene-dual">
+            <div class="dual-pane player">
+              <div class="dual-label" id="dl1">👤 玩家侧</div>
+              <div id="playerActions"></div>
+            </div>
+            <div class="dual-pane owner">
+              <div class="dual-label" id="dl2">👑 服主侧</div>
+              <div id="ownerActions"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="theatre-ctrl">
+        <div class="ctrl-left">
+          <button class="ctrl-btn" id="prevBtn">◀</button>
+          <button class="ctrl-btn" id="playBtn">⏸</button>
+          <button class="ctrl-btn" id="nextBtn">▶</button>
+        </div>
+        <div class="scene-progress" id="sceneProg"></div>
+        <div class="scene-name" id="sceneName">玩家进服</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec-pad" id="feat">
+  <div class="sec-inner">
+    <div class="feat-layout">
+      <div class="feat-side reveal">
+        <div class="sec-label">03 · 核心能力</div>
+        <h2 class="sec-title">运维 + 变现<br>+ 社区<br>一个面板</h2>
+        <p class="sec-desc">从部署到运营，从秩序到变现，GSP 把游戏服运营链路做成可插拔的标准件。</p>
+      </div>
+      <div class="feat-grid stagger">
+        <div class="feat"><div class="feat-ic bl">⚙️</div><h3>一键部署运维</h3><p>SteamCMD 自动下载、RCON 自动连接、Daemon 节点健康监控。11+ 款游戏，每款只写一份 YAML。</p><div class="feat-tags"><span class="tag bl">SteamCMD</span><span class="tag bl">RCON</span><span class="tag bl">自动备份</span></div></div>
+        <div class="feat"><div class="feat-ic or">💎</div><h3>VIP / 商城</h3><p>微信/支付宝扫码支付，自动到账。权限组、物品、CDK 全链路打通。</p><div class="feat-tags"><span class="tag or">微信支付</span><span class="tag or">自动发货</span></div></div>
+        <div class="feat"><div class="feat-ic pp">🎫</div><h3>CDK 兑换</h3><p>批量生成兑换码，自定义物品/权限组/时长，活动推广利器。</p><div class="feat-tags"><span class="tag" style="background:rgba(175,82,220,0.08);color:var(--purple)">批量生成</span></div></div>
+        <div class="feat"><div class="feat-ic gr">💬</div><h3>聊天触发</h3><p>自动欢迎语、进服礼包、关键词响应。玩家聊天触发自动化流程，无需在线值守。</p><div class="feat-tags"><span class="tag gr">自动回复</span><span class="tag gr">礼包发放</span></div></div>
+        <div class="feat"><div class="feat-ic rd">🗳</div><h3>投票踢人</h3><p>社区自治，玩家投票处理作弊/挂机，自动执行封禁，维护服务器秩序。</p><div class="feat-tags"><span class="tag" style="background:rgba(255,59,48,0.08);color:var(--red)">自动执行</span></div></div>
+        <div class="feat"><div class="feat-ic bl">📊</div><h3>数据看板</h3><p>在线趋势、流水报表、玩家留存、活跃度分析。做决策靠数据，不靠感觉。</p><div class="feat-tags"><span class="tag bl">在线趋势</span><span class="tag bl">流水报表</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec-pad band-dark" id="games">
+  <div class="sec-inner">
+    <div class="games-head">
+      <div class="sec-label reveal">04 · 支持游戏</div>
+      <h2 class="sec-title reveal">11+ 款游戏<br>YAML 驱动，零代码接入</h2>
+      <p class="sec-desc reveal">每款游戏只写一份 Pack YAML，社区可贡献。越多游戏越值钱。</p>
+      <div class="games-chips reveal">
+        <button class="chip on">全部</button><button class="chip">沙盒</button><button class="chip">生存</button><button class="chip">射击</button><button class="chip">RPG</button>
+      </div>
+    </div>
+    <div class="games-grid stagger">
+      <div class="game"><div class="game-ic" style="background:rgba(139,92,246,0.08)">⛏</div><div class="game-nm">Minecraft</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(34,197,94,0.08)">🌲</div><div class="game-nm">Valheim</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(239,68,68,0.08)">🧟</div><div class="game-nm">P Zomboid</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(249,115,22,0.08)">🦖</div><div class="game-nm">ARK</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(234,179,8,0.08)">🔫</div><div class="game-nm">Rust</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(59,130,246,0.08)">🌍</div><div class="game-nm">Palworld</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(236,72,153,0.08)">🔥</div><div class="game-nm">DST</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(168,85,247,0.08)">⚙️</div><div class="game-nm">Factorio</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(20,184,166,0.08)">🌳</div><div class="game-nm">Terraria</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(99,102,241,0.08)">🏰</div><div class="game-nm">Enshrouded</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(234,88,12,0.08)">🏭</div><div class="game-nm">Satisfactory</div><div class="game-st">● 已支持</div></div>
+      <div class="game add"><div class="game-ic">+</div><div class="game-nm">更多游戏</div><div class="game-st">贡献 Pack</div></div>
+    </div>
+  </div>
+</section>
+
+<section class="nums-band">
+  <div class="sec-label reveal">05 · 数据说话</div>
+  <h2 class="sec-title reveal" style="text-align:center;max-width:800px;margin:0 auto">为什么服主选择 GSP</h2>
+  <div class="nums-grid stagger">
+    <div class="num"><div class="num-v" data-c="11">0</div><div class="num-l">支持游戏</div></div>
+    <div class="num"><div class="num-v" data-c="3">0</div><div class="num-l">权限层级</div></div>
+    <div class="num"><div class="num-v" data-c="5">0</div><div class="num-l">分钟开服</div></div>
+    <div class="num"><div class="num-v" data-c="0">0</div><div class="num-l">代码接入</div></div>
+  </div>
+</section>
+
+<section class="cta-band" id="cta">
+  <h2 class="reveal">现在就开始。</h2>
+  <p class="reveal">5 分钟开服，今天就有第一笔收入。开源免费，自托管无限制。</p>
+  <div class="cta-ctas reveal">
+    <button class="btn-primary" style="font-size:clamp(16px,2vw,20px);padding:clamp(16px,2.2vw,22px) clamp(40px,5vw,64px)">🚀 免费开始使用</button>
+    <button class="btn-secondary" style="font-size:clamp(16px,2vw,20px);padding:clamp(15px,2.2vw,21px) clamp(38px,5vw,62px)">⭐ Star on GitHub</button>
+  </div>
+  <div class="cta-steps reveal">
+    <div class="step"><span class="step-n">1</span>选择游戏</div><span class="arr">→</span>
+    <div class="step"><span class="step-n">2</span>一键部署</div><span class="arr">→</span>
+    <div class="step"><span class="step-n">3</span>配置运营</div><span class="arr">→</span>
+    <div class="step"><span class="step-n">4</span>开始赚钱</div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="logo"><div class="logo-ic">🎮</div>GSP</div>
+      <p class="footer-d">游戏服务器运营中台。把开服从技术活变成运营活。AGPL-3.0 开源。</p>
+    </div>
+    <div class="footer-col"><h4>产品</h4><a href="#">功能介绍</a><a href="#">支持游戏</a><a href="#">定价</a><a href="#">更新日志</a></div>
+    <div class="footer-col"><h4>资源</h4><a href="#">文档</a><a href="#">API 参考</a><a href="#">Pack 开发</a><a href="#">社区</a></div>
+    <div class="footer-col"><h4>GitHub</h4><a href="#">源码</a><a href="#">Issues</a><a href="#">Discussions</a><a href="#">贡献指南</a></div>
+    <div class="footer-col"><h4>关于</h4><a href="#">团队</a><a href="#">博客</a><a href="#">联系我们</a><a href="#">隐私政策</a></div>
+  </div>
+  <div class="footer-bot"><span>© 2026 GSP · Game Server Panel</span><span>AGPL-3.0 · Made with ❤️ for server owners</span></div>
+</footer>
+
+<script>
+// ===== Nav & Scroll =====
+function updateNav() { document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 40); }
+updateNav();
+window.addEventListener('scroll', () => {
+  const h = document.documentElement.scrollHeight - window.innerHeight;
+  document.getElementById('prog').style.width = (h > 0 ? (window.scrollY / h) * 100 : 0) + '%';
+  updateNav();
+}, { passive: true });
+
+// ===== Reveal on scroll =====
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); }});
+}, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal, .stagger').forEach(el => io.observe(el));
+
+// ===== Number counters =====
+function animateNumber(el, target, duration = 1200) {
+  const start = performance.now();
+  const tick = (now) => {
+    const t = Math.min((now - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(ease * target);
+    if (t < 1) requestAnimationFrame(tick); else el.textContent = target;
+  };
+  requestAnimationFrame(tick);
+}
+const numIO = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const target = parseInt(e.target.dataset.c);
+      if (!isNaN(target)) animateNumber(e.target, target);
+      numIO.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.5 });
+document.querySelectorAll('.num-v[data-c]').forEach(el => numIO.observe(el));
+
+// ===== Utility =====
+function go(id) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function qs(sel, root) { return (root || document).querySelector(sel); }
+function qsa(sel, root) { return Array.from((root || document).querySelectorAll(sel)); }
+
+// ===== Virtual Cursor System =====
+const vcursor = document.getElementById('vcursor');
+let cursorX = 200, cursorY = 200;
+let targetX = 200, targetY = 200;
+let cursorRAF = null;
+function moveCursorTo(x, y, duration = 600) {
+  return new Promise(resolve => {
+    const startX = cursorX, startY = cursorY;
+    const startTime = performance.now();
+    function step(now) {
+      const t = Math.min((now - startTime) / duration, 1);
+      const ease = t < 0.5 ? 2*t*t : 1-Math.pow(-2*t+2,2)/2;
+      cursorX = startX + (x - startX) * ease;
+      cursorY = startY + (y - startY) * ease;
+      vcursor.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
+      if (t < 1) requestAnimationFrame(step); else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+}
+function cursorClick(x, y) {
+  return new Promise(async resolve => {
+    const stage = document.getElementById('stage');
+    const rect = stage.getBoundingClientRect();
+    // Create ripple
+    const ripple = document.createElement('div');
+    ripple.className = 'ripple';
+    ripple.style.left = x + 'px';
+    ripple.style.top = y + 'px';
+    stage.appendChild(ripple);
+    vcursor.classList.add('clicking');
+    await sleep(150);
+    vcursor.classList.remove('clicking');
+    setTimeout(() => ripple.remove(), 600);
+    resolve();
+  });
+}
+// Initial cursor position
+vcursor.style.transform = `translate(${cursorX}px, ${cursorY}px)`;
+// Don't animate cursor if page isn't visible
+let demoVisible = false;
+const demoIO = new IntersectionObserver((entries) => {
+  demoVisible = entries[0].isIntersecting;
+}, { threshold: 0.3 });
+demoIO.observe(document.getElementById('demo'));
+
+// ===== Typewriter =====
+function typewriter(el, text, speed = 30) {
+  return new Promise(resolve => {
+    el.textContent = '';
+    let i = 0;
+    const interval = setInterval(() => {
+      el.textContent += text[i];
+      i++;
+      if (i >= text.length) { clearInterval(interval); resolve(); }
+    }, speed + Math.random() * 20);
+  });
+}
+
+// ===== Scene Definitions & Animation Orchestration =====
+const sceneNames = ['玩家进服', '商城购物', '投票踢人', '...', '服主后台', '双视角联动'];
+const sceneTitles = ['玩家进服 · 领取礼包', '商城购物 · VIP 购买', '社区投票 · 自动执法', '视角转换', '服主工作台 · 实时数据', '双视角联动'];
+const viewModes = {
+  full: [0, 1, 2, 3, 4, 5],
+  player: [0, 1, 2],
+  owner: [4, 5]
+};
+let currentView = 'full';
+let currentSceneIdx = 0;
+let isPlaying = true;
+let sceneTimer = null;
+let sceneAbort = false;
+const totalScenes = 6;
+
+// Build progress segments
+const progContainer = document.getElementById('sceneProg');
+for (let i = 0; i < totalScenes; i++) {
+  const seg = document.createElement('div');
+  seg.className = 'prog-seg';
+  seg.innerHTML = '<div class="prog-seg-fill"></div>';
+  seg.addEventListener('click', () => goToScene(i));
+  progContainer.appendChild(seg);
+}
+
+function switchScene(idx) {
+  // Hide all scenes
+  qsa('.scene-container').forEach(s => s.classList.remove('active'));
+  // Show target
+  const scene = document.getElementById('scene' + idx);
+  if (scene) scene.classList.add('active');
+  currentSceneIdx = idx;
+  // Update progress
+  const segs = qsa('.prog-seg');
+  segs.forEach((seg, i) => {
+    const fill = seg.querySelector('.prog-seg-fill');
+    seg.classList.remove('done');
+    fill.style.width = '0%';
+    if (i < idx) { seg.classList.add('done'); fill.style.width = '100%'; }
+    if (i === idx) fill.style.width = '0%';
+  });
+  // Update name
+  document.getElementById('sceneName').textContent = sceneTitles[idx] || '';
+  // Update chrome
+  const badge = document.getElementById('roleBadge');
+  const url = document.getElementById('theatreUrl');
+  badge.className = 'theatre-role-badge';
+  if (idx <= 2) { badge.classList.add('player'); badge.textContent = '👤 玩家视角'; url.className = 'theatre-url player-view'; url.textContent = 'https://play.gsp.ecsrz.com/join'; }
+  else if (idx === 3) { badge.classList.add('dual'); badge.textContent = '🔄 视角转换...'; url.className = 'theatre-url'; url.textContent = 'https://panel.gsp.ecsrz.com'; }
+  else if (idx === 4) { badge.classList.add('owner'); badge.textContent = '👑 服主视角'; url.className = 'theatre-url owner-view'; url.textContent = 'https://panel.gsp.ecsrz.com/dashboard'; }
+  else { badge.classList.add('dual'); badge.textContent = '🔄 双视角联动'; url.className = 'theatre-url'; url.textContent = 'https://panel.gsp.ecsrz.com'; }
+  // Run scene animation
+  runSceneAnimation(idx);
+}
+
+function resetSceneState(idx) {
+  sceneAbort = true;
+  // We need a small delay for abort to propagate
+  return new Promise(resolve => {
+    setTimeout(() => {
+      sceneAbort = false;
+      // Reset scene elements
+      const scene = document.getElementById('scene' + idx);
+      if (!scene) { resolve(); return; }
+      // Reset all animated elements
+      qsa('.chat-msg', scene).forEach(m => m.classList.remove('show'));
+      qsa('.gift-popup', scene).forEach(p => p.classList.remove('show'));
+      qsa('.shop-item', scene).forEach(i => { i.classList.remove('show', 'highlight', 'purchased'); });
+      qsa('.pay-qr, .success-check, .result-text, .result-sub, .vip-badge', scene).forEach(e => e.classList.remove('show'));
+      qsa('.vote-title, .vote-sub, .vote-result, .vote-count', scene).forEach(e => e.classList.remove('show'));
+      qsa('.vote-fill', scene).forEach(f => f.style.width = '0%');
+      qsa('.dash-sidebar, .dash-stat, .dash-chart', scene).forEach(e => e.classList.remove('show'));
+      qsa('.dual-label, .dual-action', scene).forEach(e => e.classList.remove('show'));
+      qsa('.sync-line, .sync-pulse', scene).forEach(e => e.classList.remove('show'));
+      qsa('.narrator-text h3, .narrator-text p', scene).forEach(e => e.classList.remove('show'));
+      qsa('.dash-event, .ripple', scene).forEach(e => e.remove());
+      const playerActions = document.getElementById('playerActions');
+      const ownerActions = document.getElementById('ownerActions');
+      if (playerActions) playerActions.innerHTML = '';
+      if (ownerActions) ownerActions.innerHTML = '';
+      const voteChat = document.getElementById('voteChat');
+      if (voteChat) voteChat.innerHTML = '';
+      resolve();
+    }, 100);
+  });
+}
+
+let sceneProgressTimer = null;
+function startProgressBar(duration) {
+  const seg = qsa('.prog-seg')[currentSceneIdx];
+  if (!seg) return;
+  const fill = seg.querySelector('.prog-seg-fill');
+  const start = performance.now();
+  function tick(now) {
+    if (sceneAbort) { fill.style.width = '0%'; return; }
+    const t = Math.min((now - start) / duration, 1);
+    fill.style.width = (t * 100) + '%';
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+async function runSceneAnimation(idx) {
+  await resetSceneState(idx);
+  if (sceneAbort) return;
+  const stage = document.getElementById('stage');
+  const stageRect = { w: stage.offsetWidth, h: stage.offsetHeight };
+  const isMobile = window.innerWidth <= 768;
+
+  switch(idx) {
+    case 0: { // Player Join
+      startProgressBar(12000);
+      const msgs = qsa('#chat1 .chat-msg');
+      for (const msg of msgs) {
+        if (sceneAbort) return;
+        const delay = parseInt(msg.dataset.delay) || 500;
+        const prevDelay = msgs.indexOf(msg) > 0 ? parseInt(msgs[msgs.indexOf(msg)-1].dataset.delay) || 0 : 0;
+        await sleep(delay - prevDelay);
+        if (sceneAbort) return;
+        msg.classList.add('show');
+      }
+      await sleep(1200);
+      if (sceneAbort) return;
+      // Cursor moves to gift area (desktop only)
+      if (!isMobile && demoVisible) {
+        const gift = document.getElementById('giftPop');
+        const giftRect = gift.getBoundingClientRect();
+        const stageBox = stage.getBoundingClientRect();
+        await moveCursorTo(giftRect.left - stageBox.left + 50, giftRect.top - stageBox.top + 40, 800);
+      }
+      await sleep(400);
+      document.getElementById('giftPop').classList.add('show');
+      await sleep(2200);
+      break;
+    }
+    case 1: { // Shop
+      startProgressBar(16000);
+      // Items appear
+      const items = qsa('#shopList .shop-item');
+      for (const item of items) {
+        if (sceneAbort) return;
+        await sleep(500);
+        item.classList.add('show');
+      }
+      await sleep(800);
+      if (sceneAbort) return;
+      // Cursor moves to VIP item and clicks
+      if (!isMobile && demoVisible) {
+        const vipItem = document.getElementById('shop1');
+        const rect = vipItem.getBoundingClientRect();
+        const stageBox = stage.getBoundingClientRect();
+        const cx = rect.left - stageBox.left + 60;
+        const cy = rect.top - stageBox.top + rect.height/2;
+        await moveCursorTo(cx, cy, 800);
+        await sleep(400);
+        vipItem.classList.add('highlight');
+        await sleep(800);
+        // Move to buy button
+        const btn = document.getElementById('buy1Btn');
+        const btnRect = btn.getBoundingClientRect();
+        await moveCursorTo(btnRect.left - stageBox.left + btnRect.width/2, btnRect.top - stageBox.top + btnRect.height/2, 500);
+        await sleep(300);
+        await cursorClick(btnRect.left - stageBox.left + btnRect.width/2, btnRect.top - stageBox.top + btnRect.height/2);
+      } else {
+        document.getElementById('shop1').classList.add('highlight');
+        await sleep(1500);
+      }
+      // Show QR
+      await sleep(800);
+      if (sceneAbort) return;
+      document.getElementById('qr').classList.add('show');
+      await sleep(2500);
+      if (sceneAbort) return;
+      document.getElementById('qr').classList.remove('show');
+      document.getElementById('check').classList.add('show');
+      document.getElementById('resText').classList.add('show');
+      document.getElementById('resSub').classList.add('show');
+      await sleep(600);
+      document.getElementById('vipBadge').classList.add('show');
+      // Mark purchased
+      const sib = document.getElementById('buy1Btn');
+      sib.textContent = '已购';
+      sib.style.background = 'var(--green)';
+      document.getElementById('shop1').classList.add('purchased');
+      await sleep(1800);
+      break;
+    }
+    case 2: { // Vote
+      startProgressBar(14000);
+      document.getElementById('voteT').classList.add('show');
+      await sleep(600);
+      document.getElementById('voteS').classList.add('show');
+      await sleep(800);
+      if (sceneAbort) return;
+      // Vote chat appears
+      const chatMsgs = [
+        { text: 'Alex: 有人开挂！', type: 'player', delay: 0 },
+        { text: 'Steve: /vote kick Hacker123', type: 'player', delay: 800 },
+      ];
+      const chatContainer = document.getElementById('voteChat');
+      for (const cm of chatMsgs) {
+        const div = document.createElement('div');
+        div.className = 'chat-msg ' + cm.type;
+        div.style.fontSize = '11px';
+        div.style.padding = '6px 10px';
+        div.style.opacity = '0';
+        div.style.transform = 'translateY(6px)';
+        div.textContent = cm.text;
+        chatContainer.appendChild(div);
+        await sleep(cm.delay);
+        requestAnimationFrame(() => div.classList.add('show'));
+      }
+      await sleep(800);
+      if (sceneAbort) return;
+      // Vote counts animate
+      const yesEl = document.getElementById('voteY');
+      const noEl = document.getElementById('voteN');
+      yesEl.classList.add('show');
+      noEl.classList.add('show');
+      const fill = document.getElementById('voteFill');
+      // Animate votes 1->5
+      for (let i = 1; i <= 5; i++) {
+        if (sceneAbort) return;
+        await sleep(1100);
+        const yesNum = yesEl.querySelector('.num');
+        animateNumber(yesNum, i, 400);
+        const pct = Math.round((i / 5) * 100);
+        fill.style.width = pct + '%';
+        fill.textContent = i + '/5';
+      }
+      await sleep(600);
+      if (sceneAbort) return;
+      document.getElementById('voteR').classList.add('show');
+      const kickMsg = document.createElement('div');
+      kickMsg.className = 'chat-msg success';
+      kickMsg.style.fontSize = '11px';
+      kickMsg.style.padding = '6px 10px';
+      kickMsg.textContent = '[系统] Hacker123 已被踢出';
+      kickMsg.style.opacity = '0';
+      kickMsg.style.transform = 'translateY(6px)';
+      chatContainer.appendChild(kickMsg);
+      await sleep(400);
+      requestAnimationFrame(() => kickMsg.classList.add('show'));
+      await sleep(1500);
+      break;
+    }
+    case 3: { // Narrator
+      startProgressBar(6000);
+      await sleep(500);
+      document.querySelector('#scene3 .narrator-text h3').classList.add('show');
+      await sleep(1000);
+      document.querySelector('#scene3 .narrator-text p').classList.add('show');
+      await sleep(3500);
+      break;
+    }
+    case 4: { // Dashboard
+      startProgressBar(14000);
+      // Sidebar slides in
+      document.getElementById('dashSide').classList.add('show');
+      await sleep(600);
+      if (sceneAbort) return;
+      // Stats appear
+      const stats = qsa('.dash-stat');
+      for (const s of stats) {
+        if (sceneAbort) return;
+        await sleep(500);
+        s.classList.add('show');
+        const numEl = s.querySelector('.dnum');
+        if (numEl) animateNumber(numEl, parseInt(numEl.dataset.target) || 0, 1000);
+      }
+      await sleep(500);
+      if (sceneAbort) return;
+      qs('.dash-chart').classList.add('show');
+      // Live events
+      await sleep(1200);
+      if (sceneAbort || isMobile) { await sleep(3500); break; }
+      const events = [
+        { text: '💎 Steve 购买 VIP ¥30', cls: 'vip', amt: '+¥30' },
+        { text: '🎁 Lucy 领取新手礼包', cls: 'gift', amt: '新玩家' },
+        { text: '🎫 Alex 兑换 CDK', cls: '', amt: '+1' },
+      ];
+      const eventContainer = document.getElementById('dashEvents');
+      for (const ev of events) {
+        if (sceneAbort) return;
+        const div = document.createElement('div');
+        div.className = 'dash-event ' + ev.cls;
+        div.innerHTML = `<div>${ev.text}</div><div class="amt">${ev.amt}</div>`;
+        eventContainer.appendChild(div);
+        await sleep(200);
+        requestAnimationFrame(() => div.classList.add('show'));
+        // Animate the revenue number
+        const revNum = qsa('.dnum')[1];
+        if (revNum) {
+          const cur = parseInt(revNum.textContent) || 0;
+          animateNumber(revNum, Math.min(cur + 30, 388), 800);
+        }
+        await sleep(1800);
+      }
+      await sleep(1000);
+      break;
+    }
+    case 5: { // Dual view
+      startProgressBar(14000);
+      document.getElementById('dl1').classList.add('show');
+      document.getElementById('dl2').classList.add('show');
+      await sleep(700);
+      document.getElementById('syncLine').classList.add('show');
+      document.getElementById('syncPulse').classList.add('show');
+      await sleep(700);
+      if (sceneAbort) return;
+      const syncPairs = [
+        { p: '👤 Lucy 加入服务器', o: '📊 在线玩家 47→48' },
+        { p: '💎 Lucy 购买 VIP ¥30', o: '💰 流水 ¥358→¥388' },
+        { p: '🎫 Alex 兑换 CDK: WELCOME', o: '🎁 CDK 已核销 · 发放道具' },
+        { p: '🗳 投票踢人通过', o: '⚖️ 自治事件 +1 · 自动封禁' },
+      ];
+      const pContainer = document.getElementById('playerActions');
+      const oContainer = document.getElementById('ownerActions');
+      for (const pair of syncPairs) {
+        if (sceneAbort) return;
+        const pDiv = document.createElement('div');
+        pDiv.className = 'dual-action player';
+        pDiv.textContent = pair.p;
+        pContainer.appendChild(pDiv);
+        await sleep(200);
+        requestAnimationFrame(() => pDiv.classList.add('show'));
+        await sleep(600);
+        if (sceneAbort) return;
+        const oDiv = document.createElement('div');
+        oDiv.className = 'dual-action owner';
+        oDiv.textContent = pair.o;
+        oContainer.appendChild(oDiv);
+        await sleep(200);
+        requestAnimationFrame(() => oDiv.classList.add('show'));
+        await sleep(1500);
+      }
+      await sleep(1500);
+      break;
+    }
+  }
+  // Auto advance
+  if (isPlaying && !sceneAbort) {
+    const scenes = viewModes[currentView];
+    const curPos = scenes.indexOf(currentSceneIdx);
+    if (curPos < scenes.length - 1) {
+      sceneTimer = setTimeout(() => goToScene(scenes[curPos + 1]), 500);
+    } else {
+      sceneTimer = setTimeout(() => goToScene(scenes[0]), 1500);
+    }
+  }
+}
+
+function goToScene(idx) {
+  if (sceneTimer) clearTimeout(sceneTimer);
+  switchScene(idx);
+}
+
+function nextScene() {
+  const scenes = viewModes[currentView];
+  const curPos = scenes.indexOf(currentSceneIdx);
+  const next = scenes[(curPos + 1) % scenes.length];
+  goToScene(next);
+}
+function prevScene() {
+  const scenes = viewModes[currentView];
+  const curPos = scenes.indexOf(currentSceneIdx);
+  const prev = scenes[(curPos - 1 + scenes.length) % scenes.length];
+  goToScene(prev);
+}
+
+// Controls
+document.getElementById('nextBtn').addEventListener('click', nextScene);
+document.getElementById('prevBtn').addEventListener('click', prevScene);
+document.getElementById('playBtn').addEventListener('click', (e) => {
+  isPlaying = !isPlaying;
+  e.target.textContent = isPlaying ? '⏸' : '▶';
+  if (isPlaying) nextScene();
+  else if (sceneTimer) clearTimeout(sceneTimer);
+});
+
+// View switch
+qsa('.view-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    qsa('.view-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentView = btn.dataset.view;
+    const first = viewModes[currentView][0];
+    goToScene(first);
+  });
+});
+
+// Live number animation in preview
+const liveNumIO = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const target = parseInt(e.target.dataset.target) || 0;
+      animateNumber(e.target, target, 1500);
+      liveNumIO.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.5 });
+qsa('.live-num').forEach(el => liveNumIO.observe(el));
+
+// Game chips
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+  c.classList.add('on');
+}));
+
+// Start demo when scrolled into view
+let demoStarted = false;
+const demoStartIO = new IntersectionObserver((entries) => {
+  if (entries[0].isIntersecting && !demoStarted) {
+    demoStarted = true;
+    goToScene(0);
+  }
+}, { threshold: 0.3 });
+demoStartIO.observe(document.getElementById('demo'));
+</script>
+</body>
+</html>

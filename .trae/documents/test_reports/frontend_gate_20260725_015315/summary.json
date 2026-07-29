@@ -1,0 +1,30 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "PASSED",
+  "timestamp": "2026-07-25T01:56:30+08:00",
+  "version": "4.16.0",
+  "build_id": "20260725-007",
+  "evidence_path": ".trae/documents/test_reports/frontend_gate_20260725_015315/",
+  "summary": "v4.16.0 前端改动（/demo 公开动态演示页 + IdentitySelector demo 分支修复 + BUILD 20260725-007 + 版本同步）三重闸门全绿：Test1 单测 170/170，Test2 E2E 67 passed + 19 skipped（预期跳过），Test3 Mock 依赖稳定性检查通过。生产构建通过违规地址校验。",
+  "tests": {
+    "test1_unit": {
+      "status": "PASS",
+      "command": "npx vitest run",
+      "result": "15 files / 170 tests passed",
+      "log": "test1_streamlit.log"
+    },
+    "test2_e2e": {
+      "status": "PASS",
+      "command": "npx playwright test",
+      "result": "67 passed + 19 skipped (chromium + mobile-chrome)",
+      "log": "test2_playwright.log"
+    },
+    "test3_mock_regression": {
+      "status": "PASS",
+      "method": "Mock 依赖稳定性检查（MSW handlers 未变更 + vitest MSW 全套通过）",
+      "log": "test3_mock_checklist.md"
+    }
+  },
+  "failed_cases": [],
+  "conclusion": "已闭合"
+}

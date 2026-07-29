@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/user-coupons-schema.json",
+  "title": "User Coupons Schema",
+  "description": "user_coupons 表数据契约。用户领取的优惠券记录表。来源：docs/plans/business-logic-system-completion-plan.md §4.1 步骤 4。\n\n与 coupons 关系：\n- coupons 是模板（管理员创建，定义规则）\n- user_coupons 是用户领取记录（关联 user_id + coupon_id）\n\n领取方式：\n- 用户主动领取（POST /api/coupons/:code/claim）\n- 系统批量发放（管理员操作，写入 user_coupons）\n\n状态机：\n- unused → used（订单结算时使用，关联 order_id）\n- unused → expired（超过 coupons.valid_until 未使用）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "用户 ID，引用 users.id"
+    },
+    "coupon_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "优惠券 ID，引用 coupons.id"
+    },
+    "server_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "default": null,
+      "description": "实例 ID（可空），引用 servers.id。null=未限定实例（global scope 适用）。领取时若 coupons.scope='server' 则写入对应 server_id"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["unused", "used", "expired"],
+      "default": "unused",
+      "description": "状态机：unused=未使用；used=已使用（关联 order_id）；expired=已过期（超过 coupons.valid_until）"
+    },
+    "claimed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "领取时间（ISO 8601 字符串）"
+    },
+    "used_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "使用时间（ISO 8601），仅 status=used 时有值"
+    },
+    "order_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "default": null,
+      "description": "使用的订单 ID（仅 status=used 时填写），引用 shop_orders.id。便于追溯某订单用了哪张券"
+    }
+  },
+  "required": ["id", "user_id", "coupon_id", "status", "claimed_at"]
+}

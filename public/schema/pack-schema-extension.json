@@ -1,0 +1,386 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/pack-schema-extension.json",
+  "title": "Pack Schema Extension",
+  "description": "Pack schema 扩展字段契约（items / event_parsers / business / commands 模板）。所有新增字段均为 optional，向后兼容现有 minecraft-vanilla Pack。本契约不修改现有 pack-schema.ts，仅作为扩展字段的独立描述。来源：scheme-final-merged.md §三。",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "items": {
+      "type": "object",
+      "description": "物品池配置。由 Panel shopService / itemSyncService 使用。当 Pack 无品质概念时（如 Minecraft），qualities 为空数组、quality_tiers=0。",
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "object",
+          "description": "物品来源配置",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["github_sync", "static", "local_file"],
+              "description": "来源类型：github_sync=定时拉取 GitHub JSON；static=直接内联在 Pack YAML；local_file=本地文件"
+            },
+            "url": {
+              "type": "string",
+              "format": "uri",
+              "description": "github_sync 模式下的 GitHub raw JSON URL"
+            },
+            "sync_interval_hours": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 720,
+              "default": 24,
+              "description": "Panel 定时拉取间隔（小时），默认 24 小时"
+            }
+          },
+          "required": ["type"]
+        },
+        "qualities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["normal", "uncommon", "rare", "epic", "legendary"]
+          },
+          "default": [],
+          "description": "该游戏支持的品质枚举。factorio 为 5 级全部，Minecraft 为空数组"
+        },
+        "quality_tiers": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 0,
+          "description": "品质等级数。factorio=5，Minecraft=0（无品质概念）"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "物品分类枚举（如 ammo/armor/fluid/item/recipe/technology）"
+        },
+        "static_list": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+                "description": "物品名（字母数字下划线短横线，1-64 字符）"
+              },
+              "display_name": {
+                "type": "string",
+                "description": "展示名"
+              },
+              "category": {
+                "type": "string",
+                "description": "分类，应 ∈ categories"
+              }
+            },
+            "required": ["name"]
+          },
+          "description": "static 模式下直接内联的物品清单，适用于物品数少的游戏"
+        }
+      },
+      "required": ["source"]
+    },
+    "event_parsers": {
+      "type": "object",
+      "description": "stdout 事件解析规则。Panel 端 chatMonitor / joinHandler 按这些正则解析 Daemon 转发的原始 stdout。不同游戏的日志格式差异完全由 Pack 吸收。",
+      "additionalProperties": false,
+      "properties": {
+        "chat": {
+          "type": "object",
+          "description": "聊天日志解析规则",
+          "additionalProperties": false,
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "description": "正则表达式（字符串形式），用于匹配聊天日志行"
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["timestamp", "level", "player", "message"]
+              },
+              "description": "正则捕获组名称映射，按捕获组顺序排列"
+            }
+          },
+          "required": ["pattern", "groups"]
+        },
+        "join": {
+          "type": "object",
+          "description": "玩家加入日志解析规则",
+          "additionalProperties": false,
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "description": "正则表达式（字符串形式），用于匹配玩家加入日志行"
+            },
+            "player_group": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "从正则哪个捕获组提取玩家名（1-based）"
+            }
+          },
+          "required": ["pattern", "player_group"]
+        },
+        "leave": {
+          "type": "object",
+          "description": "玩家离开日志解析规则",
+          "additionalProperties": false,
+          "properties": {
+            "pattern": {
+              "type": "string",
+              "description": "正则表达式（字符串形式），用于匹配玩家离开日志行"
+            },
+            "player_group": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "从正则哪个捕获组提取玩家名（1-based）"
+            }
+          },
+          "required": ["pattern", "player_group"]
+        }
+      }
+    },
+    "business": {
+      "type": "object",
+      "description": "业务能力声明。Panel 业务模块加载器据此实例化业务模块，commandDispatcher 据此渲染命令模板。某游戏不支持的能力（如 Minecraft 无 vote_kick）应 enabled=false 或缺省。",
+      "additionalProperties": false,
+      "properties": {
+        "shop": {
+          "type": "object",
+          "description": "商店业务能力",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "是否启用商店"
+            },
+            "give_command": {
+              "type": "string",
+              "description": "物品发放命令模板，使用 {{var}} 占位（player/item/count/quality）。Panel 渲染时严格校验变量值防注入"
+            },
+            "quality_tiers": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 0,
+              "description": "品质等级数，应与 items.quality_tiers 一致"
+            },
+            "support_quality": {
+              "type": "boolean",
+              "default": false,
+              "description": "是否支持品质选择"
+            }
+          },
+          "required": ["enabled"]
+        },
+        "cdk": {
+          "type": "object",
+          "description": "CDK 兑换业务能力",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "是否启用 CDK 兑换"
+            },
+            "redeem_command": {
+              "type": "string",
+              "description": "CDK 兑换命令模板。可填 'same as shop.give_command' 引用 shop.give_command 的值"
+            }
+          },
+          "required": ["enabled"]
+        },
+        "chat_enhancement": {
+          "type": "object",
+          "description": "聊天增强业务能力（P1-P4）",
+          "additionalProperties": false,
+          "properties": {
+            "welcome": {
+              "type": "object",
+              "description": "P1 欢迎礼包",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "first_gift_command": {
+                  "type": "string",
+                  "description": "首次加入礼包命令模板，可填 'same as shop.give_command'"
+                }
+              },
+              "required": ["enabled"]
+            },
+            "periodic_messages": {
+              "type": "object",
+              "description": "P2 定时消息",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "broadcast_command": {
+                  "type": "string",
+                  "description": "广播命令模板，使用 {{message}} 占位"
+                }
+              },
+              "required": ["enabled"]
+            },
+            "response_rules": {
+              "type": "object",
+              "description": "P3 关键词触发响应",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false
+                }
+              },
+              "required": ["enabled"]
+            },
+            "vote_kick": {
+              "type": "object",
+              "description": "P4 投票踢人",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": false
+                },
+                "kick_command": {
+                  "type": "string",
+                  "description": "踢人命令模板，使用 {{player}} {{reason}} 占位"
+                }
+              },
+              "required": ["enabled"]
+            }
+          }
+        },
+        "players": {
+          "type": "object",
+          "description": "玩家管理命令模板",
+          "additionalProperties": false,
+          "properties": {
+            "kick_command": {
+              "type": "string",
+              "description": "踢人命令模板，{{player}} {{reason}}"
+            },
+            "ban_command": {
+              "type": "string",
+              "description": "封禁命令模板，{{player}} {{reason}}"
+            }
+          }
+        },
+        "lists": {
+          "type": "object",
+          "description": "黑白名单命令模板",
+          "additionalProperties": false,
+          "properties": {
+            "whitelist_add": {
+              "type": "string",
+              "description": "白名单添加命令模板，{{json}} {{player}}"
+            },
+            "banlist_add": {
+              "type": "string",
+              "description": "黑名单添加命令模板，{{player}} {{reason}}"
+            }
+          }
+        },
+        "verify": {
+          "type": "object",
+          "description": "玩家绑定验证。Panel 收到 chat 事件 '!verify <code>' 时不下发命令，仅更新 DB 绑定状态",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false
+            }
+          },
+          "required": ["enabled"]
+        },
+        "instance": {
+          "type": "object",
+          "description": "实例业务能力（有效期/续费定价，决策 V6 全可配）。v1 新增（business-logic-v1-contracts）",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "是否启用实例有效期机制。false=该 Pack 的实例默认永久（不强制续费）"
+            },
+            "pricing": {
+              "type": "object",
+              "description": "续费定价配置（决策 V6 全可配）",
+              "additionalProperties": false,
+              "properties": {
+                "daily_price": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "default": 0,
+                  "description": "每日单价（点券数）。0=免费 Pack（实例永久免费）。续费金额 = daily_price × duration_days × tier_discount × vip_discount"
+                },
+                "tier_discounts": {
+                  "type": "object",
+                  "description": "阶梯折扣（按 duration_days 匹配）。键为天数门槛，值为折扣系数（1.0=无折扣，0.8=8 折）",
+                  "patternProperties": {
+                    "^\\d+$": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    }
+                  },
+                  "additionalProperties": false,
+                  "default": {},
+                  "examples": [
+                    { "30": 1.0, "90": 0.9, "365": 0.8 }
+                  ]
+                },
+                "currency": {
+                  "type": "string",
+                  "enum": ["points", "gift_only"],
+                  "default": "points",
+                  "description": "支付货币：points=点券（从钱包扣款）；gift_only=仅赠送（不可用户购买，amount_paid=0）"
+                }
+              },
+              "required": ["daily_price"]
+            }
+          },
+          "required": ["enabled"]
+        }
+      }
+    },
+    "commands": {
+      "type": "object",
+      "description": "通用运维命令模板（无业务语义）。与 business 下命令模板分工：commands=通用运维命令，business=带业务上下文渲染命令。",
+      "additionalProperties": true,
+      "properties": {
+        "broadcast": {
+          "type": "string",
+          "description": "广播命令模板，{{message}} 占位"
+        },
+        "list_players": {
+          "type": "string",
+          "description": "列出在线玩家命令"
+        },
+        "save_world": {
+          "type": "string",
+          "description": "保存世界命令"
+        },
+        "say_private": {
+          "type": "string",
+          "description": "私聊命令模板，{{player}} {{message}} 占位"
+        }
+      }
+    }
+  }
+}

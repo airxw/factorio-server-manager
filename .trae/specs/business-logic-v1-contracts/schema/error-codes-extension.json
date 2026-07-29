@@ -1,0 +1,235 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/error-codes-extension.json",
+  "title": "Error Codes Extension Schema (v1)",
+  "description": "错误码扩展契约（v1 实施）。新增 wallet / recharge / refund / coupon / expiry / quota / points 七类错误码，追加到 error-codes-schema.json 的 error_codes 数组。\n\n本契约不修改既有 error-codes-schema.json，仅声明新增错误码清单。category 枚举需同步扩展（新增 'wallet' / 'recharge' / 'refund' / 'coupon' / 'expiry' / 'quota' / 'points'）。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "error_codes": {
+      "type": "array",
+      "description": "新增错误码列表（追加到 error-codes-schema.json）",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{2,63}$" },
+          "message_template": { "type": "string", "minLength": 1 },
+          "http_status": { "type": "integer", "minimum": 100, "maximum": 599 },
+          "category": {
+            "type": "string",
+            "enum": [
+              "wallet", "recharge", "refund", "coupon",
+              "expiry", "quota", "points",
+              "vip", "instance", "shop", "cdk", "concurrency"
+            ]
+          },
+          "retryable": { "type": "boolean", "default": false },
+          "description": { "type": "string", "minLength": 1 }
+        },
+        "required": ["code", "message_template", "http_status", "category", "retryable", "description"]
+      }
+    }
+  },
+  "required": ["error_codes"],
+  "definitions": {
+    "predefined_codes": {
+      "type": "object",
+      "description": "v1 预定义新增错误码清单（文档参考用）",
+      "properties": {
+        "INSUFFICIENT_BALANCE": {
+          "code": "INSUFFICIENT_BALANCE",
+          "message_template": "Insufficient wallet balance: required={required}, actual={actual}, user={user_id}, server={server_id}",
+          "http_status": 400,
+          "category": "wallet",
+          "retryable": false,
+          "description": "钱包余额不足。触发场景：下单/续费/付费 CDK 兑换时 balance < amount。注：既有 impl errors.ts:498 已用此 code，本次首次纳入 public 契约（B-NEW-2 修复：保留既有命名，http_status 对齐既有 shop.ts:409 的 400）"
+        },
+        "DAILY_REWARD_ALREADY_CLAIMED": {
+          "code": "DAILY_REWARD_ALREADY_CLAIMED",
+          "message_template": "Daily reward already claimed today: user={user_id}, server={server_id}, date={date}",
+          "http_status": 409,
+          "category": "wallet",
+          "retryable": false,
+          "description": "今日已领取每日点券奖励。触发场景：walletService.claimDailyReward 按 last_daily_claim_date 判断今日已领。注：既有 impl errors.ts:507 已用此 code，本次首次纳入 public 契约（S-NEW-2 修复）"
+        },
+        "WALLET_NOT_FOUND": {
+          "code": "WALLET_NOT_FOUND",
+          "message_template": "Wallet not found: user={user_id}, server={server_id}",
+          "http_status": 404,
+          "category": "wallet",
+          "retryable": false,
+          "description": "钱包不存在。触发场景：用户在某实例未创建钱包（未绑定）"
+        },
+        "RECHARGE_CDK_INVALID": {
+          "code": "RECHARGE_CDK_INVALID",
+          "message_template": "Recharge CDK invalid: code={code}",
+          "http_status": 404,
+          "category": "recharge",
+          "retryable": false,
+          "description": "充值 CDK 不存在。触发场景：recharge_cdks 查询未命中"
+        },
+        "RECHARGE_CDK_ALREADY_REDEEMED": {
+          "code": "RECHARGE_CDK_ALREADY_REDEEMED",
+          "message_template": "Recharge CDK already redeemed or in progress: code={code}",
+          "http_status": 409,
+          "category": "recharge",
+          "retryable": false,
+          "description": "充值 CDK 已兑换或正在兑换中。触发场景：乐观锁 UPDATE 影响行数=0（status 非 unused）"
+        },
+        "RECHARGE_CDK_EXPIRED": {
+          "code": "RECHARGE_CDK_EXPIRED",
+          "message_template": "Recharge CDK expired: code={code}, expired_at={expired_at}",
+          "http_status": 409,
+          "category": "recharge",
+          "retryable": false,
+          "description": "充值 CDK 已过期。触发场景：expires_at < now"
+        },
+        "RECHARGE_CDK_BATCH_NOT_FOUND": {
+          "code": "RECHARGE_CDK_BATCH_NOT_FOUND",
+          "message_template": "Recharge CDK batch not found: batch_id={batch_id}",
+          "http_status": 404,
+          "category": "recharge",
+          "retryable": false,
+          "description": "充值 CDK 批次不存在。触发场景：recharge_cdk_batches 查询未命中"
+        },
+        "RECHARGE_CDK_BATCH_CREATE_FAILED": {
+          "code": "RECHARGE_CDK_BATCH_CREATE_FAILED",
+          "message_template": "Recharge CDK batch create failed: reason={reason}",
+          "http_status": 400,
+          "category": "recharge",
+          "retryable": false,
+          "description": "充值 CDK 批次创建失败。触发场景：total_count 超限 / face_value 非法 / 批量插入失败"
+        },
+        "REFUND_ORDER_NOT_FOUND": {
+          "code": "REFUND_ORDER_NOT_FOUND",
+          "message_template": "Refund order not found: refund_id={refund_id}",
+          "http_status": 404,
+          "category": "refund",
+          "retryable": false,
+          "description": "退款申请不存在。触发场景：wallet_refund_orders 查询未命中"
+        },
+        "REFUND_ORDER_NOT_PENDING": {
+          "code": "REFUND_ORDER_NOT_PENDING",
+          "message_template": "Refund order not pending: refund_id={refund_id}, current_status={status}",
+          "http_status": 409,
+          "category": "refund",
+          "retryable": false,
+          "description": "退款申请非 pending 状态。触发场景：approve/reject 时 status 非 pending"
+        },
+        "REFUND_AMOUNT_EXCEEDS_LIMIT": {
+          "code": "REFUND_AMOUNT_EXCEEDS_LIMIT",
+          "message_template": "Refund amount exceeds limit: requested={requested}, max={max}",
+          "http_status": 400,
+          "category": "refund",
+          "retryable": false,
+          "description": "退款金额超限。触发场景：amount > system_config.wallet.refund_max_amount"
+        },
+        "ORDER_NOT_REFUNDABLE": {
+          "code": "ORDER_NOT_REFUNDABLE",
+          "message_template": "Order not refundable: order_id={order_id}, status={status}",
+          "http_status": 409,
+          "category": "refund",
+          "retryable": false,
+          "description": "订单不可退款。触发场景：shop_orders.status != 'pending'（已领取订单需走补偿发放）"
+        },
+        "COUPON_INVALID": {
+          "code": "COUPON_INVALID",
+          "message_template": "Coupon invalid or expired: code={code}",
+          "http_status": 404,
+          "category": "coupon",
+          "retryable": false,
+          "description": "优惠券无效或已过期。触发场景：coupons 查询未命中或 valid_until < now"
+        },
+        "COUPON_ALREADY_CLAIMED": {
+          "code": "COUPON_ALREADY_CLAIMED",
+          "message_template": "Coupon already claimed by user: code={code}, user={user_id}",
+          "http_status": 409,
+          "category": "coupon",
+          "retryable": false,
+          "description": "用户已领取过该优惠券。触发场景：user_coupons 已有 active 记录"
+        },
+        "COUPON_USAGE_LIMIT_EXCEEDED": {
+          "code": "COUPON_USAGE_LIMIT_EXCEEDED",
+          "message_template": "Coupon usage limit exceeded: code={code}, used={used}, limit={limit}",
+          "http_status": 409,
+          "category": "coupon",
+          "retryable": false,
+          "description": "优惠券已达使用上限。触发场景：coupons.used_count >= coupons.usage_limit"
+        },
+        "COUPON_NOT_APPLICABLE": {
+          "code": "COUPON_NOT_APPLICABLE",
+          "message_template": "Coupon not applicable: code={code}, reason={reason}",
+          "http_status": 400,
+          "category": "coupon",
+          "retryable": false,
+          "description": "优惠券不适用于当前订单。触发场景：min_order_amount 不满足 / scope 不匹配 / 已过期"
+        },
+        "INSTANCE_NOT_RENEWABLE": {
+          "code": "INSTANCE_NOT_RENEWABLE",
+          "message_template": "Instance not renewable: server_id={server_id}, expiry_status={expiry_status}",
+          "http_status": 409,
+          "category": "expiry",
+          "retryable": false,
+          "description": "实例不可续费。触发场景：expiry_status='cleaned'（已清理磁盘的实例不可恢复）"
+        },
+        "INSTANCE_EXPIRY_CONFIG_ERROR": {
+          "code": "INSTANCE_EXPIRY_CONFIG_ERROR",
+          "message_template": "Instance expiry config error: key={key}, value={value}, reason={reason}",
+          "http_status": 500,
+          "category": "expiry",
+          "retryable": false,
+          "description": "实例到期配置错误。触发场景：system_config.instance.expiry.* 配置项缺失或非法"
+        },
+        "QUOTA_LIMIT_REACHED": {
+          "code": "QUOTA_LIMIT_REACHED",
+          "message_template": "Quota limit reached: user={user_id}, resource={resource_type}, used={used}, limit={limit}",
+          "http_status": 429,
+          "category": "quota",
+          "retryable": false,
+          "description": "配额已达上限。触发场景：创建实例/上传文件时超 max_instances / max_disk_mb / max_players_total"
+        },
+        "QUOTA_CONFIG_ERROR": {
+          "code": "QUOTA_CONFIG_ERROR",
+          "message_template": "Quota config error: key={key}, value={value}",
+          "http_status": 500,
+          "category": "quota",
+          "retryable": false,
+          "description": "配额配置错误。触发场景：vip.quota_overrides JSON 解析失败"
+        },
+        "VIP_POINTS_CONFIG_ERROR": {
+          "code": "VIP_POINTS_CONFIG_ERROR",
+          "message_template": "VIP points config error: key={key}, reason={reason}",
+          "http_status": 500,
+          "category": "points",
+          "retryable": false,
+          "description": "VIP 积分配置错误。触发场景：vip.points_thresholds JSON 解析失败或等级缺失"
+        },
+        "VIP_LEVEL_UPGRADE_FAILED": {
+          "code": "VIP_LEVEL_UPGRADE_FAILED",
+          "message_template": "VIP level upgrade failed: user={user_id}, server={server_id}, target_level={target_level}, reason={reason}",
+          "http_status": 500,
+          "category": "points",
+          "retryable": false,
+          "description": "VIP 等级升级失败。触发场景：vipService.setVipLevel 抛错（无 active 绑定记录等）"
+        },
+        "VIP_CHECKIN_ALREADY_TODAY": {
+          "code": "VIP_CHECKIN_ALREADY_TODAY",
+          "message_template": "VIP checkin already done today: user={user_id}, server={server_id}, date={date}",
+          "http_status": 409,
+          "category": "points",
+          "retryable": false,
+          "description": "今日已签到。触发场景：last_checkin_date == today"
+        },
+        "BINDING_NOT_FOUND": {
+          "code": "BINDING_NOT_FOUND",
+          "message_template": "Active binding not found: user={user_id}, server={server_id}",
+          "http_status": 404,
+          "category": "vip",
+          "retryable": false,
+          "description": "无 active 绑定记录。触发场景：vipPointService.addPoints / checkin 时用户未绑定实例（需先 bindInstance）。注：既有 vipService.updateBindingVip 也抛此错误，本错误码统一覆盖"
+        }
+      }
+    }
+  }
+}

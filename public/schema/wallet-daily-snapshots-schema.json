@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/wallet-daily-snapshots-schema.json",
+  "title": "Wallet Daily Snapshots Schema",
+  "description": "wallet_daily_snapshots 表数据契约。钱包每日快照表，支撑月度对账与余额变化曲线。来源：docs/plans/business-logic-system-completion-plan.md §4.1 步骤 2。\n\n调度任务：\n- WALLET_DAILY_SNAPSHOT（cron '0 1 * * *'）：每日凌晨 1 点快照所有 active 钱包余额\n- WALLET_SNAPSHOT_CLEANUP（cron '0 5 * * *'）：每日凌晨 5 点清理超过 90 天的快照\n\n对账场景：\n- 月度账单聚合：SUM 当月 shop_orders.total_price（消费）+ SUM recharge_cdks.face_value（充值）+ SUM wallet_refund_orders.amount（退款）\n- 余额校验：月末 snapshot.balance 应 = 月初 snapshot.balance + 充值 - 消费 + 退款\n- 余额变化曲线：按 snapshot_date 升序绘制",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "用户 ID，引用 users.id"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "实例 ID，引用 servers.id。快照按实例作用域"
+    },
+    "balance": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "快照时的钱包余额（点券数）"
+    },
+    "total_earned": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "快照时的累计获得点券总量"
+    },
+    "total_spent": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "快照时的累计消费点券总量"
+    },
+    "snapshot_date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "快照日期（YYYY-MM-DD）。UNIQUE(user_id, server_id, snapshot_date)。每日仅一条快照"
+    },
+    "snapshot_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "快照执行时间（ISO 8601 字符串）。通常为当日凌晨 1 点"
+    }
+  },
+  "required": ["id", "user_id", "server_id", "balance", "total_earned", "total_spent", "snapshot_date", "snapshot_at"]
+}

@@ -1,0 +1,41 @@
+# 故意构造的非法 Pack，用于验证 zod schema 的拦截能力
+pack:
+  id: 'Bad_ID_With_Upper'  # 错误：必须 kebab-case
+  game: 'unknown-game'     # 错误：不在 enum 内
+  variant: ''
+  display_name: ''
+  version: 'latest'        # 错误：非语义版本
+
+startup:
+  binary: ''
+  args: []
+  working_dir: ''
+  ready_pattern: ''
+  stop_command: 'stop'
+  stop_timeout: -1         # 错误：必须为正整数
+
+protocol:
+  type: 'unknown'          # 错误：不在 enum 内
+  default_port: 99999      # 错误：超过 65535
+  auth: 'invalid'
+  encrypt: 'invalid'
+
+config:
+  format: 'xml'            # 错误：不在 enum 内
+  main_file: ''
+  schema: []
+
+commands: 'should-be-object'  # 错误：必须是 Record<string,string>
+
+versions:
+  source: ''
+  type: 'unknown'
+  eula_required: 'yes'     # 错误：必须 boolean
+
+backup:
+  world_dir: ''
+  pre_backup_commands: 'not-array'
+  post_backup_commands: []
+
+ui:
+  tabs: ['unknown-tab']

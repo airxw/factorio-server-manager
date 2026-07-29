@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/config_template/permission.config.schema.json",
+  "title": "Permission System Configuration Schema",
+  "description": "v4.17.0 权限系统可调参数配置契约。控制权限缓存行为、失败降级策略等。来源：docs/plans/binding-unification-multi-role-plan.md §2.6 + §8.4。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "cache_ttl_seconds": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 3600,
+      "default": 300,
+      "description": "权限缓存 TTL（秒），默认 300=5 分钟。0=禁用缓存（每次查 DB）。权限变更后通过 invalidateCache 主动失效"
+    },
+    "cache_max_entries": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 10000,
+      "default": 100,
+      "description": "LRU 缓存容量上限，默认 100 条（按 user_id + active_role 组合缓存）。每条缓存约 1KB，100 条 ≈ 100KB 内存"
+    },
+    "cache_prewarm_on_startup": {
+      "type": "boolean",
+      "default": true,
+      "description": "服务启动时是否预热缓存（加载所有 active 用户的权限）。true=启动稍慢但首请求快；false=启动快但首请求慢"
+    },
+    "fail_closed": {
+      "type": "boolean",
+      "default": true,
+      "description": "DB 不可用时是否拒绝所有请求（fail-closed 安全模式）。true=拒绝（安全优先，生产推荐）；false=放行（可用性优先，仅开发环境）"
+    },
+    "superadmin_bypass_cache": {
+      "type": "boolean",
+      "default": true,
+      "description": "server_admin 角色是否绕过权限缓存直接放行。true=高性能（适用于 server_admin 拥有全部权限的场景）；false=严格走权限点查询"
+    },
+    "audit_permission_checks": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否记录权限检查审计日志（每个 hasPermission 调用）。false=不记录（性能优先）；true=记录（调试模式或合规要求）"
+    },
+    "role_template_editable": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否允许运行时修改 role_permission_templates。false=只读（模板由迁移脚本预置，变更需新迁移）；true=可读可写（通过 API 修改，触发缓存失效）"
+    }
+  },
+  "required": [
+    "cache_ttl_seconds",
+    "cache_max_entries",
+    "fail_closed"
+  ]
+}

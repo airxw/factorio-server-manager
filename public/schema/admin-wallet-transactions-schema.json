@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/admin-wallet-transactions-schema.json",
+  "title": "Admin Wallet Transactions Schema",
+  "description": "admin_wallet_transactions 表数据契约。腐竹账户流水审计表，记录 admin_wallets 每一次余额变动（含余额快照）。来源：docs/plans/role-permission-economy-system-plan.md §4.4.2。\n\n设计要点：\n- 所有 admin_wallets 余额变更必须先写流水再提交事务（同一 DB 事务内）\n- balance_after / pending_balance_after 为操作后快照，支持全链路对账\n- 流水同步写入 audit_logs（含余额查询操作），支持 server_admin 全局查询与导出\n- 建议保留至少 5 年备查（方案 §6.3-6 法务合规建议）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "admin_user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "腐竹用户 ID，引用 users.id (string UUID)"
+    },
+    "wallet_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "钱包 ID，引用 admin_wallets.id"
+    },
+    "transaction_type": {
+      "type": "string",
+      "enum": ["credit", "debit", "freeze", "unfreeze", "settle", "withdraw", "refund"],
+      "description": "流水类型：credit=入账（充值/赠送/退款回滚）；debit=出账（资源费/手续费）；freeze=冻结（分账入 pending_balance）；unfreeze=解冻（pending→balance）；settle=结算；withdraw=提现；refund=退款冲正"
+    },
+    "amount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "金额（点券，正数）。方向由 direction 字段表达"
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["in", "out"],
+      "description": "入账/出账。freeze/unfreeze 为账户内部迁移，direction 按对可用余额的影响记录（freeze=out，unfreeze=in）"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": ["settlement", "recharge", "gift", "refund", "fee", "withdrawal", "adjustment"],
+      "description": "来源类型：settlement=平台分账；recharge=腐竹充值（线下付费后平台手动加款）；gift=平台赠送；refund=退款冲正；fee=资源费/订阅费/手续费；withdrawal=提现；adjustment=人工调账（server_admin）"
+    },
+    "source_ref": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "关联 ID（结算记录 ID / 续费记录 ID / 提现单 ID / 审计事件 ID），便于追溯来源单据"
+    },
+    "balance_after": {
+      "type": "integer",
+      "description": "操作后可用余额快照（审计用，不可为负——欠费场景通过 owed_amount 表达）"
+    },
+    "pending_balance_after": {
+      "type": "integer",
+      "description": "操作后冻结余额快照（审计用）"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "completed", "failed", "reversed"],
+      "default": "completed",
+      "description": "流水状态：pending=处理中（如提现申请待审批）；completed=已完成；failed=失败；reversed=已冲正"
+    },
+    "metadata": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "扩展字段（JSON 字符串），如规则快照、操作员 ID、审批意见"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "completed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "完成时间（ISO 8601）。pending → completed/failed 时写入"
+    }
+  },
+  "required": ["id", "admin_user_id", "wallet_id", "transaction_type", "amount", "direction", "source_type", "balance_after", "pending_balance_after", "status", "created_at"]
+}

@@ -1,0 +1,690 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/config_template/panel-config.schema.json",
+  "title": "Panel Backend Configuration",
+  "description": "Panel Backend 配置契约。覆盖端口、JWT、数据库、Daemon 连接、VIP 默认值、scheduler、eventBus、shop、cdk、聊天增强、限流、CORS 等配置项。所有字段必须显式声明默认值与补齐规则，业务代码禁止硬编码配置参数。来源：scheme-final-merged.md §10.1 / §五 / panel.env.template。",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "LogLevel": {
+      "type": "string",
+      "enum": ["trace", "debug", "info", "warn", "error"],
+      "description": "日志级别"
+    },
+    "IsoTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 时间戳"
+    }
+  },
+  "properties": {
+    "server": {
+      "type": "object",
+      "description": "HTTP 服务监听配置",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 3000,
+          "description": "Panel 后端监听端口"
+        },
+        "host": {
+          "type": "string",
+          "default": "0.0.0.0",
+          "description": "监听地址，0.0.0.0 表示所有接口"
+        },
+        "cors_origins": {
+          "type": "array",
+          "items": { "type": "string", "format": "uri" },
+          "default": ["http://localhost:5173", "http://127.0.0.1:5173"],
+          "description": "CORS 允许来源列表。生产环境应替换为实际前端域名"
+        },
+        "request_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 600000,
+          "default": 30000,
+          "description": "HTTP 请求超时（毫秒）"
+        },
+        "body_limit_mb": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10,
+          "description": "请求体大小上限（MB）"
+        }
+      },
+      "required": ["port"],
+      "default": { "port": 3000, "host": "0.0.0.0", "cors_origins": ["http://localhost:5173", "http://127.0.0.1:5173"], "request_timeout_ms": 30000, "body_limit_mb": 10 }
+    },
+    "auth": {
+      "type": "object",
+      "description": "认证与 JWT 配置",
+      "additionalProperties": false,
+      "properties": {
+        "jwt_secret": {
+          "type": "string",
+          "minLength": 16,
+          "description": "JWT 签名密钥。生产环境必须替换为强随机值（至少 32 字符）。无默认值，缺失时启动报错。"
+        },
+        "jwt_min_secret_length": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 128,
+          "default": 16,
+          "description": "JWT 密钥最小长度。低于此值时生产环境拒绝启动，非生产环境降级 warn。对应环境变量 JWT_MIN_SECRET_LENGTH"
+        },
+        "jwt_expires_in_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400,
+          "default": 86400,
+          "description": "JWT 过期时间（秒），默认 24 小时"
+        },
+        "password_hash_rounds": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 15,
+          "default": 10,
+          "description": "bcrypt 哈希轮数"
+        },
+        "verify_code_length": {
+          "type": "integer",
+          "minimum": 4,
+          "maximum": 8,
+          "default": 6,
+          "description": "玩家绑定验证码长度"
+        },
+        "verify_code_ttl_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400,
+          "default": 600,
+          "description": "验证码有效期（秒），默认 10 分钟"
+        },
+        "password_policy": {
+          "type": "object",
+          "description": "改密安全策略（v3.4.0 新增）。对应 userService.updatePassword 三重校验",
+          "additionalProperties": false,
+          "properties": {
+            "min_zxcvbn_score": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 4,
+              "default": 3,
+              "description": "zxcvbn 密码强度最低分（0-4）。默认 3 = 强密码。0 = 禁用强度校验（仅开发环境）"
+            },
+            "max_history": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 24,
+              "default": 5,
+              "description": "密码历史保留条数。改密时与最近 N 条比对防重用。0 = 禁用历史校验"
+            }
+          },
+          "required": ["min_zxcvbn_score", "max_history"],
+          "default": { "min_zxcvbn_score": 3, "max_history": 5 }
+        }
+      },
+      "required": ["jwt_secret"],
+      "default": { "jwt_min_secret_length": 16, "jwt_expires_in_seconds": 86400, "password_hash_rounds": 10, "verify_code_length": 6, "verify_code_ttl_seconds": 600, "password_policy": { "min_zxcvbn_score": 3, "max_history": 5 } }
+    },
+    "database": {
+      "type": "object",
+      "description": "数据库连接配置。P0 使用 SQLite，零配置。",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "default": "./data/panel.db",
+          "description": "数据库连接字符串。SQLite 为文件路径，PostgreSQL 为 postgres://..."
+        },
+        "pool_min": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 2,
+          "description": "连接池最小连接数（SQLite 忽略）"
+        },
+        "pool_max": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 10,
+          "description": "连接池最大连接数（SQLite 忽略）"
+        },
+        "migrations_dir": {
+          "type": "string",
+          "default": "./db/migrations",
+          "description": "Knex migrations 目录路径"
+        },
+        "migrations_auto_run": {
+          "type": "boolean",
+          "default": true,
+          "description": "Panel 启动时是否自动执行 pending migrations"
+        }
+      },
+      "required": ["url"],
+      "default": { "url": "./data/panel.db", "pool_min": 2, "pool_max": 10, "migrations_dir": "./db/migrations", "migrations_auto_run": true }
+    },
+    "daemon_client": {
+      "type": "object",
+      "description": "Panel → Daemon 客户端配置",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "default": "http://localhost:8080",
+          "description": "Daemon 节点 URL（P0 单机模式，Panel+Daemon 同机）"
+        },
+        "token": {
+          "type": "string",
+          "description": "Daemon 鉴权 Token。必须与 daemon-config.token 保持一致。无默认值，缺失时启动报错。"
+        },
+        "request_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 120000,
+          "default": 30000,
+          "description": "REST 请求超时（毫秒）"
+        },
+        "ws_reconnect_interval_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "default": 5000,
+          "description": "WS 断连后重连间隔（毫秒）"
+        },
+        "ws_heartbeat_interval_ms": {
+          "type": "integer",
+          "minimum": 5000,
+          "maximum": 120000,
+          "default": 30000,
+          "description": "WS 心跳间隔（毫秒）"
+        }
+      },
+      "required": ["url", "token"],
+      "default": { "url": "http://localhost:8080", "request_timeout_ms": 30000, "ws_reconnect_interval_ms": 5000, "ws_heartbeat_interval_ms": 30000 }
+    },
+    "vip": {
+      "type": "object",
+      "description": "VIP 默认配置。运行时具体值由 vip_permissions 表覆盖；本配置仅用于初始化 seed 与兜底默认值。",
+      "additionalProperties": false,
+      "properties": {
+        "default_level": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5,
+          "default": 0,
+          "description": "新注册用户默认 VIP 等级"
+        },
+        "admin_level": {
+          "type": "integer",
+          "minimum": 999,
+          "maximum": 999,
+          "default": 999,
+          "description": "管理员 VIP 等级（不受品质/限购约束）"
+        },
+        "default_daily_limit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000,
+          "default": 5,
+          "description": "默认每日购买限额（件）"
+        },
+        "default_expires_days": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3650,
+          "default": 30,
+          "description": "默认 VIP 有效期（天），0 表示永久"
+        }
+      },
+      "required": ["default_level", "admin_level"],
+      "default": { "default_level": 0, "admin_level": 999, "default_daily_limit": 5, "default_expires_days": 30 }
+    },
+    "shop": {
+      "type": "object",
+      "description": "商店业务配置",
+      "additionalProperties": false,
+      "properties": {
+        "order_claim_ttl_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 86400,
+          "default": 3600,
+          "description": "订单 claim_code 有效期（秒），默认 1 小时"
+        },
+        "claiming_timeout_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600,
+          "default": 300,
+          "description": "claiming 状态超时阈值（秒），超时后定时任务回滚为 pending。默认 5 分钟"
+        },
+        "claiming_scan_interval_seconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 600,
+          "default": 60,
+          "description": "claiming 超时扫描定时任务间隔（秒）"
+        },
+        "max_items_per_order": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50,
+          "default": 10,
+          "description": "单笔订单最大商品数"
+        }
+      },
+      "required": ["order_claim_ttl_seconds", "claiming_timeout_seconds"],
+      "default": { "order_claim_ttl_seconds": 3600, "claiming_timeout_seconds": 300, "claiming_scan_interval_seconds": 60, "max_items_per_order": 10 }
+    },
+    "cdk": {
+      "type": "object",
+      "description": "CDK 兑换业务配置",
+      "additionalProperties": false,
+      "properties": {
+        "code_length": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 32,
+          "default": 16,
+          "description": "CDK 兑换码长度（字符数）"
+        },
+        "code_charset": {
+          "type": "string",
+          "default": "ABCDEFGHJKLMNPQRSTUVWXYZ23456789",
+          "description": "CDK 字符集（去除易混淆字符 0/O/1/I）"
+        },
+        "batch_size_limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10000,
+          "default": 1000,
+          "description": "批量生成 CDK 单次上限"
+        },
+        "claiming_timeout_seconds": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3600,
+          "default": 300,
+          "description": "CDK claiming 状态超时阈值（秒）"
+        }
+      },
+      "required": ["code_length", "code_charset"],
+      "default": { "code_length": 16, "code_charset": "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", "batch_size_limit": 1000, "claiming_timeout_seconds": 300 }
+    },
+    "chat_enhancement": {
+      "type": "object",
+      "description": "聊天增强 P1-P4 配置",
+      "additionalProperties": false,
+      "properties": {
+        "stdout_batch_window_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2000,
+          "default": 100,
+          "description": "stdout 批处理窗口（毫秒）。chatMonitor 在窗口内合并多行日志一起解析以降低正则开销。0 表示禁用批处理"
+        },
+        "parser_regex_cache_size": {
+          "type": "integer",
+          "minimum": 16,
+          "maximum": 1024,
+          "default": 128,
+          "description": "event_parsers 正则预编译缓存大小"
+        },
+        "vote_default_threshold": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 50,
+          "default": 3,
+          "description": "投票踢人默认阈值（票数）"
+        },
+        "vote_default_duration_seconds": {
+          "type": "integer",
+          "minimum": 30,
+          "maximum": 1800,
+          "default": 300,
+          "description": "投票默认持续时间（秒）"
+        },
+        "periodic_message_max_per_server": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 20,
+          "description": "单实例最大定时消息条数"
+        },
+        "welcome_first_gift_cooldown_seconds": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 86400,
+          "default": 0,
+          "description": "同一玩家首次礼包冷却（秒），0 表示无冷却（仅首次加入发放）"
+        }
+      },
+      "required": ["stdout_batch_window_ms", "vote_default_threshold"],
+      "default": { "stdout_batch_window_ms": 100, "parser_regex_cache_size": 128, "vote_default_threshold": 3, "vote_default_duration_seconds": 300, "periodic_message_max_per_server": 20, "welcome_first_gift_cooldown_seconds": 0 }
+    },
+    "command_dispatcher": {
+      "type": "object",
+      "description": "命令队列与重试配置",
+      "additionalProperties": false,
+      "properties": {
+        "queue_max_size": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 100000,
+          "default": 1000,
+          "description": "命令队列上限。超限触发告警，丢弃低优先级命令"
+        },
+        "max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "命令最大重试次数"
+        },
+        "retry_backoff_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000,
+          "default": 1000,
+          "description": "重试退避基准（毫秒），指数退避：attempts * retry_backoff_ms"
+        },
+        "worker_interval_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 10000,
+          "default": 500,
+          "description": "队列 worker 拉取间隔（毫秒）"
+        },
+        "variable_whitelist_regex": {
+          "type": "string",
+          "default": "^[a-zA-Z0-9_-]{1,64}$",
+          "description": "命令模板变量值白名单正则。所有 {{var}} 渲染前必须通过此正则校验，防注入"
+        }
+      },
+      "required": ["queue_max_size", "max_attempts", "variable_whitelist_regex"],
+      "default": { "queue_max_size": 1000, "max_attempts": 3, "retry_backoff_ms": 1000, "worker_interval_ms": 500, "variable_whitelist_regex": "^[a-zA-Z0-9_-]{1,64}$" }
+    },
+    "scheduler": {
+      "type": "object",
+      "description": "定时任务调度器配置",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用 scheduler"
+        },
+        "tick_interval_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "default": 5000,
+          "description": "scheduler tick 间隔（毫秒），所有 cron/interval 任务按此粒度检查"
+        },
+        "max_concurrent_tasks": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10,
+          "description": "最大并发任务数"
+        }
+      },
+      "required": ["enabled", "tick_interval_ms"],
+      "default": { "enabled": true, "tick_interval_ms": 5000, "max_concurrent_tasks": 10 }
+    },
+    "event_bus": {
+      "type": "object",
+      "description": "事件总线配置",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用 eventBus"
+        },
+        "max_listeners_per_event": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 50,
+          "description": "单个事件最大监听器数（防内存泄漏）"
+        },
+        "dead_letter_log": {
+          "type": "string",
+          "default": "./data/event_bus_dead_letter.log",
+          "description": "事件处理失败时的死信日志路径"
+        }
+      },
+      "required": ["enabled"],
+      "default": { "enabled": true, "max_listeners_per_event": 50, "dead_letter_log": "./data/event_bus_dead_letter.log" }
+    },
+    "item_sync": {
+      "type": "object",
+      "description": "物品同步服务配置",
+      "additionalProperties": false,
+      "properties": {
+        "retry_max_attempts": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "GitHub 拉取失败重试次数"
+        },
+        "retry_backoff_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "default": 5000,
+          "description": "重试退避基准（毫秒）"
+        },
+        "cache_dir": {
+          "type": "string",
+          "default": "./data/item_cache",
+          "description": "物品缓存目录"
+        },
+        "request_timeout_ms": {
+          "type": "integer",
+          "minimum": 5000,
+          "maximum": 120000,
+          "default": 30000,
+          "description": "GitHub raw 拉取超时（毫秒）"
+        }
+      },
+      "required": ["retry_max_attempts"],
+      "default": { "retry_max_attempts": 3, "retry_backoff_ms": 5000, "cache_dir": "./data/item_cache", "request_timeout_ms": 30000 }
+    },
+    "rate_limit": {
+      "type": "object",
+      "description": "速率限制配置（基于内存，单实例）",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用速率限制"
+        },
+        "auth_login_per_minute": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 10,
+          "description": "登录接口每分钟每 IP 限制"
+        },
+        "shop_order_per_minute": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 20,
+          "description": "下单接口每分钟每用户限制"
+        },
+        "cdk_redeem_per_minute": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 10,
+          "description": "CDK 兑换接口每分钟每用户限制"
+        },
+        "api_default_per_minute": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 10000,
+          "default": 120,
+          "description": "其他 API 默认每分钟每 IP 限制"
+        }
+      },
+      "required": ["enabled"],
+      "default": { "enabled": true, "auth_login_per_minute": 10, "shop_order_per_minute": 20, "cdk_redeem_per_minute": 10, "api_default_per_minute": 120 }
+    },
+    "log": {
+      "type": "object",
+      "description": "日志输出配置",
+      "additionalProperties": false,
+      "properties": {
+        "level": { "$ref": "#/definitions/LogLevel", "default": "info" },
+        "format": {
+          "type": "string",
+          "enum": ["json", "text"],
+          "default": "text",
+          "description": "日志输出格式。生产环境建议 json"
+        },
+        "file_path": {
+          "type": "string",
+          "default": "",
+          "description": "日志文件路径。空字符串表示仅输出到 stdout"
+        },
+        "max_file_size_mb": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024,
+          "default": 100,
+          "description": "单日志文件大小上限（MB）"
+        },
+        "max_file_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 7,
+          "description": "保留日志文件数量"
+        }
+      },
+      "required": ["level"],
+      "default": { "level": "info", "format": "text", "file_path": "", "max_file_size_mb": 100, "max_file_count": 7 }
+    },
+    "audit_log": {
+      "type": "object",
+      "description": "审计日志配置",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否记录审计日志到 audit_logs 表"
+        },
+        "retention_days": {
+          "type": "integer",
+          "minimum": 7,
+          "maximum": 3650,
+          "default": 90,
+          "description": "审计日志保留天数。超过的记录由定时任务清理"
+        }
+      },
+      "required": ["enabled"],
+      "default": { "enabled": true, "retention_days": 90 }
+    },
+    "system_update": {
+      "type": "object",
+      "description": "系统更新与诊断配置（v3.4.0 新增）。控制蓝绿更新流程、诊断规则与修复脚本路径、改密安全策略",
+      "additionalProperties": false,
+      "properties": {
+        "update_source_type": {
+          "type": "string",
+          "enum": ["tar", "git"],
+          "default": "tar",
+          "description": "更新源类型。tar=B 方案蓝绿 tar 包（主路径，含 sha256 校验）；git=A 方案 git pull（可选路径，开发/单机部署适用）"
+        },
+        "update_manifest_url": {
+          "type": "string",
+          "format": "uri",
+          "default": "https://api.github.com/repos/airxw/gameserver-panel/releases/latest",
+          "description": "更新清单 URL。tar 模式下为 GitHub Releases API；git 模式下忽略"
+        },
+        "update_branch": {
+          "type": "string",
+          "default": "main",
+          "description": "git 模式下的分支名；tar 模式下用于校验 release target_commitish"
+        },
+        "deploy_root": {
+          "type": "string",
+          "default": "/opt/gameserver-panel",
+          "description": "蓝绿部署根目录。下含 current/ next/ previous/ shared/ 四个子目录"
+        },
+        "process_manager": {
+          "type": "string",
+          "enum": ["systemd", "pm2", "none"],
+          "default": "systemd",
+          "description": "进程管理器。切换 symlink 后通过此管理器重启服务。none=直接 kill+spawn（仅开发用）"
+        },
+        "smoke_test_port": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65535,
+          "default": 9090,
+          "description": "冒烟测试端口。蓝绿切换后在新端口启动 next 实例做健康检查，通过后再切换 current symlink。注意：8080 禁外网（rules-1.md），不可用作 smoke_test_port"
+        },
+        "smoke_test_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 30000,
+          "default": 5000,
+          "description": "冒烟测试单次请求超时（毫秒）"
+        },
+        "smoke_test_max_retries": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "default": 3,
+          "description": "冒烟测试最大重试次数（间隔 1s）"
+        },
+        "diagnostic_rules_path": {
+          "type": "string",
+          "default": "./config/diagnostic-rules.json",
+          "description": "诊断规则静态配置文件路径。systemDiagnosticService.runDiagnostics 读取此文件"
+        },
+        "diagnostic_fixes_path": {
+          "type": "string",
+          "default": "./config/diagnostic-fixes.json",
+          "description": "修复脚本白名单配置路径。systemDiagnosticService.applyFix 仅执行此文件中列出的脚本"
+        }
+      },
+      "required": ["update_source_type", "deploy_root", "smoke_test_port"],
+      "default": { "update_source_type": "tar", "update_manifest_url": "https://api.github.com/repos/airxw/gameserver-panel/releases/latest", "update_branch": "main", "deploy_root": "/opt/gameserver-panel", "process_manager": "systemd", "smoke_test_port": 9090, "smoke_test_timeout_ms": 5000, "smoke_test_max_retries": 3, "diagnostic_rules_path": "./config/diagnostic-rules.json", "diagnostic_fixes_path": "./config/diagnostic-fixes.json" }
+    }
+  },
+  "required": ["server", "auth", "database", "daemon_client", "log"],
+  "default": {
+    "server": { "port": 3000, "host": "0.0.0.0", "cors_origins": ["http://localhost:5173"], "request_timeout_ms": 30000, "body_limit_mb": 10 },
+    "auth": { "jwt_expires_in_seconds": 86400, "password_hash_rounds": 10, "verify_code_length": 6, "verify_code_ttl_seconds": 600 },
+    "database": { "url": "./data/panel.db", "pool_min": 2, "pool_max": 10, "migrations_dir": "./db/migrations", "migrations_auto_run": true },
+    "daemon_client": { "url": "http://localhost:8080", "request_timeout_ms": 30000, "ws_reconnect_interval_ms": 5000, "ws_heartbeat_interval_ms": 30000 },
+    "vip": { "default_level": 0, "admin_level": 999, "default_daily_limit": 5, "default_expires_days": 30 },
+    "shop": { "order_claim_ttl_seconds": 3600, "claiming_timeout_seconds": 300, "claiming_scan_interval_seconds": 60, "max_items_per_order": 10 },
+    "cdk": { "code_length": 16, "code_charset": "ABCDEFGHJKLMNPQRSTUVWXYZ23456789", "batch_size_limit": 1000, "claiming_timeout_seconds": 300 },
+    "chat_enhancement": { "stdout_batch_window_ms": 100, "parser_regex_cache_size": 128, "vote_default_threshold": 3, "vote_default_duration_seconds": 300, "periodic_message_max_per_server": 20, "welcome_first_gift_cooldown_seconds": 0 },
+    "command_dispatcher": { "queue_max_size": 1000, "max_attempts": 3, "retry_backoff_ms": 1000, "worker_interval_ms": 500, "variable_whitelist_regex": "^[a-zA-Z0-9_-]{1,64}$" },
+    "scheduler": { "enabled": true, "tick_interval_ms": 5000, "max_concurrent_tasks": 10 },
+    "event_bus": { "enabled": true, "max_listeners_per_event": 50, "dead_letter_log": "./data/event_bus_dead_letter.log" },
+    "item_sync": { "retry_max_attempts": 3, "retry_backoff_ms": 5000, "cache_dir": "./data/item_cache", "request_timeout_ms": 30000 },
+    "rate_limit": { "enabled": true, "auth_login_per_minute": 10, "shop_order_per_minute": 20, "cdk_redeem_per_minute": 10, "api_default_per_minute": 120 },
+    "log": { "level": "info", "format": "text", "file_path": "", "max_file_size_mb": 100, "max_file_count": 7 },
+    "audit_log": { "enabled": true, "retention_days": 90 },
+    "system_update": { "update_source_type": "tar", "update_manifest_url": "https://api.github.com/repos/airxw/gameserver-panel/releases/latest", "update_branch": "main", "deploy_root": "/opt/gameserver-panel", "process_manager": "systemd", "smoke_test_port": 9090, "smoke_test_timeout_ms": 5000, "smoke_test_max_retries": 3, "diagnostic_rules_path": "./config/diagnostic-rules.json", "diagnostic_fixes_path": "./config/diagnostic-fixes.json" }
+  },
+  "$comment": "自动补齐规则：配置加载时按 default 字段补齐缺失项；jwt_secret 与 daemon_client.token 必须显式提供，缺失则启动失败。环境变量映射：PORT→server.port, JWT_SECRET→auth.jwt_secret, JWT_MIN_SECRET_LENGTH→auth.jwt_min_secret_length, CORS_ORIGIN→server.cors_origins（逗号分隔自动转数组）, DATABASE_URL→database.url, DAEMON_URL→daemon_client.url, DAEMON_TOKEN→daemon_client.token, LOG_LEVEL→log.level, UPDATE_SOURCE_TYPE→system_update.update_source_type, UPDATE_MANIFEST_URL→system_update.update_manifest_url, UPDATE_BRANCH→system_update.update_branch, DEPLOY_ROOT→system_update.deploy_root, PROCESS_MANAGER→system_update.process_manager, SMOKE_TEST_PORT→system_update.smoke_test_port, PASSWORD_MIN_ZXCVBN_SCORE→auth.password_policy.min_zxcvbn_score, PASSWORD_MAX_HISTORY→auth.password_policy.max_history。"
+}

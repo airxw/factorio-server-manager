@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/coupons-schema.json",
+  "title": "Coupons Schema",
+  "description": "coupons 表数据契约。优惠券模板表，定义折扣规则与适用范围。来源：docs/plans/business-logic-system-completion-plan.md §4.1 步骤 4。\n\n折扣类型：\n- percent：百分比折扣（如 90=9 折，50=5 折）\n- fixed：固定金额抵扣（如 100=抵扣 100 点券）\n\n适用范围（scope）：\n- global：全平台通用\n- server：指定实例可用（scope_id=server_id）\n- item：指定商品可用（scope_id=item_name）\n\n叠加规则（在 shopService.createOrder 强校验）：\n- VIP 折扣与优惠券不叠加，取最优（即用户选择最优折扣）\n- 0 元订单仅允许 total_price = 0 的免费商品\n\n使用限制：\n- usage_limit：总使用次数上限（null=不限）\n- used_count：已使用次数（冗余字段）\n- valid_from / valid_until：有效期区间",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "code": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 32,
+      "pattern": "^[A-Z0-9]{4,32}$",
+      "description": "优惠券码。UNIQUE 约束。大写字母数字，4-32 字符。用户在结算页输入此码应用折扣"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "优惠券展示名（如 '新年 9 折券' / '满 100 减 20'）"
+    },
+    "discount_type": {
+      "type": "string",
+      "enum": ["percent", "fixed"],
+      "description": "折扣类型：percent=百分比折扣（discount_value 为百分比 1-100）；fixed=固定金额抵扣（discount_value 为点券数）"
+    },
+    "discount_value": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "折扣值。percent 模式：1-100（90=9 折，50=5 折，1=1 折）；fixed 模式：1-1000000（抵扣点券数）"
+    },
+    "min_order_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "最低订单金额（点券数）。0=无门槛。订单 total_price 必须 ≥ 此值才可使用"
+    },
+    "max_discount_amount": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "default": null,
+      "description": "最大抵扣金额（点券数）。null=不限。仅 percent 模式有意义（防止高金额订单折扣过大）"
+    },
+    "valid_from": {
+      "type": "string",
+      "format": "date-time",
+      "description": "有效期起始时间（ISO 8601 字符串）。在此之前不可使用"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date-time",
+      "description": "有效期结束时间（ISO 8601 字符串）。在此之后不可使用"
+    },
+    "usage_limit": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "default": null,
+      "description": "总使用次数上限。null=不限。每次使用 used_count+1，达上限后自动失效"
+    },
+    "used_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "已使用次数（冗余字段，与 user_coupons WHERE status='used' COUNT 同步）"
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["global", "server", "item"],
+      "default": "global",
+      "description": "适用范围：global=全平台；server=指定实例；item=指定商品"
+    },
+    "scope_id": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "范围限定 ID。scope=server 时为 server_id (UUID)；scope=item 时为 item_name；scope=global 时为 null"
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid",
+      "description": "创建者用户 ID（管理员），引用 users.id"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "code", "display_name", "discount_type", "discount_value", "valid_from", "valid_until", "scope", "created_by", "created_at"]
+}

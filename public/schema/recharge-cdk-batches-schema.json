@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/recharge-cdk-batches-schema.json",
+  "title": "Recharge CDK Batches Schema",
+  "description": "recharge_cdk_batches 表数据契约。充值 CDK 批次管理表，便于卡商对账与库存管理。来源：docs/plans/business-logic-system-completion-plan.md §4.1 步骤 1（决策 V2）。\n\n批次与 CDK 关系：\n- 1 个批次包含 N 个 recharge_cdks（N = total_count）\n- 批次内所有 CDK 共享 face_value / expires_at\n- 批次不可修改（创建后只能查看/导出，不能增删 CDK）\n\n卡商对账场景：\n- 系统管理员创建批次时记录 batch_name（如 '2026Q3-卡商A-10000元面值'）\n- 卡商付费后导出该批次 CSV 转卖\n- 通过 used_count / total_count 监控批次消耗进度",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "batch_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "批次名称（管理员可读）。如 '2026Q3-卡商A-100元面值-1000张'"
+    },
+    "batch_description": {
+      "type": ["string", "null"],
+      "maxLength": 512,
+      "default": null,
+      "description": "批次描述（可选）。记录卡商信息、合同编号等"
+    },
+    "total_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100000,
+      "description": "批次总 CDK 数量。创建时确定，不可修改。1-100000（防误操作批量过大）"
+    },
+    "used_count": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "已兑换数量（冗余字段，定期与 recharge_cdks WHERE status='used' COUNT 同步）。便于快速查询批次进度"
+    },
+    "face_value": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000,
+      "description": "面值（点券数）。批次内所有 CDK 共享此面值。100=1 元等价"
+    },
+    "total_face_value": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "批次总面值 = total_count × face_value。冗余字段，便于对账"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "批次过期时间（ISO 8601 字符串）。批次内所有 CDK 的 expires_at 取此值。过期后未兑换的 CDK 自动 expired"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "archived"],
+      "default": "active",
+      "description": "批次状态：active=活跃（可继续兑换）；archived=归档（不再展示在卡商列表，但保留审计记录）"
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid",
+      "description": "创建者用户 ID（系统管理员），引用 users.id"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "archived_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "归档时间（ISO 8601），仅 status=archived 时有值"
+    }
+  },
+  "required": ["id", "batch_name", "total_count", "used_count", "face_value", "total_face_value", "expires_at", "status", "created_by", "created_at"]
+}

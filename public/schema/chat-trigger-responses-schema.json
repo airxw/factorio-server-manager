@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/chat-trigger-responses-schema.json",
+  "title": "Chat Trigger Responses Schema",
+  "description": "chat_trigger_responses 表数据契约。P3 自定义触发响应规则——玩家在游戏内 chat 输入 trigger 关键词时，Panel 自动下发 response 命令。来源：scheme-final-merged.md §4.2.2 P3。factorio 迁移表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "trigger": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "触发关键词。chatMonitor 解析 stdout 后匹配此字段，命中则下发 response"
+    },
+    "response": {
+      "type": "string",
+      "minLength": 1,
+      "description": "响应命令模板。可使用 {{player}} {{message}} 占位，由 commandDispatcher 渲染后下发"
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "default": 50,
+      "description": "优先级，数字越小越先匹配。同一 trigger 多条规则时按 priority 升序"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用此规则"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "trigger", "response", "priority", "enabled", "created_at"]
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/vote-settings-schema.json",
+  "title": "Vote Settings Schema",
+  "description": "vote_settings 表数据契约。P4 投票踢人配置——阈值、时长、原因前缀。来源：scheme-final-merged.md §4.2.2 P3 / §5.4。factorio 迁移表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)。UNIQUE 约束（每服务器一条配置）"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否启用投票踢人。受 Pack.business.chat_enhancement.vote_kick.enabled 上限约束"
+    },
+    "threshold": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 3,
+      "description": "通过阈值（票数）。达此票数则执行 kick"
+    },
+    "duration_seconds": {
+      "type": "integer",
+      "minimum": 10,
+      "maximum": 3600,
+      "default": 60,
+      "description": "投票持续时长（秒），10-3600。超时未达阈值则投票 failed"
+    },
+    "reason_prefix": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "default": "[VoteKick]",
+      "description": "kick 原因前缀。实际 kick reason = reason_prefix + ' ' + 投票原因"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "enabled", "threshold", "duration_seconds", "reason_prefix", "updated_at"]
+}

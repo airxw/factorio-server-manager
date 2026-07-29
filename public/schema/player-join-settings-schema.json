@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/player-join-settings-schema.json",
+  "title": "Player Join Settings Schema",
+  "description": "player_join_settings 表数据契约。P1 玩家加入配置——欢迎语、首次礼包。来源：scheme-final-merged.md §4.2.2 P3 / §5.4。factorio 迁移表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)。UNIQUE 约束（每服务器一条配置）"
+    },
+    "welcome_message": {
+      "type": ["string", "null"],
+      "maxLength": 500,
+      "default": null,
+      "description": "欢迎语。玩家加入时按 Pack.business.chat_enhancement.welcome 模板下发。null=不发送欢迎语"
+    },
+    "gift_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否启用首次加入礼包。true 时按 Pack.business.chat_enhancement.welcome.first_gift_command 渲染下发"
+    },
+    "gift_item": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+      "default": null,
+      "description": "礼包物品名，应 ∈ Pack.items。仅 gift_enabled=true 时有效"
+    },
+    "gift_count": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "maximum": 999999,
+      "default": null,
+      "description": "礼包物品数量。仅 gift_enabled=true 时有效"
+    },
+    "gift_quality": {
+      "type": ["string", "null"],
+      "enum": ["normal", "uncommon", "rare", "epic", "legendary", null],
+      "default": null,
+      "description": "礼包物品品质。仅 gift_enabled=true 时有效。null=normal"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "gift_enabled", "updated_at"]
+}

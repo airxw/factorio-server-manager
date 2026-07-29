@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/config_template/binding.config.schema.json",
+  "title": "Binding Configuration Schema",
+  "description": "v4.17.0 绑定流程可调参数配置契约。所有参数有默认值，缺失字段由 zod schema 自动补全（rules-3 §三 auto_fill 要求）。来源：docs/plans/binding-unification-multi-role-plan.md §2.6。敏感字段（如 webhook secret）不入此文件，从环境变量读取。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "verify_code_ttl_seconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 3600,
+      "default": 300,
+      "description": "验证码有效期（秒），默认 300=5 分钟。过短影响用户体验，过长增加被穷举风险"
+    },
+    "verify_code_length": {
+      "type": "integer",
+      "minimum": 4,
+      "maximum": 8,
+      "default": 6,
+      "description": "验证码位数，默认 6 位数字。8 位提供更高安全性但用户输入体验下降"
+    },
+    "verify_code_max_attempts": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20,
+      "default": 5,
+      "description": "最大验证码尝试次数，超过后锁定该用户在该作用域的绑定申请"
+    },
+    "verify_code_lockout_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1440,
+      "default": 30,
+      "description": "锁定时长（分钟），默认 30 分钟。1440=24 小时"
+    },
+    "verify_code_format": {
+      "type": "string",
+      "pattern": "^\\^.*\\$$",
+      "default": "^\\d{6}$",
+      "description": "验证码格式正则表达式，默认 ^\\d{6}$（6 位数字）。修改时需同步修改 verify_code_length"
+    },
+    "verify_code_charset": {
+      "type": "string",
+      "default": "0123456789",
+      "description": "验证码字符集，默认纯数字。可扩展为 '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ'（去除易混淆字符）"
+    },
+    "max_bindings_per_user_per_scope": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "default": 1,
+      "description": "单用户单作用域最大绑定数，默认 1（一个用户在一个实例/游戏类型上只能绑定一个角色）。>1 用于多角色游戏场景"
+    },
+    "webhook_callback_timeout_seconds": {
+      "type": "integer",
+      "minimum": 5,
+      "maximum": 60,
+      "default": 15,
+      "description": "Webhook 回调超时时间（秒），默认 15 秒。Daemon 端游戏事件回调等待确认的最大时长"
+    }
+  },
+  "required": [
+    "verify_code_ttl_seconds",
+    "verify_code_length",
+    "verify_code_max_attempts",
+    "verify_code_lockout_minutes",
+    "verify_code_format"
+  ]
+}

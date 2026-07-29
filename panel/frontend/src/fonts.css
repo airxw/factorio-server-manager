@@ -1,0 +1,35 @@
+/* ============================================================================
+ * 本地字体定义——替代 Google Fonts CDN
+ *
+ * Inter v20 和 JetBrains Mono v24 都是 variable font，
+ * 单个 woff2 文件包含所有 weight（400-700），浏览器通过 font-weight 自动渲染。
+ * 仅包含 Latin 子集（约 48KB + 31KB），中文字符由系统字体（PingFang SC / Microsoft YaHei）渲染。
+ *
+ * 替代 index.html 中的：
+ *   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" />
+ * ============================================================================
+ */
+
+/* Inter — 主 UI 字体（variable font, 100-900 范围） */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/Inter-Variable.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}
+
+/* JetBrains Mono — 代码/终端字体（variable font） */
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/fonts/JetBrainsMono-Variable.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215,
+    U+FEFF, U+FFFD;
+}

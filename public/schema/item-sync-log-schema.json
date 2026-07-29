@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/item-sync-log-schema.json",
+  "title": "Item Sync Log Schema",
+  "description": "item_sync_log 表数据契约。物品同步日志，记录 Panel 按 Pack.items.source.url 定时拉取 GitHub JSON 的结果。来源：scheme-final-merged.md §4.2.2 P1。factorio 迁移表，直接迁移。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "pack_id": {
+      "type": "string",
+      "description": "Pack ID，引用 packs.id。标识物品来源于哪个 Pack"
+    },
+    "source_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "拉取的 GitHub raw JSON URL"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["success", "failed"],
+      "description": "同步状态：success=成功；failed=失败。失败重试 3 次后标记 failed"
+    },
+    "items_count": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "本次同步拉取的物品数量。null=同步失败未拉取"
+    },
+    "synced_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "同步时间（ISO 8601 字符串）"
+    },
+    "error_message": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "失败时的错误信息。null=成功"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "记录创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "pack_id", "source_url", "status", "synced_at", "created_at"]
+}

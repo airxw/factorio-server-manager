@@ -1,0 +1,432 @@
+# ============================================================================
+# Terraria TShock Pack — GameServer Panel 4.12.0
+# 依据：public/schema/pack-schema.ts（必须通过 zod 校验）
+# 协议：stdin（TShock 控制台通过标准输入发送命令，支持物品名拼写）
+# 参考：https://github.com/Pryaxis/TShock + https://tshock.readme.io/
+# verified: 2026-07-24 https://github.com/Pryaxis/TShock/releases (v5.x)
+#
+# 重要说明:
+#   - TShock 是 Terraria 的服务端 mod，版本号独立于 Terraria 主版本(5.x.x)
+#   - TShock give 命令支持物品名拼写(如 Copper Broadsword)而非数字 ID
+#   - 通过 GitHub Releases 分发(非 SteamCMD)
+#   - 待开发需求:Pack 详情页需显示 variant_type 区分原版/tshock
+# ============================================================================
+
+pack:
+  id: terraria-tshock
+  game: terraria
+  variant: tshock
+  display_name: 泰拉瑞亚 (TShock)
+  version: '1.0'
+
+startup:
+  # TShock 下载解压后的二进制
+  binary: './TShockServer'
+  args:
+    - '-config'
+    - 'serverconfig.txt'
+    - '-port'
+    - '{{game_port}}'
+    - '-players'
+    - '{{max_players}}'
+    - '-pass'
+    - '{{server_password}}'
+  working_dir: '{{instance_root}}'
+  # TShock 就绪日志
+  ready_pattern: 'TShock successfully initialized|Server started|Listening on port'
+  stop_command: 'exit'
+  stop_timeout: 15
+  # Terraria 默认游戏端口
+  default_game_port: 7777
+  # v4.12.0 步骤8: 端口声明
+  required_ports:
+    - { port: 7777, protocol: tcp, name: game, primary: true }
+    - { port: 7878, protocol: tcp, name: rest-api, primary: false }
+  # v4.12.0 步骤9: 停止方法
+  stop_method: stdin
+  failure_pattern: 'FATAL|Crash|Exception|TShock encountered a fatal error'
+
+protocol:
+  type: stdin
+  default_port: 0
+  auth: none
+  encrypt: none
+
+# v4.12.0 步骤6: TShock give 命令支持物品名拼写
+commands:
+  broadcast: 'broadcast {{message}}'
+  kick_player: 'kick {{player}}'
+  ban_player: 'ban {{player}}'
+  unban_player: 'unban {{player}}'
+  list_players: 'playing'
+  save_world: 'save'
+  # TShock give 命令: give <player> <item-name> <count>
+  # 物品名支持英文拼写(如 "Copper Broadsword")或数字 ID
+  give_item: 'give {{player}} {{item}} {{count}}'
+
+versions:
+  # v4.12.0 步骤1: TShock 通过 GitHub Releases 分发
+  source: 'github://Pryaxis/TShock'
+  type: binary
+  download_pattern: 'https://github.com/Pryaxis/TShock/releases/download/v{{version}}/TShock.v{{version}}.zip'
+  eula_required: false
+  provider: github-release
+
+# ---- 游戏更新 ----
+# TShock 通过 GitHub Releases 获取最新版本
+update:
+  source_url: 'https://api.github.com/repos/Pryaxis/TShock/releases/latest'
+  current_version_command: './TShockServer -version'
+  download_dir: '{{instance_root}}/downloads'
+  install_command: 'unzip -o {{download_path}} -d {{instance_root}} && chmod +x {{instance_root}}/TShockServer'
+
+backup:
+  world_dir: '{{instance_root}}/Worlds'
+  pre_backup_commands: []
+  post_backup_commands: []
+
+ui:
+  tabs:
+    - { tab: console,      group: runtime,  order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: config-files, group: config,   order: 10, require_state: [stopped, starting, running, error] }
+    - { tab: players,      group: runtime,  order: 40, require_state: [stopped, running, stopping, error] }
+    - { tab: saves,        group: ops,      order: 10, require_state: [stopped, error] }
+    - { tab: mods,         group: ops,      order: 20, require_state: [stopped, error] }
+    - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
+    - { tab: shop-admin,   group: business, order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: update,       group: ops,      order: 30, require_state: [stopped, error] }
+
+resources:
+  min_ram: '512M'
+  recommended_ram: '1G'
+  min_disk: '500M'
+
+# ============================================================================
+# 扩展字段
+# ============================================================================
+
+# ---- 物品池配置 ----
+# TShock give 命令支持物品名拼写(英文),如 "Copper Broadsword"
+# 物品名来源: https://terraria.wiki.gg/wiki/Item_IDs (英文名)
+items:
+  source:
+    type: static
+  qualities: []
+  quality_tiers: 0
+  categories: [weapon, tool, armor, accessory, potion, material, block, furniture]
+  static_list:
+    # ---- 基础资源(TShock 用英文物品名)----
+    - name: Dirt Block
+      display_name: 土块
+      category: block
+    - name: Stone Block
+      display_name: 石块
+      category: block
+    - name: Wood
+      display_name: 木材
+      category: material
+    - name: Iron Ore
+      display_name: 铁矿石
+      category: material
+    - name: Copper Ore
+      display_name: 铜矿石
+      category: material
+    - name: Silver Ore
+      display_name: 银矿石
+      category: material
+    - name: Gold Ore
+      display_name: 金矿石
+      category: material
+    - name: Iron Bar
+      display_name: 铁锭
+      category: material
+    - name: Copper Bar
+      display_name: 铜锭
+      category: material
+    - name: Silver Bar
+      display_name: 银锭
+      category: material
+    - name: Gold Bar
+      display_name: 金锭
+      category: material
+    - name: Gel
+      display_name: 凝胶
+      category: material
+    # ---- 武器 ----
+    - name: Copper Broadsword
+      display_name: 铜阔剑
+      category: weapon
+    - name: Iron Broadsword
+      display_name: 铁阔剑
+      category: weapon
+    - name: Gold Broadsword
+      display_name: 金阔剑
+      category: weapon
+    - name: Muramasa
+      display_name: 村正
+      category: weapon
+    - name: Nights Edge
+      display_name: 永夜刃 (Nights Edge)
+      category: weapon
+    - name: Minishark
+      display_name: 迷你鲨
+      category: weapon
+    # ---- 工具 ----
+    - name: Copper Pickaxe
+      display_name: 铜镐
+      category: tool
+    - name: Iron Pickaxe
+      display_name: 铁镐
+      category: tool
+    - name: Silver Pickaxe
+      display_name: 银镐
+      category: tool
+    - name: Gold Pickaxe
+      display_name: 金镐
+      category: tool
+    - name: Molten Pickaxe
+      display_name: 熔岩镐
+      category: tool
+    # ---- 防具 ----
+    - name: Wood Helmet
+      display_name: 木头盔
+      category: armor
+    - name: Wood Breastplate
+      display_name: 木胸甲
+      category: armor
+    - name: Molten Helmet
+      display_name: 熔岩头盔
+      category: armor
+    - name: Molten Breastplate
+      display_name: 熔岩胸甲
+      category: armor
+    # ---- 药水 ----
+    - name: Healing Potion
+      display_name: 治疗药水
+      category: potion
+    - name: Mana Potion
+      display_name: 魔力药水
+      category: potion
+    - name: Ironskin Potion
+      display_name: 铁皮药水
+      category: potion
+    - name: Swiftness Potion
+      display_name: 迅捷药水
+      category: potion
+    - name: Regeneration Potion
+      display_name: 再生药水
+      category: potion
+
+# ---- stdout 事件解析规则 ----
+event_parsers:
+  chat:
+    pattern: '^<([^>]+)> (.+)$'
+    groups: [player, message]
+  join:
+    pattern: '^([^ ]+) has joined\.$'
+    player_group: 1
+  leave:
+    pattern: '^([^ ]+) has left\.$'
+    player_group: 1
+
+# ---- 业务能力声明 ----
+business:
+  shop:
+    enabled: true
+    give_command: 'give {{player}} {{item}} {{count}}'
+    quality_tiers: 0
+    support_quality: false
+  cdk:
+    enabled: true
+    redeem_command: 'give {{player}} {{item}} {{count}}'
+  chat_enhancement:
+    welcome:
+      enabled: true
+      first_gift_command: 'give {{player}} Copper Pickaxe 1'
+    periodic_messages:
+      enabled: true
+      broadcast_command: 'broadcast {{message}}'
+    response_rules:
+      enabled: false
+  players:
+    kick_command: 'kick {{player}}'
+    ban_command: 'ban {{player}}'
+  lists:
+    banlist_add: 'ban {{player}}'
+  verify:
+    enabled: false
+
+# ============================================================================
+# TShock 扩展字段
+# ============================================================================
+
+# ---- 多配置文件 ----
+config_files:
+  - name: server-config
+    path: '{{instance_root}}/serverconfig.txt'
+    format: ini
+    group: server
+    schema:
+      maxplayers:
+        type: integer
+        description: 最大玩家数
+      port:
+        type: integer
+        description: 服务器端口
+      password:
+        type: string
+        description: 服务器密码
+        sensitive: true
+      motd:
+        type: string
+        description: 每日消息
+      worldpath:
+        type: string
+        description: 世界文件路径
+      worldname:
+        type: string
+        description: 世界名称
+      seed:
+        type: string
+        description: 世界种子
+      difficulty:
+        type: string
+        description: 游戏难度
+    read_only: false
+  - name: tshock-config
+    path: '{{instance_root}}/tshock/config.json'
+    format: json
+    group: server
+    schema:
+      ServerPort:
+        type: integer
+        description: 服务器端口
+      MaxSlots:
+        type: integer
+        description: 最大玩家数
+      ReservedSlots:
+        type: integer
+        description: 保留 slots
+      ServerPassword:
+        type: string
+        description: 服务器密码
+        sensitive: true
+      RegionProtectPvP:
+        type: boolean
+        description: 区域内禁止 PvP
+      DisableSpew:
+        type: boolean
+        description: 禁止怪物生成
+      IgnoreChestStacksOnChech:
+        type: boolean
+        description: 忽略箱子堆叠检查
+      AutoSave:
+        type: boolean
+        description: 自动保存
+      SaveInterval:
+        type: integer
+        description: 保存间隔(分钟)
+      EnableLoginWhenWorldNotLoaded:
+        type: boolean
+        description: 世界未加载时允许登录
+      DefaultRegistrationGroupName:
+        type: string
+        description: 默认注册用户组名
+      DefaultGuestGroupName:
+        type: string
+        description: 默认游客组名
+      RestApiEnabled:
+        type: boolean
+        description: 启用 REST API
+      RestApiPort:
+        type: integer
+        description: REST API 端口
+    read_only: false
+
+# ---- 存档管理 ----
+saves:
+  dir: '{{instance_root}}/Worlds'
+  extension: '.wld'
+  create_command: 'save'
+  activate_command: 'save'
+
+# ---- 聊天日志解析 ----
+chat_log:
+  pattern: '^<([^>]+)> (.+)$'
+  storage_enabled: true
+  retention_days: 30
+
+# ---- Mod 管理 ----
+# TShock 自身即 Terraria 的 mod，无额外 mod 管理需求
+# tModLoader 是独立的 Terraria mod 加载器，需要单独的 Pack
+mods:
+  list_file: '{{instance_root}}/tshock/mods/enabled.json'
+  list_format: json
+  dependency_check: false
+  download_enabled: false
+  download_source: 'https://forums.terraria.org/index.php?forums%2Fworkshop.205/'
+
+# ---- 启动前置引导（首次启动前向导，v4.x 新增）----
+startup_guide:
+  enabled: true
+  steps:
+    - key: world-setup
+      title: 世界设置
+      description: 设置世界名称、种子与难度（写入 serverconfig.txt）
+      fields:
+        - key: world_name
+          type: world_name
+          label: 世界名称
+          description: 对应 serverconfig.txt 的 worldname
+          required: true
+          default: world
+        - key: world_seed
+          type: seed
+          label: 世界种子
+          description: 留空则随机生成
+          required: false
+        - key: difficulty
+          type: difficulty
+          label: 游戏难度
+          description: 对应 serverconfig.txt 的 difficulty
+          required: true
+          default: normal
+          enum_values: [normal, expert, master, journey]
+    - key: server-settings
+      title: 服务器设置
+      description: 最大玩家数与服务器密码（写入 tshock/config.json）
+      fields:
+        - key: max_players
+          type: config_ref
+          label: 最大玩家数
+          config_ref:
+            file: tshock-config
+            key: MaxSlots
+          required: true
+          default: 16
+          min: 1
+          max: 255
+        - key: server_password
+          type: password
+          label: 服务器密码
+          description: 留空则无密码
+          required: false
+  args_mapping:
+    max_players: '{{max_players}}'
+    server_password: '{{server_password}}'
+  config_writes:
+    - field_key: world_name
+      file: server-config
+      config_key: worldname
+    - field_key: world_seed
+      file: server-config
+      config_key: seed
+    - field_key: difficulty
+      file: server-config
+      config_key: difficulty
+    - field_key: max_players
+      file: tshock-config
+      config_key: MaxSlots
+    - field_key: server_password
+      file: tshock-config
+      config_key: ServerPassword

@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/periodic-messages-schema.json",
+  "title": "Periodic Messages Schema",
+  "description": "periodic_messages 表数据契约。P2 定时消息任务——Panel scheduler 按 interval_minutes 定时触发，下发 broadcast 命令。来源：scheme-final-merged.md §4.2.2 P3 / §5.4。factorio 迁移表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "定时消息内容。按 Pack.business.chat_enhancement.periodic_messages.broadcast_command 模板渲染后下发"
+    },
+    "interval_minutes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10080,
+      "description": "发送间隔（分钟），1-10080（最长一周）"
+    },
+    "enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用此定时消息"
+    },
+    "next_run_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "下次执行时间（ISO 8601 字符串）。scheduler 据此调度，执行后更新为 now + interval_minutes"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "message", "interval_minutes", "enabled", "next_run_at", "created_at"]
+}

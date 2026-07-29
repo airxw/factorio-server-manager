@@ -1,0 +1,29 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "PASSED",
+  "timestamp": "2026-07-28T16:10:00Z",
+  "evidence_path": "/home/airxw/Documents/gsp/gameserver-panel/.trae/documents/test_reports/frontend_gate_20260728_232542",
+  "summary": {
+    "overall": "已闭合",
+    "notes": [
+      "Test1 已通过：typecheck、定向 vitest、frontend build 均通过",
+      "Test2 已通过：生产环境定向 Playwright 回归通过，已适配 /select-identity 登录链路与网关瞬时波动",
+      "Test3 已通过：Mock checklist 维持一致",
+      "真实浏览器核验确认 /store/servers/:id 已显示“当前实例”页头，旧“返回列表”按钮未再出现"
+    ]
+  },
+  "tests": {
+    "test1": {
+      "status": "PASS",
+      "log": "test1_streamlit.log"
+    },
+    "test2": {
+      "status": "PASS",
+      "log": "test2_playwright.log"
+    },
+    "test3": {
+      "status": "PASS",
+      "log": "test3_mock_checklist.md"
+    }
+  }
+}

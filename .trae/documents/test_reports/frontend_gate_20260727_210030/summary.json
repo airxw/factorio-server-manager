@@ -1,0 +1,50 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "FAILED",
+  "timestamp": "2026-07-27T21:04:24+08:00",
+  "evidence_path": ".trae/documents/test_reports/frontend_gate_20260727_210030",
+  "summary": "本轮 /store 前端修复已完成代码落地，Test1 单测与类型检查通过，Test3 mock 静态核对通过，但 Test2 Playwright/E2E 未执行，因此三重闸门未闭合。",
+  "tests": {
+    "test1": {
+      "name": "单元测试与类型检查",
+      "status": "PASS",
+      "log": "test1_streamlit.log",
+      "details": [
+        "npm run typecheck 通过",
+        "npm run test -- src/components/Layout.test.tsx 8/8 通过"
+      ]
+    },
+    "test2": {
+      "name": "Playwright / E2E",
+      "status": "FAIL",
+      "log": "test2_playwright.log",
+      "details": [
+        "本轮未部署到正式环境",
+        "按项目规则未使用本地开发预览替代正式入口"
+      ]
+    },
+    "test3": {
+      "name": "Mock 回归核对",
+      "status": "PASS",
+      "log": "test3_mock_checklist.md",
+      "details": [
+        "未改动 mocks/handlers.ts",
+        "未改动 public 契约或预生成 mock"
+      ]
+    }
+  },
+  "failed_test_type": "test2_playwright",
+  "failed_cases": [
+    "未执行正式入口 Playwright 回归"
+  ],
+  "failure_summary": "由于当前工作区仍有大量未部署变更，本轮未进行生产 E2E；按照规则这不能被视为闸门通过。",
+  "next_actions": [
+    "在独立部署批次前运行部署预检",
+    "部署后对 /store 首页、/store/servers/new、/store/servers/:id 执行浏览器与 Playwright 回归",
+    "复核收入/实例列表的错误态在真实失败场景下的呈现"
+  ],
+  "rerun_entry": [
+    "cd /home/airxw/Documents/gsp/gameserver-panel/panel/frontend && npm run typecheck && npm run test -- src/components/Layout.test.tsx",
+    "部署完成后：cd /home/airxw/Documents/gsp/gameserver-panel/panel/frontend && npm run test:e2e:prod -- e2e/<target-spec>"
+  ]
+}

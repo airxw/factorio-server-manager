@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CommercialSystemConfig",
+  "description": "商业化系统全局配置契约",
+  "type": "object",
+  "properties": {
+    "max_ugc_assets_per_instance": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 500,
+      "default": 50,
+      "description": "每个实例允许创建的最大UGC商品数"
+    },
+    "rcon_sandbox_allowed_patterns": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": ["^[a-zA-Z0-9_\\{\\} ]+$"],
+      "description": "允许的 RCON 指令正则白名单（防注入）"
+    },
+    "asset_retention_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 365,
+      "default": 30,
+      "description": "实例停机后资产与记录保留天数"
+    }
+  },
+  "required": ["max_ugc_assets_per_instance", "rcon_sandbox_allowed_patterns", "asset_retention_days"]
+}

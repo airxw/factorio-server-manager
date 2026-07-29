@@ -1,0 +1,201 @@
+# ============================================================================
+# Game Pack 模板 — GameServer Panel 3.0.0
+# 依据：public/schema/pack-schema.ts（zod，必通过校验）
+#       public/schema/pack-schema-extension.json（items/event_parsers/business 扩展字段契约）
+# 用途：新建 Pack 时复制本模板，按目标游戏填充实际值。
+# 协议：本模板以 Factorio 为参考实现完整业务能力示例；其他游戏按需 enable/disable 业务模块。
+# 注意：禁止游戏专属硬编码（业务代码不得出现 if (game === 'xxx')），所有游戏差异由 Pack 吸收。
+# ============================================================================
+
+# ---- 1. Pack 元数据 ----
+pack:
+  id: factorio-vanilla               # kebab-case，全局唯一
+  game: factorio                      # minecraft / factorio / rust / ark / palworld / dst / dyson / enshrouded / satisfactory / terraria / valheim / zomboid / custom
+  variant: vanilla                    # 变体标识（vanilla / modded / forge ...）
+  display_name: Factorio (Vanilla)
+  version: '1.0'                      # Pack 版本（语义版本号）
+
+# ---- 2. 启动配置 ----
+startup:
+  binary: ./factorio/bin/x64/factorio
+  args:
+    - '--start-server'
+    - '{{save_file}}'
+    - '--server-settings'
+    - 'server-settings.json'
+    - '--port'
+    - '{{server_port}}'
+    - '--rcon-port'
+    - '{{rcon_port}}'
+    - '--rcon-password'
+    - '{{rcon_password}}'
+  working_dir: '{{instance_root}}'
+  ready_pattern: '.*\d+\.\d+\.\d+.*Become a host.*'   # 正则，匹配就绪日志
+  stop_command: '/quit'
+  stop_timeout: 30                    # 秒
+
+# ---- 3. 通信协议 ----
+# discriminatedUnion: stdin | rcon | webrcon
+protocol:
+  type: rcon                          # stdin（无端口）/ rcon / webrcon
+  default_port: 34187                 # rcon/webrcon 必填
+  auth: password                      # stdin=none, rcon/webrcon=password|none
+  encrypt: none                       # none | tls
+  config_key:                         # 协议配置在主配置文件中的 key 映射（可选）
+    file: server-settings.json
+    enable_key: rcon_enabled
+    port_key: rcon_port
+    password_key: rcon_password
+
+# ---- 4. 主配置文件 ----
+config:
+  format: json                        # properties | json | ini | yaml
+  main_file: server-settings.json
+  schema:                             # 可编辑配置项定义（前端表单生成依据）
+    - key: max_players
+      type: int
+      label: 最大玩家数
+      default: 20
+      min: 1
+      max: 100
+      description: 同时在线玩家上限
+    - key: game_password
+      type: string
+      label: 服务器密码
+      default: ''
+      description: 留空表示无密码
+    - key: visibility
+      type: enum
+      label: 可见性
+      default: public
+      enum_values: [public, lan, hidden]
+      description: 服务器在匹配列表中的可见性
+
+# ---- 5. 通用运维命令模板（无业务语义，与 business 下命令分工） ----
+# {{var}} 占位符由 commandDispatcher 渲染，渲染前对变量值做白名单正则校验防注入
+commands:
+  broadcast: '/silent-command game.print("{{message}}")'
+  list_players: '/players'
+  save_world: '/server-save'
+  say_private: '/silent-command game.players["{{player}}"].print("{{message}}")'
+
+# ---- 6. 版本管理 ----
+versions:
+  source: factorio-portal             # 版本来源标识
+  manifest_url: https://updater.factorio.com/get-available-versions
+  type: binary                        # server-jar | binary | steamcmd
+  download_pattern: 'https://factorio.com/get-download/{{version}}/headless/linux64'
+  eula_required: false
+  eula_file: ''
+
+# ---- 7. 备份配置 ----
+backup:
+  world_dir: saves                    # 相对 instance_root 的世界目录
+  pre_backup_commands:                # 备份前执行（如 save-all）
+    - '/server-save'
+  post_backup_commands:               # 备份后执行
+    - ''
+
+# ---- 8. UI Tab 配置 ----
+# 现有 tabs：console / config / players / backups / monitor / logs
+# 扩展 tabs（按 business 启用情况自动显示）：shop / cdk / chat / vote / lists / mods / saves / webhooks / settings
+ui:
+  tabs:
+    - console
+    - config
+    - players
+    - backups
+    - monitor
+    - logs
+    - shop
+    - cdk
+    - chat
+    - vote
+
+# ---- 9. 资源建议 ----
+resources:
+  min_ram: '1G'
+  recommended_ram: '2G'
+  min_disk: '500M'
+
+# ============================================================================
+# 以下为扩展字段（pack-schema-extension.json）
+# 全部 optional，向后兼容现有 minecraft-vanilla Pack（不写即视为禁用对应业务）
+# ============================================================================
+
+# ---- 10. 物品池配置（Panel shopService / itemSyncService 使用） ----
+items:
+  source:
+    type: github_sync                 # github_sync | static | local_file
+    url: https://raw.githubusercontent.com/airxw/factorioitem/main/items.json
+    sync_interval_hours: 24           # Panel 定时拉取间隔（小时）
+  qualities: [normal, uncommon, rare, epic, legendary]   # 该游戏支持的品质枚举
+  quality_tiers: 5                    # 品质等级数（用于 VIP 品质校验）
+  categories: [ammo, armor, fluid, item, recipe, technology]
+  # static 模式下直接内联物品清单（适用于物品数少的游戏，如 Minecraft）
+  # static_list:
+  #   - name: iron-plate
+  #     display_name: 铁板
+  #     category: item
+
+# ---- 11. stdout 事件解析规则（Panel chatMonitor / joinHandler 使用） ----
+# 注意：Daemon 仅做 stdout 流式转发，不解析；解析在 Panel 端按以下正则进行
+# 不同游戏的日志格式差异完全由 Pack 吸收，Panel 业务代码通用
+event_parsers:
+  chat:
+    pattern: '^\[([0-9:]+)\] \[(.*?)\] (.+?): (.+)$'
+    groups: [timestamp, level, player, message]
+  join:
+    pattern: '^(\S+) joined the game$'
+    player_group: 1
+  leave:
+    pattern: '^(\S+) left the game$'
+    player_group: 1
+  # 可扩展：death / achievement / system 等
+
+# ---- 12. 业务能力声明（Panel 业务模块加载器据此实例化业务模块） ----
+# 某游戏不支持的能力（如 Minecraft 无 vote_kick）应 enabled=false 或缺省
+business:
+  shop:
+    enabled: true
+    give_command: "/silent-command game.players['{{player}}'].insert{name='{{item}}',count={{count}},quality='{{quality}}'}"
+    quality_tiers: 5                  # 应与 items.quality_tiers 一致
+    support_quality: true             # 是否支持品质选择
+
+  cdk:
+    enabled: true
+    redeem_command: 'same as shop.give_command'   # shorthand，Panel 加载时解析为引用 shop.give_command
+
+  chat_enhancement:
+    welcome:
+      enabled: true
+      first_gift_command: 'same as shop.give_command'
+    periodic_messages:
+      enabled: true
+      broadcast_command: "/silent-command game.print('{{message}}')"
+    response_rules:
+      enabled: true                   # 关键词触发响应（chat_trigger_responses 表）
+    vote_kick:
+      enabled: true
+      kick_command: "/silent-command game.players['{{player}}'].kick('{{reason}}')"
+
+  players:
+    kick_command: "/silent-command game.kick_player('{{player}}', '{{reason}}')"
+    ban_command: "/silent-command game.ban_player('{{player}}', '{{reason}}')"
+
+  lists:
+    whitelist_add: "/silent-command game.write_file('whitelist.json', '{{json}}')"
+    banlist_add: "/silent-command game.ban_player('{{player}}', '{{reason}}')"
+
+  verify:                             # 玩家绑定验证
+    enabled: true
+    # Panel 收到 chat 事件 "!verify <code>" 时不下发命令，仅更新 DB 绑定状态
+
+# ============================================================================
+# 模板结束。新建 Pack 时：
+# 1. 复制本文件到 packs/<pack-id>/pack.yaml
+# 2. 按 target game 填充实际值
+# 3. 运行时通过 pack-schema.ts (zod) + pack-schema-extension.json 校验
+# 4. 不支持的业务能力必须 enabled=false 或删除整个字段（不可留空 enabled）
+# 5. items.source.type=static 时，static_list 必须非空
+# ============================================================================

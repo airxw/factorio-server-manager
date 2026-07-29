@@ -1,0 +1,329 @@
+# ============================================================================
+# CI 检查 — PR / push 到 main 时触发
+# L6: 三项目 quality 并行（frontend / backend / daemon）+ E2E + 版本号同步校验
+# 失败阻断合并
+# ============================================================================
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+# 同一 PR 重复 push 时取消旧 run
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # -------------------------------------------------------------------------
+  # 前端质量检查：typecheck + lint + unit test + coverage + build
+  # -------------------------------------------------------------------------
+  frontend-quality:
+    name: Frontend Quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: panel/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: panel/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Coverage (overall threshold)
+        run: npm run test:coverage
+
+      - name: Coverage (utils 100% threshold)
+        run: npm run test:coverage:utils
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: panel/frontend/coverage/
+          retention-days: 7
+
+  # -------------------------------------------------------------------------
+  # 前端 E2E：需要后端 + daemon 运行
+  # 使用 service container 或手动启动；此处配置为完整 E2E 流程
+  # -------------------------------------------------------------------------
+  frontend-e2e:
+    name: Frontend E2E
+    runs-on: ubuntu-latest
+    needs: frontend-quality
+    defaults:
+      run:
+        working-directory: panel/frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: panel/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Install backend dependencies
+        working-directory: panel/backend
+        run: npm ci
+
+      - name: Build backend
+        working-directory: panel/backend
+        run: npm run build
+
+      - name: Start backend
+        working-directory: panel/backend
+        env:
+          PORT: '3000'
+          JWT_SECRET: 'ci-test-secret'
+          ADMIN_EMAIL: 'admin@local.dev'
+          ADMIN_PASSWORD: 'admin123'
+          DATABASE_URL: ':memory:'
+        run: |
+          node dist/index.js &
+          # 等待后端就绪
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:3000/api/version >/dev/null 2>&1; then
+              echo "Backend ready"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run E2E tests
+        env:
+          CI: 'true'
+        run: npx playwright test --project=chromium
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: panel/frontend/playwright-report/
+          retention-days: 7
+
+      - name: Upload Playwright screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-failures
+          path: panel/frontend/test-results/
+          retention-days: 7
+
+  # -------------------------------------------------------------------------
+  # 后端质量检查：typecheck + unit test + coverage + build
+  # 与 frontend-quality / daemon-quality 并行运行，互不阻塞
+  # 依赖 T1：后端 vitest 测试体系已就绪
+  # -------------------------------------------------------------------------
+  backend-quality:
+    name: Backend Quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: panel/backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: panel/backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Coverage
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: panel/backend/coverage/
+          retention-days: 7
+
+  # -------------------------------------------------------------------------
+  # Daemon 质量检查：typecheck + unit test + coverage + build
+  # 与 frontend-quality / backend-quality 并行运行，互不阻塞
+  # 依赖 T2：daemon vitest 测试体系已就绪
+  # -------------------------------------------------------------------------
+  daemon-quality:
+    name: Daemon Quality
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: daemon
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: daemon/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Coverage
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daemon-coverage-report
+          path: daemon/coverage/
+          retention-days: 7
+
+  # -------------------------------------------------------------------------
+  # 数据库兼容性：L3 迁移预备
+  # 在 PostgreSQL 16 container 与 SQLite :memory: 上分别运行 migration
+  # 确保两种数据库行为一致（迁移脚本兼容性验证）
+  # -------------------------------------------------------------------------
+  database-compat:
+    name: Database Compatibility
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gameserver_panel
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: panel/backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: panel/backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install pg driver
+        run: npm install pg
+
+      - name: Run migrations on PostgreSQL
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/gameserver_panel
+        run: node --import tsx node_modules/.bin/knex migrate:latest --knexfile src/db/knexfile.pg.ts
+
+      - name: Verify PostgreSQL tables
+        env:
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/gameserver_panel
+        run: |
+          node --import tsx -e "
+            import knex from 'knex';
+            const db = knex({
+              client: 'pg',
+              connection: { connectionString: process.env.DATABASE_URL },
+            });
+            const { rows } = await db.raw(\"SELECT count(*)::int AS n FROM pg_tables WHERE schemaname='public'\");
+            if (rows[0].n === 0) throw new Error('No tables in PostgreSQL after migration');
+            console.log('PostgreSQL tables count:', rows[0].n);
+            await db.destroy();
+            console.log('PostgreSQL verification passed');
+          "
+
+      - name: Run migrations on SQLite (:memory:)
+        env:
+          DATABASE_URL: ':memory:'
+        run: node --import tsx node_modules/.bin/knex migrate:latest --knexfile src/db/knexfile.ts
+
+  # -------------------------------------------------------------------------
+  # 版本号同步校验：校验 version.json / 4 个 package.json / version.md /
+  # README.md / deploy.sh 中版本号一致
+  # 独立运行，不依赖 quality job（自身仅做静态文本校验，无需测试通过）
+  # -------------------------------------------------------------------------
+  version-sync:
+    name: Version Sync Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install root dependencies
+        # 根目录有 package.json（workspaces 根），安装以获得 tsx
+        run: npm ci --no-audit --no-fund
+
+      - name: Run version sync check
+        run: npx tsx scripts/check-version-sync.ts

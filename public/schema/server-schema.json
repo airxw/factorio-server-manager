@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/server-schema.json",
+  "title": "Server Schema",
+  "description": "servers 表数据契约。在 gameserver-panel 现有字段基础上扩展 shop_enabled / chat_enabled / mods_enabled（替代 factorio instances 表的同名字段，instance_id → server_id 命名对齐）。来源：scheme-final-merged.md §4.3.2。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器主键，UUID 字符串。factorio instances.id (integer) 迁移时生成新 UUID 并维护映射表"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "服务器名，1-128 字符"
+    },
+    "pack_id": {
+      "type": "string",
+      "description": "关联 Pack ID，引用 packs.id。决定本服务器的物品池/事件解析器/业务能力"
+    },
+    "game_type": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "description": "游戏类型（minecraft/factorio/rust/ark 等），应与 packs.game 一致"
+    },
+    "node_id": {
+      "type": "string",
+      "description": "所属节点 ID，引用 nodes.id"
+    },
+    "owner_user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器所有者用户 ID，引用 users.id (string UUID)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["stopped", "starting", "running", "stopping", "error"],
+      "default": "stopped",
+      "description": "进程状态：stopped=已停止；starting=启动中；running=运行中；stopping=停止中；error=错误"
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "游戏端口"
+    },
+    "rcon_port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "RCON 端口"
+    },
+    "rcon_password_enc": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "RCON 密码（加密存储），可空"
+    },
+    "resource_limits_json": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "资源限制配置（JSON 字符串），可空"
+    },
+    "shop_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用商店业务（新增，替代 factorio instances.shop_enabled）。受 Pack.business.shop.enabled 上限约束"
+    },
+    "chat_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用聊天增强业务（新增，替代 factorio instances.chat_enabled）。受 Pack.business.chat_enhancement.*.enabled 上限约束"
+    },
+    "mods_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用 Mod 管理（新增，替代 factorio instances.mod_enabled）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    },
+    "expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "实例过期时间（ISO 8601）。null=永久实例（默认）。由创建实例时 duration_days 参数计算：now + duration_days × 86400000。v1 新增（business-logic-v1-contracts）"
+    },
+    "expiry_status": {
+      "type": "string",
+      "enum": ["permanent", "active", "grace", "expired", "cleaned"],
+      "default": "permanent",
+      "description": "过期状态机：permanent=永久实例；active=有效期内；grace=宽限期内（已停止但可续费）；expired=已过期（待清理）；cleaned=已清理磁盘。状态转换：permanent→（设置 expires_at）→active→（到期）→grace→（宽限期结束）→expired→（清理磁盘）→cleaned。v1 新增（business-logic-v1-contracts）"
+    },
+    "expiry_grace_until": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "宽限期结束时间（ISO 8601）。仅 expiry_status='grace' 时有值。= expires_at + grace_days × 86400000（grace_days 由 system_config.instance.expiry.grace_days 配置，默认 7）。v1 新增（business-logic-v1-contracts）"
+    },
+    "billing_type": {
+      "type": ["string", "null"],
+      "enum": ["vps_prepaid", null],
+      "default": null,
+      "description": "[v3-billing 新增] 计费类型快照：null=未接入计费（存量兼容，migration 不自动设置）；'vps_prepaid'=VPS 预付费（按类型月费 × 周期预付费，到期自动续扣）。来源：docs/plans/instance-billing-rules-plan.md §2.3。startInstance 守卫：billing_type='vps_prepaid' 且 expiry_status ∈ {grace, expired} 时禁止启动（返回 402）"
+    }
+  },
+  "required": ["id", "name", "pack_id", "game_type", "node_id", "owner_user_id", "status", "port", "rcon_port", "shop_enabled", "chat_enabled", "mods_enabled", "created_at", "updated_at"]
+}

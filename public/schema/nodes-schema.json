@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/nodes-schema.json",
+  "title": "Nodes Schema",
+  "description": "nodes 表数据契约。Daemon 节点注册表，记录节点身份/通信凭据/来源标记。来源：baseline migration 20260808000000_baseline_v4_post_demo.ts:77-91（既有字段）+ docs/plans/role-permission-economy-system-plan.md §3.1（v-economy 新增 node_source 等 5 个字段，决策 D4 自带节点完全免费 + 完全自主）。\n\nv-economy 扩展说明：\n- node_source=platform_managed：平台提供的服务器资源，其上实例按 instance-renewals 计价（平台收腐竹资源费）\n- node_source=self_hosted：腐竹自带 daemon 节点，完全免费 + 完全自主管理（仅受账号/审计/合规基础规则约束），接入需 server_admin 审核（approval_status）\n- 存量节点迁移默认值：node_source='platform_managed'（保守原则，避免漏计费）\n- 节点来源切换（self_hosted ↔ platform_managed）按实例维度独立计费，已续费时段不追溯（方案 §5.1 冲突矩阵）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "节点主键（如 'node-local'），非自增"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "节点显示名"
+    },
+    "fqdn": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255,
+      "description": "节点访问地址（FQDN 或 IP，不含端口；端口由 DAEMON_URL 解析或默认 8080 补齐）"
+    },
+    "daemon_token_hash": {
+      "type": "string",
+      "maxLength": 255,
+      "description": "Daemon Bearer Token 哈希（Panel↔Daemon 鉴权），禁止明文存储"
+    },
+    "public_ip": {
+      "type": ["string", "null"],
+      "maxLength": 255,
+      "default": null,
+      "description": "节点公网 IP（展示用）"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["online", "offline", "error"],
+      "default": "offline",
+      "description": "节点在线状态（心跳驱动）"
+    },
+    "last_seen_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "最近心跳时间（ISO 8601）"
+    },
+    "node_type": {
+      "type": "string",
+      "enum": ["master", "slave"],
+      "default": "master",
+      "description": "节点类型（v4.10.0 集群扩展）：master=主节点；slave=从节点"
+    },
+    "comms_key": {
+      "type": ["string", "null"],
+      "maxLength": 255,
+      "default": null,
+      "description": "节点通信密钥（v4.10.0 集群扩展）"
+    },
+    "link_key_hash": {
+      "type": ["string", "null"],
+      "maxLength": 255,
+      "default": null,
+      "description": "节点接入 Link Key 哈希（v4.10.0 集群扩展）"
+    },
+    "link_key_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "Link Key 过期时间（ISO 8601，migration 20260823000000）"
+    },
+    "linked_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "节点接入时间（ISO 8601）。注意：nodes 表无 created_at 列，排序须用 linked_at（项目历史 bug 教训）"
+    },
+    "display_fqdn": {
+      "type": ["string", "null"],
+      "maxLength": 255,
+      "default": null,
+      "description": "对外展示地址（可覆盖 fqdn 用于前端展示）"
+    },
+    "node_source": {
+      "type": "string",
+      "enum": ["platform_managed", "self_hosted"],
+      "default": "platform_managed",
+      "description": "[v-economy 新增] 节点来源：platform_managed=平台资源（计费）；self_hosted=腐竹自带节点（免费 + 自主，需审核）"
+    },
+    "self_hosted_owner_id": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "default": null,
+      "description": "[v-economy 新增] 自带节点归属腐竹用户 ID，引用 users.id。node_source=self_hosted 时必填；platform_managed 时必须为 null。约束：该用户 roles 须含 instance_admin 且 admin_tier 已解锁 self_hosted_node 高级功能（tier≥2）"
+    },
+    "approval_status": {
+      "type": "string",
+      "enum": ["pending", "approved", "rejected"],
+      "default": "approved",
+      "description": "[v-economy 新增] 自带节点接入审核状态。node_source=self_hosted 默认 pending（需 server_admin 审核）；platform_managed 默认 approved（无需审核）"
+    },
+    "approved_by": {
+      "type": ["string", "null"],
+      "format": "uuid",
+      "default": null,
+      "description": "[v-economy 新增] 审核操作者用户 ID（server_admin），引用 users.id"
+    },
+    "approved_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "[v-economy 新增] 审核时间（ISO 8601）"
+    }
+  },
+  "required": ["id", "name", "fqdn", "daemon_token_hash", "status", "node_type", "node_source", "approval_status"]
+}

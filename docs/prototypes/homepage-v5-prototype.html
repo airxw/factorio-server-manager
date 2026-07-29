@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>GSP · 游戏服务器运营中台</title>
+<style>
+/* ==========================================================================
+   GSP Homepage v5 — FULL-BLEED IMPACT (Zero-Card, Ultra-Wide, Max Visual Punch)
+   核心哲学: 没有框，只有内容；没有边界，只有呼吸；没有"卡片"，只有层级
+   ========================================================================== */
+
+:root {
+  --bg: #FBFBFD;
+  --bg2: #F5F5F7;
+  --bg3: #EDEDF0;
+  --blue: #007AFF;
+  --blue2: #0051D5;
+  --blue-light: #5AC8FA;
+  --blue-soft: rgba(0,122,255,0.08);
+  --green: #34C759;
+  --orange: #FF9500;
+  --red: #FF3B30;
+  --purple: #AF52DE;
+  --t1: #1D1D1F;
+  --t2: #6E6E73;
+  --t3: #86868B;
+  --div: rgba(0,0,0,0.06);
+
+  --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'Noto Sans SC', sans-serif;
+  --mono: 'SF Mono', 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  --pad: clamp(16px, 4vw, 48px);
+  --pad-lg: clamp(24px, 6vw, 80px);
+  --max: 1440px;
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+body { font-family: var(--font); color: var(--t1); background: var(--bg); overflow-x: hidden; line-height: 1.5; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; border: none; background: none; }
+ul { list-style: none; }
+img { max-width: 100%; display: block; }
+
+/* ---- BUILD ID (tiny, unobtrusive) ---- */
+.build {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+  text-align: center; font-family: var(--mono); font-size: 10px;
+  color: var(--blue-light); letter-spacing: 0.08em; padding: 2px 0;
+  background: rgba(251,251,253,0.94); pointer-events: none;
+}
+
+/* ---- Scroll Progress ---- */
+.prog { position: fixed; top: 0; left: 0; height: 2px; z-index: 9998; background: linear-gradient(90deg, var(--blue), var(--blue-light)); width: 0; transition: width 0.1s linear; }
+
+/* ==========================================================================
+   NAV — Floating capsule that merges to top bar on scroll
+   ========================================================================== */
+.nav {
+  position: fixed; top: 20px; left: var(--pad); right: var(--pad); z-index: 100;
+  background: rgba(251,251,253,0.72);
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  border-radius: 16px;
+  border: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 20px rgba(0,0,0,0.04);
+  transition: all 0.35s cubic-bezier(.16,1,.3,1);
+}
+.nav.scrolled {
+  top: 0; left: 0; right: 0;
+  border-radius: 0;
+  border: none;
+  border-bottom: 1px solid var(--div);
+  background: rgba(251,251,253,0.88);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.nav-inner {
+  max-width: var(--max); margin: 0 auto;
+  height: 48px; padding: 0 clamp(16px,3vw,28px);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.logo { font-size: 20px; font-weight: 800; letter-spacing: -0.04em; display: flex; align-items: center; gap: 8px; }
+.logo-ic { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--blue), var(--blue-light)); display: flex; align-items: center; justify-content: center; color: #fff; font-size: 15px; }
+.nav-links { display: flex; gap: clamp(20px,3vw,36px); }
+.nav-links a { font-size: 14px; color: var(--t2); font-weight: 500; transition: color 0.2s; }
+.nav-links a:hover { color: var(--t1); }
+.nav-cta {
+  padding: 8px 20px; border-radius: 999px; background: var(--blue); color: #fff;
+  font-size: 14px; font-weight: 600;
+  transition: transform 0.15s, box-shadow 0.2s, background 0.2s;
+}
+.nav-cta:hover { transform: scale(1.04); background: var(--blue2); box-shadow: 0 4px 20px rgba(0,122,255,0.4); }
+
+/* ==========================================================================
+   HERO — Full viewport impact, zero containers, massive type
+   ========================================================================== */
+.hero {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 120px var(--pad) 0;
+  display: flex; flex-direction: column; align-items: center;
+  position: relative; overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute; top: -20%; left: 50%; transform: translateX(-50%);
+  width: 1200px; height: 1200px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,122,255,0.10) 0%, rgba(90,200,250,0.04) 40%, transparent 70%);
+  pointer-events: none; z-index: 0;
+}
+.hero::after {
+  content: '';
+  position: absolute; bottom: -30%; left: -10%; width: 600px; height: 600px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(52,199,89,0.06) 0%, transparent 60%);
+  pointer-events: none; z-index: 0;
+}
+.hero-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 16px; border-radius: 999px;
+  background: var(--blue-soft);
+  font-size: 13px; font-weight: 600; color: var(--blue);
+  margin-bottom: clamp(28px,5vw,48px); position: relative; z-index: 1;
+  letter-spacing: -0.01em;
+}
+.hero-tag .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.85)} }
+
+.hero h1 {
+  font-size: clamp(3rem, 9vw + 0.5rem, 7.5rem);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 1.02;
+  text-align: center;
+  margin-bottom: clamp(20px,3vw,32px);
+  position: relative; z-index: 1;
+}
+.hero h1 .grad {
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-light) 50%, #30D158 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.hero h1 .line2 { display: block; }
+
+.hero-sub {
+  font-size: clamp(1.15rem, 2.2vw + 0.2rem, 1.55rem);
+  color: var(--t2); font-weight: 400; line-height: 1.35;
+  text-align: center;
+  max-width: 680px; margin: 0 auto clamp(32px,5vw,52px);
+  letter-spacing: -0.015em; position: relative; z-index: 1;
+}
+
+.hero-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; margin-bottom: clamp(40px,6vw,72px); }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: clamp(14px,2vw,18px) clamp(32px,4vw,48px); border-radius: 999px;
+  background: linear-gradient(135deg, var(--blue), var(--blue2));
+  color: #fff; font-size: clamp(15px,1.8vw,18px); font-weight: 700; letter-spacing: -0.01em;
+  box-shadow: 0 8px 32px rgba(0,122,255,0.35), 0 0 80px rgba(0,122,255,0.12);
+  transition: transform 0.15s, box-shadow 0.3s;
+}
+.btn-primary:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 48px rgba(0,122,255,0.45), 0 0 120px rgba(0,122,255,0.18); }
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: clamp(13px,2vw,17px) clamp(30px,4vw,46px); border-radius: 999px;
+  background: rgba(0,0,0,0.03); color: var(--t1); font-size: clamp(15px,1.8vw,18px); font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-secondary:hover { background: rgba(0,0,0,0.07); }
+
+/* ---- HERO PRODUCT PREVIEW — Full-bleed, extends to viewport edges ---- */
+.hero-preview {
+  width: 100%; max-width: calc(var(--max) + 160px);
+  margin: 0 auto; position: relative; z-index: 1;
+  padding: 0 clamp(0px,2vw,40px);
+}
+.preview-frame {
+  background: #fff;
+  border-radius: clamp(16px,2vw,24px);
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px rgba(0,0,0,0.04),
+    0 12px 40px rgba(0,0,0,0.08),
+    0 40px 120px rgba(0,122,255,0.10);
+  transform: perspective(1200px) rotateX(4deg);
+  transform-origin: bottom center;
+  transition: transform 0.6s cubic-bezier(.16,1,.3,1);
+}
+.preview-frame:hover { transform: perspective(1200px) rotateX(0deg); }
+.preview-chrome {
+  display: flex; align-items: center; gap: 8px; padding: 14px 20px;
+  background: var(--bg2);
+}
+.preview-dot { width: 12px; height: 12px; border-radius: 50%; }
+.preview-dot.r { background: #FF5F57; }
+.preview-dot.y { background: #FEBC2E; }
+.preview-dot.g { background: #28C840; }
+.preview-url {
+  flex: 1; margin-left: 16px; padding: 6px 16px; border-radius: 8px;
+  background: rgba(0,0,0,0.04); font-family: var(--mono); font-size: 12px; color: var(--t3);
+}
+.preview-body { display: grid; grid-template-columns: clamp(160px,18vw,220px) 1fr; min-height: clamp(280px,40vw,420px); }
+.preview-side { padding: 16px 12px; display: flex; flex-direction: column; gap: 2px; background: #fff; }
+.preview-nav {
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px;
+  font-size: 13px; color: var(--t2); font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+.preview-nav.on { background: var(--blue-soft); color: var(--blue); font-weight: 700; }
+.preview-nav .ic { font-size: 16px; width: 22px; text-align: center; }
+.preview-main { padding: clamp(16px,2vw,24px); display: flex; flex-direction: column; gap: clamp(10px,1.5vw,16px); background: var(--bg); }
+.preview-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(8px,1vw,14px); }
+.stat { padding: clamp(12px,1.5vw,18px) clamp(12px,1.5vw,20px); border-radius: clamp(10px,1.2vw,16px); background: #fff; }
+.stat-l { font-size: 11px; color: var(--t3); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; font-weight: 600; }
+.stat-v { font-size: clamp(18px,2.5vw,26px); font-weight: 800; letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+.stat-v.gr { color: var(--green); } .stat-v.bl { color: var(--blue); } .stat-v.or { color: var(--orange); }
+.preview-chart { flex: 1; border-radius: clamp(10px,1.2vw,16px); background: #fff; padding: clamp(14px,1.8vw,20px); display: flex; flex-direction: column; min-height: clamp(100px,15vw,160px); }
+.chart-t { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.preview-ticker { display: flex; gap: 8px; overflow: hidden; padding: 6px 0; position: relative; }
+.preview-ticker::before, .preview-ticker::after { content:''; position:absolute; top:0;bottom:0; width:60px; z-index:1; pointer-events:none; }
+.preview-ticker::before { left:0; background: linear-gradient(90deg, var(--bg), transparent); }
+.preview-ticker::after { right:0; background: linear-gradient(-90deg, var(--bg), transparent); }
+.ticker-track { display: flex; gap: 8px; animation: scroll-x 30s linear infinite; }
+.ticker-item { flex-shrink: 0; padding: 6px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.ticker-item.j { background: rgba(52,199,89,0.1); color: var(--green); }
+.ticker-item.b { background: rgba(0,122,255,0.1); color: var(--blue); }
+.ticker-item.v { background: rgba(255,149,0,0.1); color: var(--orange); }
+.ticker-item.g { background: rgba(175,82,220,0.1); color: var(--purple); }
+@keyframes scroll-x { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+/* Hero fade-out to next section */
+.hero-fade {
+  height: clamp(60px,10vw,140px);
+  background: linear-gradient(180deg, transparent 0%, var(--bg2) 100%);
+  margin-top: clamp(-40px,-6vw,-80px);
+  position: relative; z-index: 2;
+}
+
+/* ==========================================================================
+   SECTION UTILITIES — No wrappers, full-bleed color bands
+   ========================================================================== */
+.sec-pad { padding: clamp(60px,10vw,140px) var(--pad); }
+.sec-inner { max-width: var(--max); margin: 0 auto; }
+.sec-label { font-family: var(--mono); font-size: clamp(11px,1.2vw,13px); font-weight: 700; color: var(--blue); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: clamp(12px,2vw,20px); }
+.sec-title { font-size: clamp(2.2rem, 5vw + 0.3rem, 4rem); font-weight: 800; letter-spacing: -0.04em; line-height: 1.08; margin-bottom: clamp(14px,2vw,20px); }
+.sec-desc { font-size: clamp(16px,1.8vw,20px); color: var(--t2); max-width: 600px; line-height: 1.4; letter-spacing: -0.01em; font-weight: 400; }
+.band-dark { background: var(--bg2); }
+.band-darker { background: var(--bg3); }
+
+/* ==========================================================================
+   DEMO — Full-bleed theatre, no card frame
+   ========================================================================== */
+.demo-band { background: var(--bg2); padding: clamp(60px,10vw,140px) 0; }
+.demo-head { max-width: var(--max); margin: 0 auto clamp(32px,5vw,56px); padding: 0 var(--pad); }
+.demo-layout {
+  max-width: var(--max); margin: 0 auto; padding: 0 var(--pad);
+  display: grid; grid-template-columns: clamp(180px,20vw,260px) 1fr; gap: clamp(20px,3vw,40px);
+}
+.demo-tabs { display: flex; flex-direction: column; gap: 4px; }
+.demo-tab {
+  display: flex; align-items: flex-start; gap: 14px;
+  padding: clamp(12px,1.5vw,18px) clamp(14px,1.8vw,20px); border-radius: clamp(12px,1.5vw,18px); cursor: pointer;
+  text-align: left; width: 100%; transition: all 0.2s;
+}
+.demo-tab:hover { background: rgba(0,0,0,0.04); }
+.demo-tab.on { background: #fff; box-shadow: 0 2px 16px rgba(0,0,0,0.06); }
+.demo-tab .n { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--t3); margin-top: 3px; flex-shrink: 0; }
+.demo-tab.on .n { color: var(--blue); }
+.demo-tab .t { font-size: clamp(13px,1.3vw,15px); font-weight: 500; color: var(--t2); line-height: 1.3; letter-spacing: -0.01em; }
+.demo-tab.on .t { color: var(--t1); font-weight: 700; }
+
+.demo-stage {
+  background: #fff; border-radius: clamp(16px,2vw,28px); overflow: hidden;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03), 0 8px 32px rgba(0,0,0,0.06);
+}
+.stage-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: clamp(16px,2vw,24px) clamp(20px,2.5vw,32px);
+  border-bottom: 1px solid var(--div);
+}
+.stage-title { font-size: clamp(17px,2vw,22px); font-weight: 800; letter-spacing: -0.025em; }
+.stage-ctrl { display: flex; gap: 6px; }
+.ctrl-btn {
+  width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--bg2); color: var(--t2); font-size: 14px; transition: all 0.15s;
+}
+.ctrl-btn:hover { background: var(--blue-soft); color: var(--blue); }
+.stage-body { padding: clamp(20px,3vw,40px); min-height: clamp(320px,40vw,460px); position: relative; }
+.scene { display: none; animation: fadeUp .5s cubic-bezier(.16,1,.3,1); }
+.scene.on { display: block; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+.scene-grid { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(16px,2vw,28px); }
+.scene-panel { background: var(--bg2); border-radius: clamp(12px,1.5vw,20px); padding: clamp(16px,2vw,24px); }
+.scene-pt { font-size: 11px; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 14px; display: flex; align-items: center; gap: 7px; }
+.scene-pt .d { width: 8px; height: 8px; border-radius: 50%; }
+.log-line { font-size: clamp(12px,1.2vw,14px); padding: 9px 14px; margin-bottom: 5px; border-radius: 10px; line-height: 1.4; letter-spacing: -0.01em; font-weight: 500; }
+.log-line.sys { background: var(--blue-soft); color: var(--blue); }
+.log-line.ok { background: rgba(52,199,89,0.1); color: #248A3D; }
+.log-line.hl { background: rgba(0,122,255,0.14); color: var(--blue); font-weight: 700; }
+.log-line.player { background: #fff; color: var(--t2); border: 1px solid var(--div); }
+.stage-log {
+  margin-top: clamp(12px,1.5vw,20px); padding: clamp(12px,1.5vw,18px) clamp(14px,1.8vw,22px);
+  background: #FAFAFA; border-radius: clamp(10px,1.2vw,14px);
+  font-family: var(--mono); font-size: 11px; color: var(--t3); line-height: 2;
+  max-height: 100px; overflow: hidden;
+}
+.stage-log .ts { color: var(--blue); font-weight: 600; } .stage-log .ok { color: var(--green); font-weight: 600; }
+.demo-prog { display: flex; gap: 5px; padding: 0 clamp(20px,2.5vw,32px) clamp(16px,2vw,24px); }
+.prog-dot { height: 3px; flex: 1; border-radius: 2px; background: var(--div); transition: background .3s; }
+.prog-dot.on { background: var(--blue); } .prog-dot.done { background: var(--green); }
+
+/* ==========================================================================
+   FEATURES — Pure typography, no cards, color-banded grouping
+   ========================================================================== */
+.feat-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: clamp(40px,6vw,80px);
+  align-items: start;
+}
+.feat-side { position: sticky; top: 100px; }
+.feat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: clamp(24px,3vw,40px) clamp(28px,4vw,56px);
+}
+.feat { }
+.feat-ic {
+  width: clamp(44px,4vw,56px); height: clamp(44px,4vw,56px); border-radius: clamp(12px,1.4vw,16px); margin-bottom: clamp(14px,1.8vw,20px);
+  display: flex; align-items: center; justify-content: center; font-size: clamp(20px,2.2vw,26px);
+}
+.feat-ic.bl { background: rgba(0,122,255,0.08); }
+.feat-ic.or { background: rgba(255,149,0,0.08); }
+.feat-ic.gr { background: rgba(52,199,89,0.08); }
+.feat-ic.pp { background: rgba(175,82,220,0.08); }
+.feat-ic.rd { background: rgba(255,59,48,0.08); }
+.feat h3 { font-size: clamp(18px,2vw,24px); font-weight: 800; letter-spacing: -0.03em; margin-bottom: clamp(8px,1vw,12px); }
+.feat p { font-size: clamp(14px,1.4vw,16px); color: var(--t2); line-height: 1.55; letter-spacing: -0.01em; }
+.feat-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: clamp(12px,1.5vw,18px); }
+.tag { padding: 5px 12px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--bg2); color: var(--t3); }
+.tag.bl { background: rgba(0,122,255,0.08); color: var(--blue); }
+.tag.or { background: rgba(255,149,0,0.08); color: var(--orange); }
+.tag.gr { background: rgba(52,199,89,0.08); color: var(--green); }
+
+/* ==========================================================================
+   GAMES — Full-bleed grid, no card borders
+   ========================================================================== */
+.games-head { margin-bottom: clamp(28px,4vw,48px); }
+.games-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: clamp(20px,2.5vw,28px); }
+.chip { padding: 8px 20px; border-radius: 999px; font-size: 14px; font-weight: 600; background: rgba(0,0,0,0.04); color: var(--t2); transition: all 0.15s; }
+.chip.on, .chip:hover { background: var(--blue-soft); color: var(--blue); }
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(clamp(110px,12vw,160px), 1fr));
+  gap: clamp(8px,1vw,16px);
+}
+.game {
+  border-radius: clamp(14px,1.8vw,22px); padding: clamp(18px,2.2vw,28px) clamp(12px,1.5vw,18px);
+  text-align: center; transition: all 0.25s cubic-bezier(.16,1,.3,1);
+  background: transparent;
+}
+.game:hover { transform: translateY(-4px); background: #fff; box-shadow: 0 8px 30px rgba(0,0,0,0.08); }
+.game-ic { width: clamp(40px,4.5vw,56px); height: clamp(40px,4.5vw,56px); margin: 0 auto 10px; border-radius: clamp(10px,1.2vw,14px); display: flex; align-items: center; justify-content: center; font-size: clamp(20px,2.4vw,28px); }
+.game-nm { font-size: clamp(12px,1.2vw,14px); font-weight: 700; letter-spacing: -0.01em; }
+.game-st { font-size: 11px; color: var(--green); margin-top: 3px; font-weight: 600; }
+.game.add { color: var(--t3); }
+.game.add .game-ic { background: var(--bg3); }
+
+/* ==========================================================================
+   NUMBERS — Massive type, zero containers
+   ========================================================================== */
+.nums-band { text-align: center; padding: clamp(80px,12vw,160px) var(--pad); }
+.nums-grid {
+  max-width: 1100px; margin: clamp(40px,6vw,72px) auto 0;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: clamp(16px,3vw,40px);
+}
+.num { }
+.num-v {
+  font-size: clamp(3.2rem, 8vw, 6rem); font-weight: 900; letter-spacing: -0.05em; line-height: 1;
+  background: linear-gradient(135deg, var(--blue), var(--blue-light));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  font-variant-numeric: tabular-nums; margin-bottom: clamp(8px,1vw,14px);
+}
+.num-l { font-size: clamp(14px,1.4vw,17px); color: var(--t2); font-weight: 500; letter-spacing: -0.01em; }
+
+/* ==========================================================================
+   CTA — Full-screen glow, maximum punch
+   ========================================================================== */
+.cta-band {
+  padding: clamp(80px,14vw,180px) var(--pad); text-align: center;
+  position: relative; overflow: hidden;
+  background: linear-gradient(180deg, var(--bg2) 0%, var(--bg) 100%);
+}
+.cta-band::before {
+  content: ''; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  width: clamp(500px,80vw,1000px); height: clamp(500px,80vw,1000px); border-radius: 50%;
+  background: radial-gradient(circle, rgba(0,122,255,0.12) 0%, rgba(90,200,250,0.05) 40%, transparent 65%);
+  pointer-events: none;
+}
+.cta-band h2 {
+  font-size: clamp(2.8rem, 7vw, 5.5rem); font-weight: 900; letter-spacing: -0.05em; line-height: 1.03;
+  margin-bottom: clamp(16px,2vw,24px); position: relative; z-index: 1;
+}
+.cta-band p { font-size: clamp(17px,2vw,22px); color: var(--t2); max-width: 540px; margin: 0 auto clamp(36px,5vw,56px); line-height: 1.4; position: relative; z-index: 1; font-weight: 400; }
+.cta-ctas { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; position: relative; z-index: 1; margin-bottom: clamp(40px,6vw,64px); }
+.cta-steps { display: flex; align-items: center; justify-content: center; gap: clamp(8px,1.2vw,14px); flex-wrap: wrap; position: relative; z-index: 1; }
+.step { display: flex; align-items: center; gap: 9px; padding: clamp(8px,1.2vw,12px) clamp(14px,1.8vw,22px); background: #fff; border-radius: 999px; font-size: clamp(12px,1.2vw,14px); font-weight: 600; color: var(--t2); box-shadow: 0 2px 12px rgba(0,0,0,0.05); }
+.step-n { width: 24px; height: 24px; border-radius: 50%; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; }
+.arr { color: var(--t3); font-size: 18px; }
+
+/* ==========================================================================
+   FOOTER — Clean, minimal, no heavy borders
+   ========================================================================== */
+.footer { background: var(--bg2); padding: clamp(48px,7vw,80px) var(--pad) clamp(28px,4vw,48px); }
+.footer-inner { max-width: var(--max); margin: 0 auto; display: grid; grid-template-columns: 2fr repeat(4,1fr); gap: clamp(24px,4vw,48px); }
+.footer-brand .logo { margin-bottom: 14px; }
+.footer-d { font-size: 13px; color: var(--t3); line-height: 1.5; max-width: 280px; }
+.footer-col h4 { font-size: 11px; font-weight: 700; color: var(--t3); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 16px; }
+.footer-col a { display: block; font-size: 13px; color: var(--t2); padding: 5px 0; font-weight: 500; transition: color 0.15s; }
+.footer-col a:hover { color: var(--blue); }
+.footer-bot { max-width: var(--max); margin: clamp(32px,5vw,56px) auto 0; padding-top: clamp(16px,2vw,24px); border-top: 1px solid var(--div); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--t3); }
+
+/* ==========================================================================
+   REVEAL ANIMATIONS
+   ========================================================================== */
+.reveal { opacity: 0; transform: translateY(40px); transition: opacity .8s cubic-bezier(.16,1,.3,1), transform .8s cubic-bezier(.16,1,.3,1); }
+.reveal.on { opacity: 1; transform: translateY(0); }
+.stagger > * { opacity: 0; transform: translateY(24px); transition: opacity .6s cubic-bezier(.16,1,.3,1), transform .6s cubic-bezier(.16,1,.3,1); }
+.stagger.on > *:nth-child(1) { transition-delay: 0ms; }
+.stagger.on > *:nth-child(2) { transition-delay: 80ms; }
+.stagger.on > *:nth-child(3) { transition-delay: 160ms; }
+.stagger.on > *:nth-child(4) { transition-delay: 240ms; }
+.stagger.on > *:nth-child(5) { transition-delay: 320ms; }
+.stagger.on > *:nth-child(6) { transition-delay: 400ms; }
+.stagger.on > *:nth-child(7) { transition-delay: 480ms; }
+.stagger.on > *:nth-child(8) { transition-delay: 560ms; }
+.stagger.on > *:nth-child(9) { transition-delay: 640ms; }
+.stagger.on > *:nth-child(10) { transition-delay: 720ms; }
+.stagger.on > *:nth-child(11) { transition-delay: 800ms; }
+.stagger.on > *:nth-child(12) { transition-delay: 880ms; }
+.stagger.on > * { opacity: 1; transform: translateY(0); }
+
+/* ==========================================================================
+   RESPONSIVE — Truly fluid, breakpoints only for layout shifts
+   ========================================================================== */
+@media (max-width: 900px) {
+  .feat-layout { grid-template-columns: 1fr; gap: 32px; }
+  .feat-side { position: static; }
+  .feat-grid { grid-template-columns: repeat(2, 1fr); }
+  .nums-grid { grid-template-columns: repeat(2, 1fr); gap: 24px; }
+  .footer-inner { grid-template-columns: 1fr 1fr; gap: 28px; }
+  .footer-brand { grid-column: 1/-1; }
+}
+@media (max-width: 768px) {
+  .nav-links { display: none; }
+  .nav { top: 24px; }
+  .nav.scrolled { top: 0; }
+  .hero { padding-top: 100px; }
+  .hero-ctas { flex-direction: column; align-items: center; width: 100%; }
+  .btn-primary, .btn-secondary { width: 100%; max-width: 320px; justify-content: center; }
+  .preview-body { grid-template-columns: 1fr; }
+  .preview-side { flex-direction: row; overflow-x: auto; padding: 10px 12px; gap: 4px; }
+  .preview-nav { white-space: nowrap; flex-shrink: 0; }
+  .preview-stats { grid-template-columns: repeat(2, 1fr); }
+  .preview-frame { transform: none; border-radius: 16px; }
+  .demo-layout { grid-template-columns: 1fr; }
+  .demo-tabs { flex-direction: row; overflow-x: auto; gap: 6px; padding-bottom: 4px; }
+  .demo-tab { flex-shrink: 0; padding: 10px 16px; }
+  .demo-tab .n { display: none; }
+  .scene-grid { grid-template-columns: 1fr; }
+  .stage-body { padding: 20px; min-height: auto; }
+  .feat-grid { grid-template-columns: 1fr; gap: 28px; }
+  .nums-grid { grid-template-columns: repeat(2, 1fr); gap: 20px; }
+  .cta-steps { flex-direction: column; }
+  .arr { transform: rotate(90deg); }
+  .footer-bot { flex-direction: column; gap: 8px; text-align: center; }
+  .games-grid { grid-template-columns: repeat(3, 1fr); }
+}
+@media (max-width: 420px) {
+  .games-grid { grid-template-columns: repeat(2, 1fr); }
+  .nums-grid { grid-template-columns: 1fr 1fr; gap: 16px; }
+  .preview-stats { grid-template-columns: 1fr 1fr; }
+}
+@media (min-width: 1600px) {
+  :root { --pad: 64px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  .reveal, .stagger > * { opacity: 1; transform: none; }
+  .ticker-track { animation: none; }
+  .preview-frame { transform: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="build">BUILD: 20260725-PROTO-V5</div>
+<div class="prog" id="prog"></div>
+
+<nav class="nav" id="nav">
+  <div class="nav-inner">
+    <div class="logo"><div class="logo-ic">🎮</div>GSP</div>
+    <div class="nav-links">
+      <a href="#feat">能力</a>
+      <a href="#games">游戏</a>
+      <a href="#demo">演示</a>
+      <a href="#cta">开始</a>
+    </div>
+    <a href="#cta" class="nav-cta">免费开始 →</a>
+  </div>
+</nav>
+
+<!-- ==================== HERO — Full viewport, no box ==================== -->
+<section class="hero">
+  <div class="hero-tag reveal"><span class="dot"></span>游戏服务器运营中台 · AGPL-3.0 开源</div>
+  <h1 class="reveal">
+    把开服<span class="line2">从<em style="font-style:normal">技术活</em></span><span class="line2">变成<span class="grad">运营活</span></span>
+  </h1>
+  <p class="hero-sub reveal">获客 → 内容 → 秩序 → 赞助，全链路可插拔标准件。不挑游戏类型，一个面板撑起整个玩家运营体系。</p>
+  <div class="hero-ctas reveal">
+    <button class="btn-primary" onclick="go('demo')">▶ 观看自动演示</button>
+    <button class="btn-secondary" onclick="go('cta')">5 分钟开服 →</button>
+  </div>
+
+  <div class="hero-preview reveal">
+    <div class="preview-frame">
+      <div class="preview-chrome">
+        <div class="preview-dot r"></div><div class="preview-dot y"></div><div class="preview-dot g"></div>
+        <div class="preview-url">https://panel.gsp.ecsrz.com/dashboard</div>
+      </div>
+      <div class="preview-body">
+        <div class="preview-side">
+          <div class="preview-nav on"><span class="ic">📊</span>仪表盘</div>
+          <div class="preview-nav"><span class="ic">🖥</span>服务器</div>
+          <div class="preview-nav"><span class="ic">💎</span>商城</div>
+          <div class="preview-nav"><span class="ic">👥</span>玩家</div>
+          <div class="preview-nav"><span class="ic">🎫</span>CDK</div>
+          <div class="preview-nav"><span class="ic">🗳</span>投票</div>
+        </div>
+        <div class="preview-main">
+          <div class="preview-stats">
+            <div class="stat"><div class="stat-l">在线玩家</div><div class="stat-v gr">47<span style="font-size:14px;color:var(--t3);font-weight:400">/50</span></div></div>
+            <div class="stat"><div class="stat-l">CPU</div><div class="stat-v bl">23%</div></div>
+            <div class="stat"><div class="stat-l">今日流水</div><div class="stat-v or">¥328</div></div>
+            <div class="stat"><div class="stat-l">状态</div><div class="stat-v gr">运行中</div></div>
+          </div>
+          <div class="preview-chart">
+            <div class="chart-t">玩家在线趋势</div>
+            <svg viewBox="0 0 400 80" preserveAspectRatio="none" style="flex:1;width:100%;min-height:60px">
+              <defs><linearGradient id="cg" x1="0"y1="0"x2="0"y2="1"><stop offset="0%" stop-color="rgba(0,122,255,0.12)"/><stop offset="100%" stop-color="rgba(0,122,255,0)"/></linearGradient></defs>
+              <path d="M0,65 L30,55 L60,58 L90,45 L120,35 L150,40 L180,28 L210,25 L240,32 L270,20 L300,18 L330,25 L360,14 L400,18 L400,80 L0,80 Z" fill="url(#cg)"/>
+              <path d="M0,65 L30,55 L60,58 L90,45 L120,35 L150,40 L180,28 L210,25 L240,32 L270,20 L300,18 L330,25 L360,14 L400,18" fill="none" stroke="#007AFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </div>
+          <div class="preview-ticker">
+            <div class="ticker-track">
+              <span class="ticker-item j">👤 Steve 加入了服务器</span>
+              <span class="ticker-item b">💎 Alex 购买 VIP · ¥30</span>
+              <span class="ticker-item g">🎁 新手礼包已发放</span>
+              <span class="ticker-item v">🗳 投票通过 · 踢出作弊者</span>
+              <span class="ticker-item j">👤 Alex 加入了服务器</span>
+              <span class="ticker-item b">💰 日流水 ¥328</span>
+              <span class="ticker-item j">👤 Steve 加入了服务器</span>
+              <span class="ticker-item b">💎 Alex 购买 VIP · ¥30</span>
+              <span class="ticker-item g">🎁 新手礼包已发放</span>
+              <span class="ticker-item v">🗳 投票通过 · 踢出作弊者</span>
+              <span class="ticker-item j">👤 Alex 加入了服务器</span>
+              <span class="ticker-item b">💰 日流水 ¥328</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="hero-fade"></div>
+
+<!-- ==================== DEMO — Full-bleed theatre ==================== -->
+<section class="demo-band" id="demo">
+  <div class="demo-head">
+    <div class="sec-label reveal">02 · 自动演示</div>
+    <h2 class="sec-title reveal">看看它是怎么工作的</h2>
+    <p class="sec-desc reveal">无需注册、无需安装。页面自动模拟真实操作流程，30 秒体验完整功能链路。</p>
+  </div>
+  <div class="demo-layout">
+    <div class="demo-tabs reveal" id="tabs">
+      <button class="demo-tab on" data-s="0"><span class="n">01</span><span class="t">5 分钟开服</span></button>
+      <button class="demo-tab" data-s="1"><span class="n">02</span><span class="t">新手礼包自动发放</span></button>
+      <button class="demo-tab" data-s="2"><span class="n">03</span><span class="t">VIP 商城购买</span></button>
+      <button class="demo-tab" data-s="3"><span class="n">04</span><span class="t">社区投票踢挂</span></button>
+      <button class="demo-tab" data-s="4"><span class="n">05</span><span class="t">跨游戏统一管理</span></button>
+    </div>
+    <div class="demo-stage reveal">
+      <div class="stage-head">
+        <div class="stage-title" id="st">5 分钟开服</div>
+        <div class="stage-ctrl">
+          <button class="ctrl-btn" id="prev">◀</button>
+          <button class="ctrl-btn" id="play">⏸</button>
+          <button class="ctrl-btn" id="next">▶</button>
+        </div>
+      </div>
+      <div class="stage-body" id="sb">
+        <!-- Scene 1 -->
+        <div class="scene on" data-s="0">
+          <div class="scene-grid">
+            <div class="scene-panel">
+              <div class="scene-pt"><span class="d" style="background:var(--blue)"></span>控制台输出</div>
+              <div class="log-line sys">→ 选择游戏: Minecraft</div>
+              <div class="log-line sys">→ 配置端口: 25565</div>
+              <div class="log-line sys">→ SteamCMD 下载中... [████░░░░] 82%</div>
+              <div class="log-line sys">→ 解压服务端文件...</div>
+              <div class="log-line sys">→ 初始化 RCON 连接...</div>
+              <div class="log-line ok">✓ 服务器已启动！耗时: 4分32秒</div>
+              <div class="log-line hl">🎮 地址: mc.yourserver.com:25565</div>
+            </div>
+            <div class="scene-panel">
+              <div class="scene-pt"><span class="d" style="background:var(--green)"></span>服务器状态</div>
+              <div style="padding:8px 0;font-size:14px">
+                <div style="display:flex;justify-content:space-between;margin-bottom:14px"><span style="color:var(--t3)">状态</span><span style="font-weight:700;color:var(--green)">● 运行中</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:14px"><span style="color:var(--t3)">版本</span><span style="font-weight:700">1.21.1</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:14px"><span style="color:var(--t3)">端口</span><span style="font-weight:700">25565</span></div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:14px"><span style="color:var(--t3)">RCON</span><span style="font-weight:700;color:var(--green)">已连接</span></div>
+                <div style="height:5px;background:var(--bg3);border-radius:3px;overflow:hidden;margin-top:12px"><div style="width:100%;height:100%;background:var(--green);border-radius:3px"></div></div>
+                <div style="font-size:11px;color:var(--t3);margin-top:4px;text-align:right">启动完成</div>
+              </div>
+            </div>
+          </div>
+          <div class="stage-log"><span class="ts">[00:00]</span> 初始化 Daemon... <span class="ok">OK</span><br><span class="ts">[00:15]</span> Mojang API → 1.21.1 <span class="ok">OK</span><br><span class="ts">[04:32]</span> RCON ready → <span class="ok">Server started</span></div>
+        </div>
+        <!-- Scene 2 -->
+        <div class="scene" data-s="1">
+          <div class="scene-grid">
+            <div class="scene-panel">
+              <div class="scene-pt"><span class="d" style="background:var(--green)"></span>游戏内聊天</div>
+              <div class="log-line player">Steve: 第一次来，怎么玩？</div>
+              <div class="log-line sys">[系统] 检测到新玩家 Steve 首次登录</div>
+              <div class="log-line sys">[系统] 自动发放新手礼包...</div>
+              <div class="log-line ok">✓ 给予 Steve: 钻石剑×1、面包×16、金苹果×3</div>
+              <div class="log-line player">Steve: 哇！刚进来就有装备！</div>
+            </div>
+            <div class="scene-panel">
+              <div class="scene-pt"><span class="d" style="background:var(--purple)"></span>触发规则</div>
+              <div style="padding:8px 0">
+                <div style="padding:14px;background:#fff;border-radius:12px;margin-bottom:8px"><div style="font-size:13px;font-weight:700;margin-bottom:3px">🎁 新手欢迎礼包</div><div style="font-size:12px;color:var(--t3)">触发: 首次登录</div></div>
+                <div style="padding:14px;background:#fff;border-radius:12px;margin-bottom:8px"><div style="font-size:13px;font-weight:700;margin-bottom:3px">⏰ 每日签到</div><div style="font-size:12px;color:var(--t3)">触发: 每日首次登录</div></div>
+                <div style="padding:14px;background:#fff;border-radius:12px"><div style="font-size:13px;font-weight:700;margin-bottom:3px">🏆 在线奖励</div><div style="font-size:12px;color:var(--t3)">触发: 累计在线2h</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="stage-log"><span class="ts">[event]</span> player.first_join → welcome_gift <span class="ok">OK</span><br><span class="ts">[RCON]</span> give Steve diamond_sword <span class="ok">OK</span></div>
+        </div>
+        <!-- Scene 3 -->
+        <div class="scene" data-s="2">
+          <div class="scene-grid">
+            <div class="scene-panel">
+              <div class="scene-pt"><span class="d" style="background:var(--orange)"></span>玩家商城</div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;background:#fff;border-radius:14px;margin-bottom:8px">
+                <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,var(--orange),#FF6B00);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">💎</div>
+                <div style="flex:1"><div style="font-size:14px;font-weight:700">VIP 月卡</div><div style="font-size:13px;color:var(--orange);font-weight:700">¥30/月</div></div>
+                <div style="padding:7px 16px;border-radius:999px;background:var(--green);color:#fff;font-size:12px;font-weight:700">已购</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;background:#fff;border-radius:14px;margin-bottom:8px">
+                <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#AF52DE,#D45BDE);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">👑</div>
+                <div style="flex:1"><div style="font-size:14px;font-weight:700">SVIP 永久</div><div style="font-size:13px;color:var(--orange);font-weight:700">¥198</div></div>
+                <div style="padding:7px 16px;border-radius:999px;background:var(--blue);color:#fff;font-size:12px;font-weight:700">购买</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;padding:14px;background:#fff;border-radius:14px">
+                <div style="width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#34C759,#30D158);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">⚡</div>
+                <div style="flex:1"><div style="font-size:14px;font-weight:700">飞行权限</div><div style="font-size:13px;color:var(--orange);font-weight:700">¥10</div></div>
+                <div style="padding:7px 16px;border-radius:999px;background:var(--blue);color:#fff;font-size:12px;font-weight:700">购买</div>
+              </div>
+            </div>
+            <div class="scene-panel">
+              <div class="scene-pt"><span class="d" style="background:var(--blue)"></span>支付流程</div>
+              <div style="padding:8px 0">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0">✓</div><div><div style="font-size:14px;font-weight:700">选择商品</div><div style="font-size:11px;color:var(--t3)">VIP 月卡 · ¥30</div></div></div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0">✓</div><div><div style="font-size:14px;font-weight:700">微信支付</div><div style="font-size:11px;color:var(--t3)">扫码完成支付</div></div></div>
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0">✓</div><div><div style="font-size:14px;font-weight:700">自动到账</div><div style="font-size:11px;color:var(--t3)">RCON 执行权限组命令</div></div></div>
+                <div style="display:flex;align-items:center;gap:12px"><div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0">✓</div><div><div style="font-size:14px;font-weight:700">入账记录</div><div style="font-size:11px;color:var(--t3)">实时流水更新</div></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="stage-log"><span class="ts">[pay]</span> Alex ¥30 <span class="ok">OK</span><br><span class="ts">[RCON]</span> lp user Alex parent add vip <span class="ok">OK</span></div>
+        </div>
+        <!-- Scene 4 -->
+        <div class="scene" data-s="3">
+          <div class="scene-grid">
+            <div class="scene-panel">
+              <div class="scene-pt"><span class="d" style="background:var(--red)"></span>投票进行中</div>
+              <div style="text-align:center;padding:20px 0">
+                <div style="font-size:48px;margin-bottom:10px">🗳</div>
+                <div style="font-size:20px;font-weight:800;letter-spacing:-0.03em">踢出 NoobHacker?</div>
+                <div style="font-size:13px;color:var(--t3);margin:10px 0 24px">举报人: Steve · 原因: 疑似作弊</div>
+                <div style="display:flex;gap:28px;justify-content:center;margin-bottom:20px">
+                  <div><div style="font-size:32px;font-weight:800;color:var(--green)">8</div><div style="font-size:12px;color:var(--t3)">赞成</div></div>
+                  <div style="width:1px;background:var(--div)"></div>
+                  <div><div style="font-size:32px;font-weight:800;color:var(--t3)">2</div><div style="font-size:12px;color:var(--t3)">反对</div></div>
+                </div>
+                <div style="padding:10px 24px;background:rgba(255,59,48,0.08);border-radius:999px;display:inline-block"><span style="font-size:14px;font-weight:700;color:var(--red)">✓ 通过 · 已自动踢出</span></div>
+              </div>
+            </div>
+            <div class="scene-panel">
+              <div class="scene-pt"><span class="d" style="background:var(--orange)"></span>秩序配置</div>
+              <div style="padding:8px 0;font-size:14px">
+                <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--div)"><span>投票踢人</span><span style="font-weight:700;color:var(--green)">已启用</span></div>
+                <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--div)"><span>通过阈值</span><span style="font-weight:700">75%</span></div>
+                <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--div)"><span>投票时长</span><span style="font-weight:700">60秒</span></div>
+                <div style="display:flex;justify-content:space-between;padding:12px 0"><span>触发命令</span><span style="font-weight:700;font-family:var(--mono);color:var(--blue);font-size:12px">!vote kick</span></div>
+              </div>
+            </div>
+          </div>
+          <div class="stage-log"><span class="ts">[vote]</span> 8/2 → 75% <span class="ok">PASSED</span><br><span class="ts">[RCON]</span> ban NoobHacker 1h <span class="ok">OK</span></div>
+        </div>
+        <!-- Scene 5 -->
+        <div class="scene" data-s="4">
+          <div class="scene-grid">
+            <div class="scene-panel" style="grid-column:1/-1">
+              <div class="scene-pt"><span class="d" style="background:var(--blue)"></span>统一仪表盘 — 5 个实例</div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;padding:8px 0">
+                <div style="padding:16px;background:#fff;border-radius:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:20px">⛏</span><span style="font-size:14px;font-weight:700">Minecraft</span><span style="margin-left:auto;font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(52,199,89,0.1);color:var(--green);font-weight:700">●</span></div><div style="font-size:12px;color:var(--t3)">47/50 · ¥328/日</div></div>
+                <div style="padding:16px;background:#fff;border-radius:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:20px">🌲</span><span style="font-size:14px;font-weight:700">Valheim</span><span style="margin-left:auto;font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(52,199,89,0.1);color:var(--green);font-weight:700">●</span></div><div style="font-size:12px;color:var(--t3)">8/10 · ¥56/日</div></div>
+                <div style="padding:16px;background:#fff;border-radius:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:20px">🧟</span><span style="font-size:14px;font-weight:700">PZ</span><span style="margin-left:auto;font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(52,199,89,0.1);color:var(--green);font-weight:700">●</span></div><div style="font-size:12px;color:var(--t3)">12/20 · ¥0/日</div></div>
+                <div style="padding:16px;background:#fff;border-radius:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:20px">🔫</span><span style="font-size:14px;font-weight:700">Rust</span><span style="margin-left:auto;font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(52,199,89,0.1);color:var(--green);font-weight:700">●</span></div><div style="font-size:12px;color:var(--t3)">23/50 · ¥189/日</div></div>
+                <div style="padding:16px;background:#fff;border-radius:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><span style="font-size:20px">🦖</span><span style="font-size:14px;font-weight:700">ARK</span><span style="margin-left:auto;font-size:10px;padding:3px 8px;border-radius:999px;background:rgba(255,149,0,0.1);color:var(--orange);font-weight:700">○</span></div><div style="font-size:12px;color:var(--t3)">0/40 · 已停止</div></div>
+                <div style="padding:16px;background:var(--bg2);border-radius:14px;border:2px dashed var(--div);display:flex;align-items:center;justify-content:center;color:var(--t3);font-size:14px;font-weight:600">+ 添加新游戏</div>
+              </div>
+            </div>
+          </div>
+          <div class="stage-log"><span class="ts">[panel]</span> 5实例 · 90玩家 · ¥573/日 <span class="ok">OK</span><br><span class="ts">[pack]</span> 11 games · YAML 驱动 · 零代码接入</div>
+        </div>
+      </div>
+      <div class="demo-prog" id="dprog"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== FEATURES — Typography-first, no cards ==================== -->
+<section class="sec-pad" id="feat">
+  <div class="sec-inner">
+    <div class="feat-layout">
+      <div class="feat-side reveal">
+        <div class="sec-label">03 · 核心能力</div>
+        <h2 class="sec-title">运维 + 变现<br>+ 社区<br>一个面板</h2>
+        <p class="sec-desc">从部署到运营，从秩序到变现，GSP 把游戏服运营链路做成可插拔的标准件。</p>
+      </div>
+      <div class="feat-grid stagger">
+        <div class="feat">
+          <div class="feat-ic bl">⚙️</div>
+          <h3>一键部署运维</h3>
+          <p>SteamCMD 自动下载、RCON 自动连接、Daemon 节点健康监控。11+ 款游戏，每款只写一份 YAML。</p>
+          <div class="feat-tags"><span class="tag bl">SteamCMD</span><span class="tag bl">RCON</span><span class="tag bl">自动备份</span></div>
+        </div>
+        <div class="feat">
+          <div class="feat-ic or">💎</div>
+          <h3>VIP / 商城</h3>
+          <p>微信/支付宝扫码支付，自动到账。权限组、物品、CDK 全链路打通。</p>
+          <div class="feat-tags"><span class="tag or">微信支付</span><span class="tag or">自动发货</span></div>
+        </div>
+        <div class="feat">
+          <div class="feat-ic pp">🎫</div>
+          <h3>CDK 兑换</h3>
+          <p>批量生成兑换码，自定义物品/权限组/时长，活动推广利器。</p>
+          <div class="feat-tags"><span class="tag" style="background:rgba(175,82,220,0.08);color:var(--purple)">批量生成</span></div>
+        </div>
+        <div class="feat">
+          <div class="feat-ic gr">💬</div>
+          <h3>聊天触发</h3>
+          <p>自动欢迎语、进服礼包、关键词响应。玩家聊天触发自动化流程，无需在线值守。</p>
+          <div class="feat-tags"><span class="tag gr">自动回复</span><span class="tag gr">礼包发放</span></div>
+        </div>
+        <div class="feat">
+          <div class="feat-ic rd">🗳</div>
+          <h3>投票踢人</h3>
+          <p>社区自治，玩家投票处理作弊/挂机，自动执行封禁，维护服务器秩序。</p>
+          <div class="feat-tags"><span class="tag" style="background:rgba(255,59,48,0.08);color:var(--red)">自动执行</span></div>
+        </div>
+        <div class="feat">
+          <div class="feat-ic bl">📊</div>
+          <h3>数据看板</h3>
+          <p>在线趋势、流水报表、玩家留存、活跃度分析。做决策靠数据，不靠感觉。</p>
+          <div class="feat-tags"><span class="tag bl">在线趋势</span><span class="tag bl">流水报表</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== GAMES — Full-bleed color band ==================== -->
+<section class="sec-pad band-dark" id="games">
+  <div class="sec-inner">
+    <div class="games-head">
+      <div class="sec-label reveal">04 · 支持游戏</div>
+      <h2 class="sec-title reveal">11+ 款游戏<br>YAML 驱动，零代码接入</h2>
+      <p class="sec-desc reveal">每款游戏只写一份 Pack YAML，社区可贡献。越多游戏越值钱。</p>
+      <div class="games-chips reveal">
+        <button class="chip on">全部</button>
+        <button class="chip">沙盒</button>
+        <button class="chip">生存</button>
+        <button class="chip">射击</button>
+        <button class="chip">RPG</button>
+      </div>
+    </div>
+    <div class="games-grid stagger">
+      <div class="game"><div class="game-ic" style="background:rgba(139,92,246,0.08)">⛏</div><div class="game-nm">Minecraft</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(34,197,94,0.08)">🌲</div><div class="game-nm">Valheim</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(239,68,68,0.08)">🧟</div><div class="game-nm">P Zomboid</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(249,115,22,0.08)">🦖</div><div class="game-nm">ARK</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(234,179,8,0.08)">🔫</div><div class="game-nm">Rust</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(59,130,246,0.08)">🌍</div><div class="game-nm">Palworld</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(236,72,153,0.08)">🔥</div><div class="game-nm">DST</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(168,85,247,0.08)">⚙️</div><div class="game-nm">Factorio</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(20,184,166,0.08)">🌳</div><div class="game-nm">Terraria</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(99,102,241,0.08)">🏰</div><div class="game-nm">Enshrouded</div><div class="game-st">● 已支持</div></div>
+      <div class="game"><div class="game-ic" style="background:rgba(234,88,12,0.08)">🏭</div><div class="game-nm">Satisfactory</div><div class="game-st">● 已支持</div></div>
+      <div class="game add"><div class="game-ic">+</div><div class="game-nm">更多游戏</div><div class="game-st">贡献 Pack</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== NUMBERS — Massive gradient type ==================== -->
+<section class="nums-band">
+  <div class="sec-label reveal">05 · 数据说话</div>
+  <h2 class="sec-title reveal" style="text-align:center;max-width:800px;margin:0 auto">为什么服主选择 GSP</h2>
+  <div class="nums-grid stagger">
+    <div class="num"><div class="num-v" data-c="11">0</div><div class="num-l">支持游戏</div></div>
+    <div class="num"><div class="num-v" data-c="3">0</div><div class="num-l">权限层级</div></div>
+    <div class="num"><div class="num-v" data-c="5">0</div><div class="num-l">分钟开服</div></div>
+    <div class="num"><div class="num-v" data-c="0">0</div><div class="num-l">代码接入</div></div>
+  </div>
+</section>
+
+<!-- ==================== CTA — Full-screen glow ==================== -->
+<section class="cta-band" id="cta">
+  <h2 class="reveal">现在就开始。</h2>
+  <p class="reveal">5 分钟开服，今天就有第一笔收入。开源免费，自托管无限制。</p>
+  <div class="cta-ctas reveal">
+    <button class="btn-primary" style="font-size:clamp(16px,2vw,20px);padding:clamp(16px,2.2vw,22px) clamp(40px,5vw,64px)">🚀 免费开始使用</button>
+    <button class="btn-secondary" style="font-size:clamp(16px,2vw,20px);padding:clamp(15px,2.2vw,21px) clamp(38px,5vw,62px)">⭐ Star on GitHub</button>
+  </div>
+  <div class="cta-steps reveal">
+    <div class="step"><span class="step-n">1</span>选择游戏</div>
+    <span class="arr">→</span>
+    <div class="step"><span class="step-n">2</span>一键部署</div>
+    <span class="arr">→</span>
+    <div class="step"><span class="step-n">3</span>配置运营</div>
+    <span class="arr">→</span>
+    <div class="step"><span class="step-n">4</span>开始赚钱</div>
+  </div>
+</section>
+
+<!-- ==================== FOOTER ==================== -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <div class="logo"><div class="logo-ic">🎮</div>GSP</div>
+      <p class="footer-d">游戏服务器运营中台。把开服从技术活变成运营活。AGPL-3.0 开源。</p>
+    </div>
+    <div class="footer-col"><h4>产品</h4><a href="#">功能介绍</a><a href="#">支持游戏</a><a href="#">定价</a><a href="#">更新日志</a></div>
+    <div class="footer-col"><h4>资源</h4><a href="#">文档</a><a href="#">API 参考</a><a href="#">Pack 开发</a><a href="#">社区</a></div>
+    <div class="footer-col"><h4>GitHub</h4><a href="#">源码</a><a href="#">Issues</a><a href="#">Discussions</a><a href="#">贡献指南</a></div>
+    <div class="footer-col"><h4>关于</h4><a href="#">团队</a><a href="#">博客</a><a href="#">联系我们</a><a href="#">隐私政策</a></div>
+  </div>
+  <div class="footer-bot">
+    <span>© 2026 GSP · Game Server Panel</span>
+    <span>AGPL-3.0 · Made with ❤️ for server owners</span>
+  </div>
+</footer>
+
+<script>
+// ---- Init: ensure correct nav state on load ----
+function updateNav() {
+  document.getElementById('nav').classList.toggle('scrolled', window.scrollY > 40);
+}
+updateNav();
+window.addEventListener('scroll', () => {
+  const h = document.documentElement.scrollHeight - window.innerHeight;
+  const p = h > 0 ? (window.scrollY / h) * 100 : 0;
+  document.getElementById('prog').style.width = p + '%';
+  updateNav();
+}, { passive: true });
+
+// ---- Reveal on scroll ----
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('on'); io.unobserve(e.target); }});
+}, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
+document.querySelectorAll('.reveal, .stagger').forEach(el => io.observe(el));
+
+// ---- Number counter ----
+const numIO = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      const el = e.target; const target = parseInt(el.dataset.c) || 0;
+      const start = performance.now(); const dur = 1200;
+      const tick = (now) => {
+        const t = Math.min((now - start) / dur, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        el.textContent = Math.round(ease * target);
+        if (t < 1) requestAnimationFrame(tick); else el.textContent = target + '+';
+      };
+      requestAnimationFrame(tick);
+      numIO.unobserve(el);
+    }
+  });
+}, { threshold: 0.5 });
+document.querySelectorAll('.num-v[data-c]').forEach(el => numIO.observe(el));
+
+// ---- Demo auto-play ----
+const scenes = document.querySelectorAll('.scene');
+const tabs = document.querySelectorAll('.demo-tab');
+const progDots = document.querySelectorAll('.prog-dot');
+const stageTitle = document.getElementById('st');
+const titles = ['5 分钟开服','新手礼包自动发放','VIP 商城购买','社区投票踢挂','跨游戏统一管理'];
+let cur = 0, playing = true, timer;
+
+function go(i) {
+  cur = (i + scenes.length) % scenes.length;
+  scenes.forEach(s => s.classList.toggle('on', +s.dataset.s === cur));
+  tabs.forEach(t => t.classList.toggle('on', +t.dataset.s === cur));
+  progDots.forEach((d, di) => d.classList.toggle('on', di === cur) || d.classList.toggle('done', di < cur));
+  stageTitle.textContent = titles[cur];
+}
+function next() { go(cur + 1); reset(); }
+function prev() { go(cur - 1); reset(); }
+function reset() { if (playing) { clearInterval(timer); timer = setInterval(next, 9000); }}
+
+// Build prog dots
+const dprog = document.getElementById('dprog');
+dprog.innerHTML = '';
+for (let i = 0; i < scenes.length; i++) { const d = document.createElement('div'); d.className = 'prog-dot' + (i === 0 ? ' on' : ''); dprog.appendChild(d); }
+// Re-select after building
+const allDots = dprog.querySelectorAll('.prog-dot');
+function go2(i) {
+  cur = (i + scenes.length) % scenes.length;
+  scenes.forEach(s => s.classList.toggle('on', +s.dataset.s === cur));
+  tabs.forEach(t => t.classList.toggle('on', +t.dataset.s === cur));
+  allDots.forEach((d, di) => { d.classList.toggle('on', di === cur); d.classList.toggle('done', di < cur); });
+  stageTitle.textContent = titles[cur];
+}
+tabs.forEach(t => t.addEventListener('click', () => { go2(+t.dataset.s); reset(); }));
+document.getElementById('next').addEventListener('click', () => { go2(cur + 1); reset(); });
+document.getElementById('prev').addEventListener('click', () => { go2(cur - 1); reset(); });
+document.getElementById('play').addEventListener('click', (e) => {
+  playing = !playing; e.target.textContent = playing ? '⏸' : '▶';
+  if (playing) timer = setInterval(() => go2(cur + 1) || reset(), 9000); else clearInterval(timer);
+});
+timer = setInterval(() => go2(cur + 1), 9000);
+
+// ---- Smooth scroll ----
+function go(id) { document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }); }
+
+// ---- Game chips ----
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+  c.classList.add('on');
+}));
+</script>
+</body>
+</html>

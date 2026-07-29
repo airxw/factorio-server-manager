@@ -1,0 +1,26 @@
+{
+  "ERR_ASSET_NOT_FOUND": {
+    "http_status": 404,
+    "message": "资产不存在或已下架"
+  },
+  "ERR_OVERRIDE_FORBIDDEN": {
+    "http_status": 403,
+    "message": "禁止覆盖该全局资产的核心属性（如 execution_logic）"
+  },
+  "ERR_RCON_INJECTION": {
+    "http_status": 400,
+    "message": "检测到非法的 RCON 指令或恶意注入参数"
+  },
+  "ERR_UGC_LIMIT_EXCEEDED": {
+    "http_status": 400,
+    "message": "实例自定义商品数量达到配额上限"
+  },
+  "ERR_INSTANCE_NOT_FOUND": {
+    "http_status": 404,
+    "message": "实例不存在或已销毁"
+  },
+  "ERR_EXECUTION_FAILED": {
+    "http_status": 500,
+    "message": "发货指令在沙箱内执行失败"
+  }
+}

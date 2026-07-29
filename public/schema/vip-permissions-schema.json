@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/vip-permissions-schema.json",
+  "title": "VIP Permissions Schema",
+  "description": "vip_permissions 表数据契约。VIP 等级权限映射表，0-5 级，含 max_quality / daily_limit。来源：scheme-final-merged.md §4.2.2 P1。factorio 迁移表，无 user_id 引用，直接迁移。\n\nv4.x 关联说明（business-logic-v1-contracts）：\n- vip_type 字段位于 user_instance_bindings 表（不在本表），区分 permanent/monthly/quarterly/yearly/trial\n- vip_expires_at 字段位于 user_instance_bindings 表，控制 VIP 等级过期降级\n- vip_permissions 表是全局模板，不按实例区分（与 user_instance_bindings 按实例存储解耦）\n- VIP 升级路径：通过 user_vip_points 表积分驱动（vipPointService.checkAndUpgradeVip）\n- VIP 续费折扣：通过 system_config.vip.renewal_discount_levels 配置（不在本表）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "vip_level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "VIP 等级 0-5。UNIQUE 约束。0=普通用户，5=最高级。VIP N 可购品质 tier ≤ N-1"
+    },
+    "display_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "description": "VIP 等级展示名（如 '普通用户' / 'VIP1' / 'VIP2' ...）"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "description": "权限标识（如 'shop.buy' / 'cdk.redeem' / 'chat.vote' 等）"
+      },
+      "default": [],
+      "description": "权限列表（JSON 数组）。空数组表示无额外权限"
+    },
+    "max_quality": {
+      "type": "string",
+      "enum": ["normal", "uncommon", "rare", "epic", "legendary", "none"],
+      "default": "normal",
+      "description": "可购买的最高品质。none=无品质概念（Minecraft）。与 Pack.items.qualities 配合使用：实际可购品质取 min(max_quality 在 qualities 中的索引, vip_level-1)"
+    },
+    "daily_limit": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "每日购买限额。null=不限。0=禁止购买"
+    },
+    "daily_reward_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "VIP 每日可领取点券金额（阶梯固定金额）。VIP0=100, VIP1=200, VIP2=400, VIP3=800, VIP4=1600, VIP5=3200。鼓励升级 VIP"
+    }
+  },
+  "required": ["id", "vip_level", "display_name", "max_quality"]
+}

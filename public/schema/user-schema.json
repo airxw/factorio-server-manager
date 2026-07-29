@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/user-schema.json",
+  "title": "User Schema",
+  "description": "users 表数据契约。在 gameserver-panel 现有 5 字段基础上扩展 factorio 用户体系字段（vip_level / vip_expires_at / is_verified / display_name / last_login_at / last_login_ip）。来源：scheme-final-merged.md §4.3.1。id 类型统一为 string (UUID)，与 factorio integer id 通过迁移映射表转换。\n\n[v4.17.0] 多角色重构：新增 roles (JSON 数组) + active_role (会话级活动角色) 字段；role 字段标记为 @deprecated（过渡期保留，等同 active_role），v4.18.0 物理删除。详见 docs/plans/binding-unification-multi-role-plan.md §3。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "用户主键，UUID 字符串。保留 gameserver-panel 既有 UUID 类型，factorio 迁移用户时生成新 UUID 并维护映射表"
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "description": "邮箱，UNIQUE 约束，用于登录"
+    },
+    "username": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "用户名，1-64 字符"
+    },
+    "password_hash": {
+      "type": "string",
+      "minLength": 1,
+      "description": "密码哈希（bcrypt/argon2 等），禁止明文存储"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["server_admin", "instance_admin", "user"],
+      "default": "user",
+      "deprecated": true,
+      "description": "[DEPRECATED v4.17.0] 单值角色字段，过渡期保留。新代码必须使用 roles（角色集合）+ active_role（会话级活动角色）。本字段在过渡期内等同 active_role：登录时取 active_role 回填此字段以兼容旧 JWT/中间件。v4.18.0 物理删除。原说明：角色（v3.1.0 升级 3 级）：server_admin=系统管理员；instance_admin=实例管理员；user=普通用户。server_admin/instance_admin 在 VIP 品质校验中不受限"
+    },
+    "roles": {
+      "type": "string",
+      "description": "[v4.17.0 新增] 角色集合（多值），以 JSON 数组字符串形式存储（SQLite TEXT 列）。例如：'[\"user\",\"instance_admin\"]'。约束：(1) 必须是合法 JSON 数组字符串；(2) 元素唯一，至少一个；(3) 元素取值 ∈ {server_admin, instance_admin, user}；(4) active_role 必须 ∈ roles（应用层校验）。一个账号可同时拥有多身份以支持工作台切换。迁移自旧 role 单值字段：roles = [role]"
+    },
+    "active_role": {
+      "type": ["string", "null"],
+      "enum": ["server_admin", "instance_admin", "user", null],
+      "default": null,
+      "description": "[v4.17.0 新增] 当前活动角色（会话级，登录时由用户选定）。取值必须 ∈ roles。null 表示未指定（应用层 fallback 到 roles[0] 或旧 role 字段）。切换工作台时通过 POST /api/auth/select-role 更新，同时签发新 JWT。修改 roles 后必须使旧 token 失效（token_version +1 或加入黑名单）"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "disabled", "deleted"],
+      "default": "active",
+      "description": "账号状态：active=正常；disabled=禁用；deleted=软删除（v3.1.0 新增，保留外键约束）"
+    },
+    "display_name": {
+      "type": ["string", "null"],
+      "maxLength": 64,
+      "default": null,
+      "description": "展示名（新增，factorio 已有），可空"
+    },
+    "vip_level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "default": 0,
+      "deprecated": true,
+      "description": "[DEPRECATED v4.x] 已被 user_instance_bindings.vip_level 取代。仅保留用于历史数据兼容，新代码禁止读取此字段。唯一真相源：instanceBindingService.getUserVipLevel。原说明：VIP 等级 0-5。VIP N 可购品质 tier ≤ N-1。admin/system_admin 不受限。0=普通用户"
+    },
+    "vip_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "deprecated": true,
+      "description": "[DEPRECATED v4.x] 已被 user_instance_bindings.vip_expires_at 取代。仅保留用于历史数据兼容，新代码禁止读取此字段。原说明：VIP 到期时间（ISO 8601 字符串），null=未购买 VIP 或永久"
+    },
+    "is_verified": {
+      "type": "boolean",
+      "default": false,
+      "description": "是否已完成玩家游戏名绑定验证（新增）。player_bindings 中存在 status=verified 记录时为 true"
+    },
+    "admin_tier_id": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "default": null,
+      "description": "[v4.28.0 新增] 用户当前腐竹等级 ID，引用 admin_tiers.id。仅 roles 含 instance_admin 的用户有值，其余用户为 null。本字段为查询加速冗余：user_admin_tiers 为主表（含审计字段），本字段写入时与主表同事务同步。迁移默认值：现有 instance_admin 用户默认为 tier 1（基础腐竹，见 docs/plans/role-permission-economy-system-plan.md §5.3）"
+    },
+    "last_login_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "最近登录时间（ISO 8601 字符串，新增），可空"
+    },
+    "last_login_ip": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "最近登录 IP（新增），可空"
+    },
+    "token_version": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "JWT 失效版本号（v3.4.0 新增）。每次密码修改后 +1，使旧 JWT 在下次请求时被 authenticateToken 中间件拒绝。0 = 兼容旧行为（JWT 不受 token_version 约束）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "email", "username", "password_hash", "role", "roles", "status", "vip_level", "is_verified", "created_at", "updated_at"]
+}

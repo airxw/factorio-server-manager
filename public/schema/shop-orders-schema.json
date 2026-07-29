@@ -1,0 +1,75 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/shop-orders-schema.json",
+  "title": "Shop Orders Schema",
+  "description": "shop_orders 表数据契约。订单头表，使用乐观锁状态机 pending→claiming→claimed 防并发领取。来源：scheme-final-merged.md §5.1 / §4.2.2 P2。claiming 超时（>5 分钟）由定时任务回滚到 pending。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "订单主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "下单用户 ID，引用 users.id (string UUID)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "claiming", "claimed", "expired"],
+      "default": "pending",
+      "description": "订单状态机（乐观锁）：pending=待领取；claiming=领取中（已锁定，防并发）；claimed=已领取；expired=已过期。状态转换：pending→claiming（乐观锁抢占）→claimed（成功）/pending（回滚）；claiming→expired（超时）"
+    },
+    "claim_code": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 32,
+      "pattern": "^[A-Za-z0-9]{4,32}$",
+      "description": "领取码。玩家在游戏内输入 '!claim <claim_code>' 触发 claimOrder 流程。UNIQUE 约束"
+    },
+    "items_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 100,
+      "description": "订单物品总数量（所有 item 的 count 之和）"
+    },
+    "total_price": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "订单总金额（点券快照，下单时计算 = Σ(item.price × count)）。0=免费订单"
+    },
+    "claimed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "领取完成时间（ISO 8601 字符串），仅 status=claimed 时有值"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "订单过期时间（ISO 8601 字符串）。超过此时间未领取则自动 expired"
+    },
+    "claimed_player": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+      "default": null,
+      "description": "实际领取的游戏内玩家名（claiming 时锁定）。null=未领取"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "下单时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "user_id", "status", "claim_code", "items_count", "expires_at", "created_at"]
+}

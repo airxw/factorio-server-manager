@@ -1,0 +1,24 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "PASSED",
+  "timestamp": "2026-07-29T15:23:29+00:00",
+  "evidence_path": ".trae/documents/test_reports/frontend_gate_20260729_143314",
+  "summary": "Test1、Test2、Test3 均已通过。正式环境已使用内置浏览器完成 ServerDetail 与 Business 懒加载路径复核，控制台无报错，关键 chunk 与接口命中正常。",
+  "tests": {
+    "test1": {
+      "status": "PASS",
+      "evidence": "test1_streamlit.log",
+      "summary": "ServerDetail 单测 8/8 通过"
+    },
+    "test2": {
+      "status": "PASS",
+      "evidence": "test2_browser_check.md",
+      "summary": "正式环境登录、实例详情与业务运营页复核通过"
+    },
+    "test3": {
+      "status": "PASS",
+      "evidence": "test3_mock_checklist.md",
+      "summary": "ServerDetailStore 回归用例 1/1 通过"
+    }
+  }
+}

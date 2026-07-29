@@ -1,0 +1,136 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/cdk-codes-schema.json",
+  "title": "CDK Codes Schema",
+  "description": "cdk_codes 表数据契约。CDK 兑换码表，使用乐观锁状态机 unused→claiming→claimed 防并发兑换。来源：scheme-final-merged.md §5.2 / §4.2.2 P2。claiming 超时（>5 分钟）由定时任务回滚到 unused。v2: 支持礼包（gift）包含多个物品，通过 cdk_code_items 子表存储。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)。替代 factorio instance_id"
+    },
+    "code": {
+      "type": "string",
+      "minLength": 4,
+      "maxLength": 64,
+      "pattern": "^[A-Za-z0-9_-]{4,64}$",
+      "description": "CDK 兑换码。UNIQUE 约束。玩家在游戏内输入 '!claim <code>' 触发 redeem 流程"
+    },
+    "gift_name": {
+      "type": ["string", "null"],
+      "maxLength": 128,
+      "default": null,
+      "description": "礼包名称（可选）。管理员创建 CDK 时可指定礼包名，便于识别和分发。null=未命名礼包"
+    },
+    "gift_description": {
+      "type": ["string", "null"],
+      "maxLength": 512,
+      "default": null,
+      "description": "礼包描述（可选）。用于记录礼包内容说明，方便服主管理。null=无描述"
+    },
+    "item_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+      "description": "主物品名（向后兼容字段）。应 ∈ Pack.items。新创建的多物品礼包此处存第一个物品或占位值；兑换时优先使用 items 子表，items 为空时降级使用此字段"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999999,
+      "description": "主物品数量（向后兼容字段）。新创建的多物品礼包此处存第一个物品的数量；兑换时优先使用 items 子表"
+    },
+    "quality": {
+      "type": "string",
+      "enum": ["normal", "uncommon", "rare", "epic", "legendary"],
+      "default": "normal",
+      "description": "主物品品质（向后兼容字段）。新创建的多物品礼包此处存第一个物品的品质；兑换时优先使用 items 子表"
+    },
+    "items": {
+      "type": "array",
+      "description": "礼包物品列表（来自 cdk_code_items 子表）。空数组表示单物品礼包（降级使用 item_name/count/quality）",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "item_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+            "description": "物品名，应 ∈ Pack.items"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 999999,
+            "description": "物品数量"
+          },
+          "quality": {
+            "type": "string",
+            "enum": ["normal", "uncommon", "rare", "epic", "legendary"],
+            "default": "normal",
+            "description": "品质"
+          },
+          "sort_order": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0,
+            "description": "排序序号（控制兑换命令发送顺序，升序）"
+          }
+        },
+        "required": ["item_name", "count", "quality"]
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["unused", "claiming", "claimed", "expired"],
+      "default": "unused",
+      "description": "CDK 状态机（乐观锁）：unused=未使用；claiming=兑换中（已锁定，防并发）；claimed=已兑换；expired=已过期。状态转换：unused→claiming（乐观锁抢占）→claimed（成功）/unused（回滚）；claiming→expired（超时）"
+    },
+    "claimed_player": {
+      "type": ["string", "null"],
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+      "default": null,
+      "description": "实际兑换的游戏内玩家名（claiming 时锁定）。null=未兑换"
+    },
+    "claimed_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "兑换完成时间（ISO 8601 字符串），仅 status=claimed 时有值"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "CDK 过期时间（ISO 8601 字符串）。超过此时间未兑换则自动 expired"
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid",
+      "description": "创建者用户 ID，引用 users.id (string UUID)。一般为管理员"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "price": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "兑换所需点券数（付费 CDK 机制）。0=免费 CDK（默认，向后兼容存量数据）。>0 时 cdkService.redeem 先 walletService.debit 扣款再下发命令，失败回滚。v1 新增（business-logic-v1-contracts）"
+    }
+  },
+  "required": ["id", "server_id", "code", "item_name", "count", "quality", "status", "expires_at", "created_by", "created_at"]
+}

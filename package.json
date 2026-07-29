@@ -1,0 +1,40 @@
+{
+  "name": "gameserver-panel",
+  "version": "4.32.4",
+  "private": true,
+  "description": "通用游戏服务器管理平台 — Panel + Daemon 双层架构",
+  "workspaces": [
+    "panel/backend",
+    "panel/frontend",
+    "daemon"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "check": "npx tsx scripts/check-all.ts",
+    "check:version": "npx tsx scripts/check-version-sync.ts",
+    "defect:query": "npx tsx scripts/defect-query.ts",
+    "defect:record": "npx tsx scripts/defect-record.ts",
+    "defect:sync": "npx tsx scripts/defect-sync.ts",
+    "packs:validate": "npx tsx scripts/validate-packs.ts",
+    "db:clean-demo": "npx tsx scripts/db-clean-demo.ts"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "jsonschema": "^1.5.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsc-alias": "^1.9.1",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.1": true,
+    "sqlite3@5.1.7": true
+  }
+}

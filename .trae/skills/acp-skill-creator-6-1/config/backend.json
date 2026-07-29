@@ -1,0 +1,13 @@
+
+{
+  "description": "Backend configuration file for non-Claude Code environments",
+  "note": "Copy this file and modify as needed for your environment",
+  
+  "default": {
+    "type": "openai_compatible",
+    "model": "doubao-seed-2-0-code-preview-260215",
+    "api_key": "9749db68-4d81-47d7-b6f0-a96c82b3a318",
+    "base_url": "https://ark.cn-beijing.volces.com/api/coding/v3",
+    "timeout": 3000
+  }
+}

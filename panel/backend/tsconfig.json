@@ -1,0 +1,18 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": "../..",
+    "paths": {
+      "@public/*": ["public/*"]
+    }
+  },
+  "include": ["src/**/*", "../../public/**/*.ts", "../../modules/模块1_系统监控/**/*.ts", "../../modules/模块0_系统自更新/**/*.ts", "../../modules/模块2_系统诊断/**/*.ts", "../../modules/模块3_用户安全/**/*.ts"]
+}

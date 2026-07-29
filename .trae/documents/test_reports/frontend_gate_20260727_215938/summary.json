@@ -1,0 +1,45 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "FAILED",
+  "failed_test_type": "Test2 E2E",
+  "timestamp": "2026-07-27T22:02:30+08:00",
+  "evidence_path": "/home/airxw/Documents/gsp/gameserver-panel/.trae/documents/test_reports/frontend_gate_20260727_215938",
+  "summary": "Store redesign has been deployed to production and manual browser verification passed on /store and /store/operations. Test1 unit coverage passed, but Test2 production Playwright remains unstable because current E2E fixtures/selectors drift from live behavior.",
+  "tests": {
+    "test1": {
+      "status": "PASS",
+      "log": "test1_streamlit.log",
+      "details": "vitest run src/components/Layout.test.tsx src/utils/role.test.ts src/pages/__tests__/Forbidden.test.tsx -> 32/32"
+    },
+    "test2": {
+      "status": "FAIL",
+      "log": "test2_playwright.log",
+      "details": "Focused production Playwright checks for store entry flow failed; broader exploratory failures preserved in test2_playwright_broad_suite_failed.log"
+    },
+    "test3": {
+      "status": "PASS",
+      "log": "test3_mock_checklist.md",
+      "details": "Mock paths were untouched; live browser verification confirmed rendering changes on production"
+    }
+  },
+  "failed_cases": [
+    {
+      "name": "instance-flow.spec.ts :: 进入 /store GM Workbench 首页",
+      "reason": "Production Playwright token-injection flow became unstable: retries show empty URL / missing anchor button while manual production browser verification shows the page renders correctly."
+    },
+    {
+      "name": "login.spec.ts :: instance_admin 登录后跳转到 /store（GM Workbench）",
+      "reason": "Existing Playwright spec still targets input[type='email']; the live login page no longer exposes that selector, causing page/target crash during locator.fill."
+    }
+  ],
+  "failure_summary": "The deployment itself is healthy and the redesigned store UI is live, but the task does not have a fully closed three-gate result because current production Playwright coverage is drifting from the live app and needs fixture/spec maintenance.",
+  "next_actions": [
+    "Update login Playwright selectors to match the current login page implementation.",
+    "Audit token-cache / injectTokenAndGoto fixture behavior against production after v4.28.7 role-login semantics changed.",
+    "After E2E fixture repair, rerun the focused /store suite and then the broader instance-flow suite."
+  ],
+  "rerun_entry": [
+    "cd /home/airxw/Documents/gsp/gameserver-panel/panel/frontend && npm run test -- src/components/Layout.test.tsx src/utils/role.test.ts src/pages/__tests__/Forbidden.test.tsx",
+    "cd /home/airxw/Documents/gsp/gameserver-panel/panel/frontend && E2E_BASE_URL=https://gsp.ecsrz.com:3001 npx playwright test e2e/login.spec.ts e2e/instance-flow.spec.ts --project=chromium -g \"instance_admin 登录后跳转到 /store（GM Workbench）|进入 /store GM Workbench 首页\""
+  ]
+}

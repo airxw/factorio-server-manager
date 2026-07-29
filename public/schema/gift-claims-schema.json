@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/gift-claims-schema.json",
+  "title": "Gift Claims Schema",
+  "description": "gift_claims 表数据契约。礼包领取记录，防止重复领取。来源：scheme-final-merged.md §4.2.2 P3 / §5.4。factorio 迁移表。user_id 用映射表转 UUID。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "领取用户 ID，引用 users.id (string UUID)。factorio 迁移时通过映射表转换"
+    },
+    "game_player_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+      "description": "领取的游戏内玩家名"
+    },
+    "claim_type": {
+      "type": "string",
+      "enum": ["welcome_gift", "shop_order", "cdk_redeem", "manual"],
+      "description": "领取类型：welcome_gift=首次加入礼包；shop_order=商店订单领取；cdk_redeem=CDK 兑换；manual=管理员手动发放"
+    },
+    "claimed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "领取时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "user_id", "game_player_name", "claim_type", "claimed_at"]
+}

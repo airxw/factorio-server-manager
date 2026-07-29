@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/backup-records-schema.json",
+  "title": "Backup Records Schema",
+  "description": "backup_records 表数据契约。备份记录表，记录服务器备份任务结果。来源：scheme-final-merged.md §4.3.6 P4。新设计表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "file_path": {
+      "type": "string",
+      "minLength": 1,
+      "description": "备份文件绝对路径（Daemon 端文件系统路径）"
+    },
+    "size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "备份文件大小（字节）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "备份创建时间（ISO 8601 字符串）"
+    },
+    "created_by": {
+      "type": "string",
+      "format": "uuid",
+      "description": "备份创建者用户 ID，引用 users.id (string UUID)。自动备份时为系统用户 ID"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["in_progress", "completed", "failed", "deleted"],
+      "default": "in_progress",
+      "description": "备份状态：in_progress=进行中；completed=完成；failed=失败；deleted=已删除（文件已清理）"
+    }
+  },
+  "required": ["id", "server_id", "file_path", "size_bytes", "created_at", "created_by", "status"]
+}

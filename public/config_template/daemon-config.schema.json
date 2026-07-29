@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/config_template/daemon-config.schema.json",
+  "title": "Daemon Configuration",
+  "description": "Daemon 配置契约。Daemon 为无状态/无业务节点代理，仅做进程生命周期管理 + RCON/stdin 协议代理 + stdout 转发 + 资源采集。所有配置项必须显式声明默认值与补齐规则。来源：scheme-final-merged.md §二 / §10.1 / daemon.env.template。",
+  "type": "object",
+  "additionalProperties": false,
+  "definitions": {
+    "LogLevel": {
+      "type": "string",
+      "enum": ["trace", "debug", "info", "warn", "error"],
+      "description": "日志级别"
+    }
+  },
+  "properties": {
+    "server": {
+      "type": "object",
+      "description": "Daemon HTTP/WS 服务监听配置",
+      "additionalProperties": false,
+      "properties": {
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "default": 8080,
+          "description": "Daemon 监听端口"
+        },
+        "host": {
+          "type": "string",
+          "default": "0.0.0.0",
+          "description": "监听地址"
+        },
+        "body_limit_mb": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 10,
+          "description": "请求体大小上限（MB）"
+        }
+      },
+      "required": ["port"],
+      "default": { "port": 8080, "host": "0.0.0.0", "body_limit_mb": 10 }
+    },
+    "auth": {
+      "type": "object",
+      "description": "鉴权配置。Daemon 仅校验请求方提供的 token 是否与本配置一致，不维护用户体系。",
+      "additionalProperties": false,
+      "properties": {
+        "token": {
+          "type": "string",
+          "minLength": 16,
+          "description": "Daemon 鉴权 Token。必须与 panel-config.daemon_client.token 保持一致。无默认值，缺失时启动报错。"
+        }
+      },
+      "required": ["token"]
+    },
+    "instances": {
+      "type": "object",
+      "description": "实例运行目录配置",
+      "additionalProperties": false,
+      "properties": {
+        "dir": {
+          "type": "string",
+          "default": "./instances",
+          "description": "实例运行根目录。每个实例以 server_id 为子目录。"
+        },
+        "default_uid": {
+          "type": ["string", "integer", "null"],
+          "default": null,
+          "description": "实例进程默认 UID（null 表示当前用户）。需 root 权限才能切换"
+        },
+        "default_gid": {
+          "type": ["string", "integer", "null"],
+          "default": null,
+          "description": "实例进程默认 GID"
+        }
+      },
+      "required": ["dir"],
+      "default": { "dir": "./instances", "default_uid": null, "default_gid": null }
+    },
+    "process": {
+      "type": "object",
+      "description": "进程管理配置",
+      "additionalProperties": false,
+      "properties": {
+        "startup_timeout_seconds": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 600,
+          "default": 120,
+          "description": "实例启动就绪超时（秒）。超时未匹配 ready_pattern 视为启动失败"
+        },
+        "stop_timeout_seconds_default": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 300,
+          "default": 30,
+          "description": "实例停止超时默认值（秒）。Pack.stop.stop_timeout 可覆盖此值"
+        },
+        "stdout_buffer_lines": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 100000,
+          "default": 5000,
+          "description": "stdout 缓冲行数。WS 订阅者连接后可获取最近 N 行历史日志"
+        },
+        "stderr_capture": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否捕获 stderr 与 stdout 合并转发"
+        }
+      },
+      "required": ["startup_timeout_seconds"],
+      "default": { "startup_timeout_seconds": 120, "stop_timeout_seconds_default": 30, "stdout_buffer_lines": 5000, "stderr_capture": true }
+    },
+    "ws": {
+      "type": "object",
+      "description": "WebSocket 配置",
+      "additionalProperties": false,
+      "properties": {
+        "heartbeat_interval_ms": {
+          "type": "integer",
+          "minimum": 5000,
+          "maximum": 120000,
+          "default": 30000,
+          "description": "WS 心跳间隔（毫秒）"
+        },
+        "client_timeout_ms": {
+          "type": "integer",
+          "minimum": 10000,
+          "maximum": 300000,
+          "default": 60000,
+          "description": "客户端无响应超时（毫秒），超时断连"
+        },
+        "max_clients_per_instance": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000,
+          "default": 50,
+          "description": "单实例最大 WS 订阅客户端数"
+        }
+      },
+      "required": ["heartbeat_interval_ms"],
+      "default": { "heartbeat_interval_ms": 30000, "client_timeout_ms": 60000, "max_clients_per_instance": 50 }
+    },
+    "monitor": {
+      "type": "object",
+      "description": "资源监控采集配置",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否启用资源监控采集上报"
+        },
+        "collect_interval_seconds": {
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 600,
+          "default": 30,
+          "description": "资源采集间隔（秒）。CPU/内存/进程状态采集，按此间隔向订阅的 Panel 上报"
+        },
+        "include_process_tree": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否采集进程树（多进程游戏如 Rust）。false 仅采集主进程"
+        }
+      },
+      "required": ["enabled", "collect_interval_seconds"],
+      "default": { "enabled": true, "collect_interval_seconds": 30, "include_process_tree": false }
+    },
+    "rcon": {
+      "type": "object",
+      "description": "RCON 客户端默认配置（Pack.protocol 可覆盖部分字段）",
+      "additionalProperties": false,
+      "properties": {
+        "connect_timeout_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 30000,
+          "default": 5000,
+          "description": "RCON 连接超时（毫秒）"
+        },
+        "request_timeout_ms": {
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 30000,
+          "default": 5000,
+          "description": "RCON 单次请求超时（毫秒）"
+        },
+        "max_payload_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 10485760,
+          "default": 4096,
+          "description": "RCON 最大载荷字节数"
+        },
+        "reconnect_interval_ms": {
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000,
+          "default": 5000,
+          "description": "RCON 连接断开后重连间隔（毫秒）"
+        }
+      },
+      "required": ["connect_timeout_ms", "request_timeout_ms"],
+      "default": { "connect_timeout_ms": 5000, "request_timeout_ms": 5000, "max_payload_bytes": 4096, "reconnect_interval_ms": 5000 }
+    },
+    "log": {
+      "type": "object",
+      "description": "日志输出配置",
+      "additionalProperties": false,
+      "properties": {
+        "level": { "$ref": "#/definitions/LogLevel", "default": "info" },
+        "format": {
+          "type": "string",
+          "enum": ["json", "text"],
+          "default": "text",
+          "description": "日志输出格式"
+        },
+        "file_path": {
+          "type": "string",
+          "default": "",
+          "description": "日志文件路径。空字符串仅输出到 stdout"
+        },
+        "max_file_size_mb": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1024,
+          "default": 100,
+          "description": "单日志文件大小上限（MB）"
+        },
+        "max_file_size_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 1073741824,
+          "default": 10485760,
+          "description": "单日志文件大小上限（字节，默认 10485760 即 10MB）。对应环境变量 LOG_FILE_MAX_SIZE。与 max_file_size_mb 同时存在时以字节值为准"
+        },
+        "max_file_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "default": 5,
+          "description": "保留日志文件数量。对应环境变量 LOG_FILES_TO_KEEP"
+        }
+      },
+      "required": ["level"],
+      "default": { "level": "info", "format": "text", "file_path": "", "max_file_size_mb": 100, "max_file_size_bytes": 10485760, "max_file_count": 5 }
+    }
+  },
+  "required": ["server", "auth", "instances", "log"],
+  "default": {
+    "server": { "port": 8080, "host": "0.0.0.0", "body_limit_mb": 10 },
+    "instances": { "dir": "./instances", "default_uid": null, "default_gid": null },
+    "process": { "startup_timeout_seconds": 120, "stop_timeout_seconds_default": 30, "stdout_buffer_lines": 5000, "stderr_capture": true },
+    "ws": { "heartbeat_interval_ms": 30000, "client_timeout_ms": 60000, "max_clients_per_instance": 50 },
+    "monitor": { "enabled": true, "collect_interval_seconds": 30, "include_process_tree": false },
+    "rcon": { "connect_timeout_ms": 5000, "request_timeout_ms": 5000, "max_payload_bytes": 4096, "reconnect_interval_ms": 5000 },
+    "log": { "level": "info", "format": "text", "file_path": "", "max_file_size_mb": 100, "max_file_size_bytes": 10485760, "max_file_count": 5 }
+  },
+  "$comment": "自动补齐规则：配置加载时按 default 字段补齐缺失项；auth.token 必须显式提供，缺失则启动失败。环境变量映射：PORT→server.port, DAEMON_TOKEN→auth.token, INSTANCES_DIR→instances.dir, LOG_LEVEL→log.level, LOG_FILE_MAX_SIZE→log.max_file_size_bytes, LOG_FILES_TO_KEEP→log.max_file_count。Daemon 不持有 DB 连接配置（无状态）。"
+}

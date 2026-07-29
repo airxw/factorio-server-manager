@@ -1,0 +1,237 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/config_template/system-config-extension.schema.json",
+  "title": "System Config Extension Schema (v1)",
+  "description": "system_config 表扩展配置契约（v1 实施）。新增 vip.* / instance.expiry.* / quota.alerts.* 三组配置项，统一存于 system_config 表（KV 模式，复杂值用 JSON 字符串）。来源：docs/plans/business-logic-system-completion-plan.md §3-6。\n\n本契约不修改既有 system-config-schema.json，仅声明新增 key 与默认值。所有配置项由系统管理员在系统设置页动态调整，zod default 自动补齐缺失字段。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "vip": {
+      "type": "object",
+      "description": "VIP 体系配置组",
+      "additionalProperties": false,
+      "properties": {
+        "points_thresholds": {
+          "type": "object",
+          "description": "积分→VIP 等级映射（决策 V1）。键为 VIP 等级（字符串数字），值为积分数阈值",
+          "patternProperties": {
+            "^[1-5]$": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false,
+          "default": { "1": 100, "2": 500, "3": 2000, "4": 8000, "5": 30000 }
+        },
+        "checkin_points": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 10,
+          "description": "每日签到积分（决策 V1）"
+        },
+        "cdk_redeem_points": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 5,
+          "description": "CDK 兑换积分（决策 V1）"
+        },
+        "purchase_points_ratio": {
+          "type": "number",
+          "minimum": 0,
+          "default": 1.0,
+          "description": "消费积分比例。1.0=每消费 1 点券得 1 积分"
+        },
+        "quota_overrides": {
+          "type": "object",
+          "description": "VIP 派生配额（决策 A2/D3）。键为 VIP 等级（字符串数字），值为配额对象",
+          "patternProperties": {
+            "^[0-5]$": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "max_instances": { "type": ["integer", "null"], "minimum": 0 },
+                "max_disk_mb": { "type": ["integer", "null"], "minimum": 0 },
+                "max_players_total": { "type": ["integer", "null"], "minimum": 0 }
+              }
+            }
+          },
+          "additionalProperties": false,
+          "default": {
+            "3": { "max_instances": 5, "max_disk_mb": 10240 },
+            "4": { "max_instances": 10, "max_disk_mb": 25600 },
+            "5": { "max_instances": 20, "max_disk_mb": 51200 }
+          }
+        },
+        "renewal_discount_levels": {
+          "type": "object",
+          "description": "VIP 续费折扣（决策 V6）。键为 VIP 等级，值为折扣百分比（90=9 折，50=5 折）",
+          "patternProperties": {
+            "^[0-5]$": { "type": "integer", "minimum": 0, "maximum": 100 }
+          },
+          "additionalProperties": false,
+          "default": { "0": 100, "1": 100, "2": 100, "3": 90, "4": 80, "5": 50 }
+        },
+        "grace_days_overrides": {
+          "type": "object",
+          "description": "VIP 宽限期延长（决策 C9）。键为 VIP 等级，值为宽限天数。覆盖 instance.expiry.grace_days",
+          "patternProperties": {
+            "^[0-5]$": { "type": "integer", "minimum": 0, "maximum": 365 }
+          },
+          "additionalProperties": false,
+          "default": { "3": 14, "4": 21, "5": 30 }
+        },
+        "retention_days_overrides": {
+          "type": "object",
+          "description": "VIP 磁盘保留期延长（决策 C9）。键为 VIP 等级，值为保留天数。覆盖 instance.expiry.retention_days",
+          "patternProperties": {
+            "^[0-5]$": { "type": "integer", "minimum": 0, "maximum": 3650 }
+          },
+          "additionalProperties": false,
+          "default": { "3": 60, "4": 120, "5": 180 }
+        },
+        "vip_type_prices": {
+          "type": "object",
+          "description": "VIP 套餐建议售价（决策 V3）。键为 vip_type，值为点券数",
+          "patternProperties": {
+            "^(permanent|monthly|quarterly|yearly)$": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false,
+          "default": { "monthly": 3000, "quarterly": 8000, "yearly": 28000, "permanent": 88000 }
+        }
+      }
+    },
+    "instance": {
+      "type": "object",
+      "description": "实例有效期配置组（决策 V4 全参数可配）",
+      "additionalProperties": false,
+      "properties": {
+        "expiry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reminder_days_before": {
+              "type": "array",
+              "items": { "type": "integer", "minimum": 1, "maximum": 365 },
+              "default": [7, 3, 1],
+              "description": "到期前提醒天数（决策 V4）"
+            },
+            "grace_days": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 365,
+              "default": 7,
+              "description": "宽限期天数（决策 V4）。到期后保留 N 天可续费"
+            },
+            "retention_days": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 3650,
+              "default": 30,
+              "description": "磁盘保留天数（决策 V4）。宽限期结束后保留 N 天再清理磁盘"
+            },
+            "stop_on_expire": {
+              "type": "boolean",
+              "default": true,
+              "description": "到期是否立即停止实例（决策 V4）"
+            },
+            "cleanup_disk_after_retention": {
+              "type": "boolean",
+              "default": true,
+              "description": "保留期结束后是否清理磁盘（决策 V4）"
+            },
+            "scan_interval_hours": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 24,
+              "default": 1,
+              "description": "扫描频率（小时，决策 V4）"
+            }
+          }
+        }
+      }
+    },
+    "quota": {
+      "type": "object",
+      "description": "配额预警配置组（决策 D2）",
+      "additionalProperties": false,
+      "properties": {
+        "alerts": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "warning_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.8,
+              "description": "预警阈值（80%）"
+            },
+            "critical_threshold": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "default": 0.95,
+              "description": "严重预警阈值（95%）"
+            }
+          }
+        }
+      }
+    },
+    "wallet": {
+      "type": "object",
+      "description": "钱包配置组",
+      "additionalProperties": false,
+      "properties": {
+        "snapshot_retention_days": {
+          "type": "integer",
+          "minimum": 7,
+          "maximum": 365,
+          "default": 90,
+          "description": "钱包快照保留天数（超过自动清理）"
+        },
+        "refund_allowed": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否允许用户发起退款申请"
+        },
+        "refund_max_amount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 10000,
+          "description": "单笔退款最大金额（点券）。0=不限"
+        }
+      }
+    },
+    "recharge_cdk": {
+      "type": "object",
+      "description": "充值 CDK 配置组（决策 V2 卡商机制）",
+      "additionalProperties": false,
+      "properties": {
+        "code_length": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 32,
+          "default": 16,
+          "description": "CDK 码长度"
+        },
+        "code_charset": {
+          "type": "string",
+          "default": "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
+          "description": "CDK 码字符集（去除易混淆字符）"
+        },
+        "max_batch_size": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100000,
+          "default": 10000,
+          "description": "单批次最大 CDK 数量"
+        },
+        "claiming_timeout_minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60,
+          "default": 5,
+          "description": "claiming 状态超时回滚时间（分钟）"
+        }
+      }
+    }
+  },
+  "required": []
+}

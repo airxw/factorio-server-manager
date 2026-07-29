@@ -1,0 +1,236 @@
+{
+  "rules": [
+    {
+      "id": "disk_usage_root",
+      "title": "根分区磁盘使用率",
+      "category": "系统环境",
+      "check_type": "disk_usage",
+      "check_params": { "path": "/", "threshold_percent": 90 },
+      "severity": "warning",
+      "fixable": true,
+      "fix_id": "cleanup_tmp",
+      "description": "检查根分区磁盘使用率，超过 90% 触发告警",
+      "success_message": "根分区磁盘使用率正常"
+    },
+    {
+      "id": "disk_usage_deploy",
+      "title": "部署目录磁盘使用率",
+      "category": "系统环境",
+      "check_type": "disk_usage",
+      "check_params": { "path": "${DEPLOY_ROOT:-/opt/gameserver-panel}", "threshold_percent": 85 },
+      "severity": "warning",
+      "fixable": false,
+      "description": "检查部署目录磁盘使用率（v3.8.0-D5: 未设置 DEPLOY_ROOT 时回退到 /opt/gameserver-panel）",
+      "success_message": "部署目录磁盘使用率正常"
+    },
+    {
+      "id": "memory_usage",
+      "title": "内存使用率",
+      "category": "系统环境",
+      "check_type": "memory_usage",
+      "check_params": { "threshold_percent": 90 },
+      "severity": "warning",
+      "fixable": false,
+      "description": "检查系统内存使用率，超过 90% 触发告警",
+      "success_message": "内存使用率正常"
+    },
+    {
+      "id": "node_version",
+      "title": "Node.js 版本",
+      "category": "系统环境",
+      "check_type": "node_version",
+      "check_params": { "min_version": "18.0.0" },
+      "severity": "error",
+      "fixable": false,
+      "description": "检查 Node.js 版本是否满足最低要求（>= 18.0.0）",
+      "success_message": "Node.js 版本符合要求"
+    },
+    {
+      "id": "panel_process_running",
+      "title": "Panel 服务状态",
+      "category": "服务状态",
+      "check_type": "systemd_service",
+      "check_params": { "service_name": "gameserver-panel.service", "expected_state": "active" },
+      "severity": "error",
+      "fixable": false,
+      "description": "v3.8.0-D2: 用 systemctl is-active 替代 pgrep -f node，避免匹配任意 Node 进程的误判",
+      "success_message": "Panel systemd 服务运行正常"
+    },
+    {
+      "id": "panel_port_listening",
+      "title": "Panel 端口监听状态",
+      "category": "服务状态",
+      "check_type": "port_listening",
+      "check_params": { "port": 3000, "process_name": "node" },
+      "severity": "error",
+      "fixable": false,
+      "description": "v3.8.0-D3: 检查 Panel 后端端口是否监听 + 用 ss 验证监听进程是 node（避免开发模式 dev server 误判）",
+      "success_message": "Panel 端口监听正常且进程匹配"
+    },
+    {
+      "id": "daemon_process_running",
+      "title": "Daemon 服务状态",
+      "category": "服务状态",
+      "check_type": "systemd_service",
+      "check_params": { "service_name": "gameserver-daemon.service", "expected_state": "active" },
+      "severity": "error",
+      "fixable": false,
+      "description": "v3.8.0-D2: 用 systemctl is-active 检查 Daemon 服务状态",
+      "success_message": "Daemon systemd 服务运行正常"
+    },
+    {
+      "id": "daemon_port_listening",
+      "title": "Daemon 端口监听状态",
+      "category": "服务状态",
+      "check_type": "port_listening",
+      "check_params": { "port": 8080, "process_name": "node" },
+      "severity": "error",
+      "fixable": false,
+      "description": "检查 Daemon 服务端口（8080）是否监听 + 进程匹配",
+      "success_message": "Daemon 端口监听正常"
+    },
+    {
+      "id": "db_connectivity",
+      "title": "数据库连通性",
+      "category": "服务状态",
+      "check_type": "db_connectivity",
+      "check_params": {},
+      "severity": "error",
+      "fixable": false,
+      "description": "检查 SQLite 数据库是否可读写",
+      "success_message": "数据库连接正常"
+    },
+    {
+      "id": "java_runtime",
+      "title": "Java 运行环境",
+      "category": "游戏依赖",
+      "check_type": "java_version",
+      "check_params": { "min_version": "1.8" },
+      "severity": "warning",
+      "fixable": false,
+      "description": "检查 Java 运行环境（Minecraft 等游戏需要）",
+      "success_message": "Java 运行环境正常"
+    },
+    {
+      "id": "steamcmd_installed",
+      "title": "SteamCMD 安装状态",
+      "category": "游戏依赖",
+      "check_type": "steamcmd_check",
+      "check_params": { "path": "/opt/steamcmd/steamcmd.sh" },
+      "severity": "warning",
+      "fixable": false,
+      "description": "检查 SteamCMD 是否已安装并可运行（Rust/ARK/Palworld/Factorio 等 Steam 游戏需要）",
+      "success_message": "SteamCMD 运行正常"
+    },
+    {
+      "id": "packs_dir",
+      "title": "Pack 配置目录",
+      "category": "配置完整性",
+      "check_type": "directory_exists",
+      "check_params": { "path": "${DEPLOY_ROOT:-/opt/gameserver-panel}/packs" },
+      "severity": "error",
+      "fixable": false,
+      "description": "检查游戏 Pack 配置目录是否存在（v3.8.0-D5: 路径回退到 /opt/gameserver-panel/packs）",
+      "success_message": "Pack 配置目录正常"
+    },
+    {
+      "id": "instances_dir",
+      "title": "实例数据目录",
+      "category": "配置完整性",
+      "check_type": "directory_exists",
+      "check_params": { "path": "${DEPLOY_ROOT:-/opt/gameserver-panel}/instances" },
+      "severity": "warning",
+      "fixable": false,
+      "description": "检查游戏实例数据目录是否存在（v3.8.0-D5: 路径回退到 /opt/gameserver-panel/instances）",
+      "success_message": "实例数据目录正常"
+    },
+    {
+      "id": "port_conflict_game",
+      "title": "游戏端口冲突检测",
+      "category": "实例完整性",
+      "check_type": "port_conflict",
+      "check_params": { "column": "port" },
+      "severity": "error",
+      "fixable": false,
+      "description": "v3.8.0-D6: 扫描 servers 表检测多实例共用同一游戏端口（端口冲突将导致启动失败）",
+      "success_message": "无游戏端口冲突"
+    },
+    {
+      "id": "port_conflict_rcon",
+      "title": "RCON 端口冲突检测",
+      "category": "实例完整性",
+      "check_type": "port_conflict",
+      "check_params": { "column": "rcon_port" },
+      "severity": "error",
+      "fixable": false,
+      "description": "v3.8.0-D6: 扫描 servers 表检测多实例共用同一 RCON 端口",
+      "success_message": "无 RCON 端口冲突"
+    },
+    {
+      "id": "path_uniqueness_instances",
+      "title": "实例目录可写性",
+      "category": "实例完整性",
+      "check_type": "path_uniqueness",
+      "check_params": { "path": "${DEPLOY_ROOT:-/opt/gameserver-panel}/instances" },
+      "severity": "error",
+      "fixable": false,
+      "description": "v3.8.0-D7: 实例路径由 INSTANCES_DIR/<server_id> 派生（UUID 保证唯一），本检查退化为验证实例根目录可写",
+      "success_message": "实例目录存在且可写"
+    },
+    {
+      "id": "state_stuck_check",
+      "title": "实例状态卡死检测",
+      "category": "实例完整性",
+      "check_type": "state_stuck",
+      "check_params": { "threshold_minutes": 5 },
+      "severity": "warning",
+      "fixable": false,
+      "description": "v3.8.0-D9: 扫描 servers 表，检测 starting/stopping 状态超过 5 分钟的实例（可能进程崩溃或事件丢失）",
+      "success_message": "无状态卡死实例"
+    },
+    {
+      "id": "file_permission_instances",
+      "title": "实例目录权限检查",
+      "category": "实例完整性",
+      "check_type": "file_permission",
+      "check_params": { "path": "${DEPLOY_ROOT:-/opt/gameserver-panel}/instances", "require": "rw" },
+      "severity": "error",
+      "fixable": false,
+      "description": "v3.8.0-D10: 验证实例目录读写权限，确保 Panel 进程能创建/删除实例文件",
+      "success_message": "实例目录权限正常"
+    },
+    {
+      "id": "file_permission_versions",
+      "title": "版本数据目录权限检查",
+      "category": "实例完整性",
+      "check_type": "file_permission",
+      "check_params": { "path": "${DEPLOY_ROOT:-/opt/gameserver-panel}/versions", "require": "rw" },
+      "severity": "warning",
+      "fixable": false,
+      "description": "v3.8.0-D10: 验证版本数据目录读写权限（缺失时仅告警，目录按需创建）",
+      "success_message": "版本数据目录权限正常"
+    },
+    {
+      "id": "admin_password_default",
+      "title": "管理员默认密码检测",
+      "category": "安全自检",
+      "check_type": "admin_password_default",
+      "check_params": { "default_password": "admin123", "admin_role": "server_admin" },
+      "severity": "error",
+      "fixable": false,
+      "description": "v3.8.0-D11: 检测 server_admin 角色用户是否使用默认密码 admin123（生产环境严重安全风险）",
+      "success_message": "管理员账号未使用默认密码"
+    },
+    {
+      "id": "zombie_instance_check",
+      "title": "僵尸实例检测",
+      "category": "实例完整性",
+      "check_type": "zombie_instance",
+      "check_params": { "stale_hours": 6 },
+      "severity": "warning",
+      "fixable": false,
+      "description": "v3.9.0-D8: 检测 status=running 但 updated_at 超过 stale_hours 未更新的实例（DB 状态与实际进程可能不一致）",
+      "success_message": "无僵尸实例"
+    }
+  ]
+}

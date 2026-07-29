@@ -1,0 +1,437 @@
+# ============================================================================
+# Factorio Vanilla Pack — GameServer Panel 3.0.0
+# 依据：public/schema/pack-schema.ts（必须通过 zod 校验）
+# 协议：RCON（type=rcon, default_port=27015, auth=password）
+# 参考：d:\代码\factorio 参考项目实现
+# ============================================================================
+
+pack:
+  id: factorio-vanilla
+  game: factorio
+  variant: vanilla
+  display_name: 异星工厂 (原版)
+  version: '1.0'
+
+startup:
+  binary: './bin/x64/factorio'
+  args:
+    - '--start-server'
+    - '{{save_path}}'
+    - '--server-settings'
+    - '{{config_dir}}/server-settings.json'
+    - '--port'
+    - '{{game_port}}'
+    - '--rcon-port'
+    - '{{rcon_port}}'
+    - '--rcon-password'
+    - '{{rcon_password}}'
+  working_dir: '{{instance_root}}'
+  # Factorio 就绪日志：changing state from(CreatingGame) to(InGame)
+  ready_pattern: 'changing state from\([^)]+\) to\(InGame\)'
+  stop_command: 'quit'
+  stop_timeout: 30
+  # Factorio 默认游戏端口（UDP，贴近实际游戏端口）
+  default_game_port: 34197
+
+protocol:
+  type: rcon
+  default_port: 27015
+  auth: password
+  encrypt: none
+
+# Factorio 不使用 config 字段（已改 optional），用 config_files 代替
+# config 字段不填（SubTask 2.18）
+
+commands:
+  broadcast: 'broadcast {{message}}'
+  # Factorio 无原生 give 命令，使用 Lua 脚本
+  give_item: "/c game.players['{{player}}'].insert({name='{{item}}', count={{count}}})"
+  kick_player: 'kick {{player}} {{reason}}'
+  ban_player: 'ban {{player}} {{reason}}'
+  list_players: 'players'
+  save_world: 'save'
+  whitelist_add: 'whitelist add {{player}}'
+  whitelist_remove: 'whitelist remove {{player}}'
+  unban_player: 'unban {{player}}'
+
+versions:
+  source: factorio-official
+  type: binary
+  eula_required: false
+  # download_pattern 用于 updateService.downloadUpdate 自动下载最新版本
+  # {{version}} 会被替换为 checkUpdate 返回的 latest_version
+  # Factorio 官方 headless server 下载地址（Linux x64）
+  download_pattern: 'https://factorio.com/get-download/{{version}}/headless/linux64'
+  # v4.12.0 步骤1: 显式声明 FactorioVersionProvider
+  # 调用 https://factorio.com/api/latest-releases 获取 stable/experimental 版本号
+  provider: factorio-official
+
+backup:
+  world_dir: saves
+  # v4.2.0: save 命令已迁移至 backupService GAME_BACKUP_PROTOCOLS（通过 sendCommand 发送）
+  pre_backup_commands: []
+  post_backup_commands: []
+
+ui:
+  tabs:
+    # v3.7.0: 对象格式——group/order/require_state
+    - { tab: console,      group: runtime,  order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: players,      group: runtime,  order: 40, require_state: [stopped, running, stopping, error] }
+    - { tab: mods,         group: ops,      order: 20, require_state: [stopped, error] }
+    - { tab: saves,        group: ops,      order: 10, require_state: [stopped, error] }
+    - { tab: config-files, group: config,   order: 10, require_state: [stopped, starting, running, error] }
+    - { tab: world-gen,    group: config,   order: 20, require_state: [stopped, error] }
+    - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
+    - { tab: monitor,      group: runtime,  order: 50, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: shop-admin,   group: business, order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: update,       group: ops,      order: 30, require_state: [stopped, error] }
+
+resources:
+  min_ram: '1G'
+  recommended_ram: '2G'
+  min_disk: '500M'
+
+# ============================================================================
+# Factorio 扩展字段（全部 optional）
+# ============================================================================
+
+# ---- 地图生成（mapGenerator.ts 参考）----
+world_generation:
+  create_command: '{{binary}} --create {{save_path}} --map-gen-settings {{config_dir}}/map-gen-settings.json --map-settings {{config_dir}}/map-settings.json'
+  settings_files:
+    - name: map-gen-settings
+      path: '{{config_dir}}/map-gen-settings.json'
+      format: json
+      schema:
+        terrain_segmentation:
+          type: string
+          description: 地形分割
+        water:
+          type: string
+          description: 水量
+        starting_area:
+          type: string
+          description: 起始区域大小
+        peaceful_mode:
+          type: boolean
+          description: 和平模式
+    - name: map-settings
+      path: '{{config_dir}}/map-settings.json'
+      format: json
+      schema:
+        pollution:
+          type: object
+          description: 污染设置
+        enemy_evolution:
+          type: object
+          description: 敌人进化设置
+
+# ---- Mod 管理 ----
+mods:
+  list_file: '{{config_dir}}/mod-list.json'
+  list_format: json
+  dependency_check: true
+  download_enabled: true
+  download_source: 'https://mods.factorio.com/api/mods/{{mod_name}}'
+
+# ---- 存档管理 ----
+saves:
+  dir: '{{instance_root}}/saves'
+  extension: '.zip'
+  create_command: '{{binary}} --create {{save_path}}'
+  activate_command: '--start-server {{save_path}}'
+
+# ---- 多配置文件 ----
+config_files:
+  - name: server-settings
+    path: '{{config_dir}}/server-settings.json'
+    format: json
+    group: server
+    schema:
+      name:
+        type: string
+        description: 服务器名称
+      description:
+        type: string
+        description: 服务器描述
+      max_players:
+        type: integer
+        description: 最大玩家数（0=不限）
+      visibility:
+        type: object
+        description: 可见性设置
+        properties:
+          public:
+            type: boolean
+          lan:
+            type: boolean
+      game_password:
+        type: string
+        description: 游戏密码
+      require_user_verification:
+        type: boolean
+        description: 要求用户验证
+      autosave_interval:
+        type: integer
+        description: 自动保存间隔（秒）
+      autosave_slots:
+        type: integer
+        description: 自动保存槽位数
+      afk_autokick_interval:
+        type: integer
+        description: AFK 踢出间隔（分钟）
+      auto_pause:
+        type: boolean
+        description: 自动暂停
+      only_admins_can_pause_the_game:
+        type: boolean
+        description: 仅管理员可暂停
+    read_only: false
+
+# ---- 游戏更新 ----
+# v4.12.0 步骤3: 改为 factorio.com 官方 API(配合 factorio-official provider)
+#   - latest 获取: provider 调 https://factorio.com/api/latest-releases
+#   - current 获取: 执行 current_version_command 解析 stdout
+#   - install: 下载 headless tar.xz + 解压
+update:
+  source_url: 'https://factorio.com/api/latest-releases'
+  current_version_command: '{{binary}} --version'
+  download_dir: '{{instance_root}}/bin'
+  install_command: 'tar xJf {{download_path}} -C {{download_dir}}'
+
+# ---- 聊天日志解析 ----
+chat_log:
+  pattern: '\[CHAT\] (.+): (.+)'
+  storage_enabled: true
+  retention_days: 30
+
+# ---- stdout 事件解析 ----
+event_parsers:
+  chat:
+    pattern: '\[CHAT\] (.+): (.+)'
+    groups: [player, message]
+  join:
+    pattern: '(.+) joined the game'
+    player_group: 1
+  leave:
+    pattern: '(.+) left the game'
+    player_group: 1
+
+# ---- 业务能力 ----
+business:
+  shop:
+    enabled: true
+    give_command: "/c game.players['{{player}}'].insert({name='{{item}}', count={{count}}, quality='{{quality}}'})"
+    quality_tiers: 5
+    support_quality: true
+
+  cdk:
+    enabled: true
+    redeem_command: "/c game.players['{{player}}'].insert({name='{{item}}', count={{count}}})"
+
+  chat_enhancement:
+    welcome:
+      enabled: true
+      first_gift_command: "/c game.players['{{player}}'].insert({name='iron-plate', count=100})"
+    periodic_messages:
+      enabled: true
+      broadcast_command: 'broadcast {{message}}'
+    response_rules:
+      enabled: false
+
+  players:
+    kick_command: 'kick {{player}} {{reason}}'
+    ban_command: 'ban {{player}} {{reason}}'
+
+  lists:
+    whitelist_add: 'whitelist add {{player}}'
+    banlist_add: 'ban {{player}} {{reason}}'
+
+  verify:
+    enabled: false
+
+# ---- 物品池（Factorio 常见物品）----
+# Factorio 2.0+ 原生支持 5 档品质（normal/uncommon/rare/epic/legendary）
+# v4.12.0 步骤5: 通过 special_attributes 声明品质自适应规则
+#   - 2.0+ 实例: 暴露品质选择给前端商店配置页
+#   - 1.1.x 实例: 按 fallback_behavior=default 自动用 normal 品质渲染命令
+items:
+  source:
+    type: static
+  qualities: [normal, uncommon, rare, epic, legendary]
+  quality_tiers: 5
+  categories: [item, fluid, tool, armor, weapon]
+  special_attributes:
+    - name: quality
+      display_name: 品质
+      # 仅 Factorio 2.0+ 支持品质参数,1.1.x 不支持
+      applicable_versions: '>=2.0.0'
+      default_value: normal
+      # 1.1.x 实例自动用 default_value 渲染命令(不报错,不阻断商店功能)
+      fallback_behavior: default
+      values: [normal, uncommon, rare, epic, legendary]
+      description: 'Factorio 2.0+ 支持 5 档品质,1.1.x 不支持(自动降级为 normal)'
+      command_template_key: '{{quality}}'
+  static_list:
+    # 基础材料
+    - name: iron-plate
+      display_name: 铁板
+      category: item
+    - name: copper-plate
+      display_name: 铜板
+      category: item
+    - name: steel
+      display_name: 钢板
+      category: item
+    - name: stone
+      display_name: 石头
+      category: item
+    - name: stone-brick
+      display_name: 砖头
+      category: item
+    - name: coal
+      display_name: 煤炭
+      category: item
+    - name: wood
+      display_name: 木材
+      category: item
+    - name: iron-ore
+      display_name: 铁矿
+      category: item
+    - name: copper-ore
+      display_name: 铜矿
+      category: item
+    # 流体
+    - name: crude-oil
+      display_name: 原油
+      category: fluid
+    - name: heavy-oil
+      display_name: 重油
+      category: fluid
+    - name: light-oil
+      display_name: 轻油
+      category: fluid
+    - name: water
+      display_name: 水
+      category: fluid
+    - name: petroleum-gas
+      display_name: 石油气
+      category: fluid
+    # 中间零件
+    - name: iron-gear-wheel
+      display_name: 铁齿轮
+      category: item
+    - name: iron-stick
+      display_name: 铁棍
+      category: item
+    - name: copper-wire
+      display_name: 铜线
+      category: item
+    - name: electronic-circuit
+      display_name: 电路板
+      category: item
+    - name: advanced-circuit
+      display_name: 高级电路板
+      category: item
+    - name: processing-unit
+      display_name: 处理器
+      category: item
+    - name: engine-unit
+      display_name: 发动机
+      category: item
+    - name: electric-motor
+      display_name: 电动机
+      category: item
+    # 化工
+    - name: sulfur
+      display_name: 硫磺
+      category: item
+    - name: plastic
+      display_name: 塑料
+      category: item
+    - name: battery
+      display_name: 电池
+      category: item
+    # 科研包
+    - name: automation-science-pack
+      display_name: 自动化科研包
+      category: tool
+    - name: logistic-science-pack
+      display_name: 物流科研包
+      category: tool
+    - name: chemical-science-pack
+      display_name: 化学科研包
+      category: tool
+    - name: military-science-pack
+      display_name: 军事科研包
+      category: tool
+    # 武器
+    - name: pistol
+      display_name: 手枪
+      category: weapon
+    - name: submachine-gun
+      display_name: 冲锋枪
+      category: weapon
+    - name: rocket-launcher
+      display_name: 火箭筒
+      category: weapon
+
+# ---- 启动前置引导（首次启动前向导，v4.x 新增）----
+# 注：Factorio 已有 world_generation 字段管理世界生成参数，此处仅补充种子与基础设置引导
+startup_guide:
+  enabled: true
+  steps:
+    - key: world-setup
+      title: 世界设置
+      description: 设置世界种子（世界生成参数详见 world_generation 字段）
+      fields:
+        - key: map_seed
+          type: seed
+          label: 世界种子
+          description: 数字种子，留空则随机生成（世界生成参数另见 map-gen-settings）
+          required: false
+    - key: server-settings
+      title: 服务器设置
+      description: 服务器名称、最大玩家数、密码与描述（写入 server-settings.json）
+      fields:
+        - key: server_name
+          type: server_name
+          label: 服务器名称
+          description: 显示在服务器列表的名称
+          required: true
+          default: 'Factorio Server'
+        - key: max_players
+          type: config_ref
+          label: 最大玩家数
+          config_ref:
+            file: server-settings
+            key: max_players
+          required: false
+          default: 0
+          min: 0
+          max: 65535
+        - key: server_password
+          type: password
+          label: 游戏密码
+          description: 玩家加入密码（可留空）
+          required: false
+        - key: description
+          type: config_ref
+          label: 服务器描述
+          config_ref:
+            file: server-settings
+            key: description
+          required: false
+  config_writes:
+    - field_key: server_name
+      file: server-settings
+      config_key: name
+    - field_key: max_players
+      file: server-settings
+      config_key: max_players
+    - field_key: server_password
+      file: server-settings
+      config_key: game_password
+    - field_key: description
+      file: server-settings
+      config_key: description

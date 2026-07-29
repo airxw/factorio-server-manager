@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/command-queue-schema.json",
+  "title": "Command Queue Schema",
+  "description": "command_queue 表数据契约。命令下发队列，commandDispatcher 用于成就预热机制——批量命令排队发送，失败重试，避免阻塞主流程。来源：scheme-final-merged.md §4.3.5。INDEX(server_id, status) / INDEX(priority, created_at)。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "command_text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "已渲染的完整命令字符串（Panel 端 commandDispatcher 渲染后存入）。禁止存储未渲染的模板"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "normal", "high"],
+      "default": "normal",
+      "description": "优先级：low=低（可被丢弃）；normal=普通；high=高（优先发送）。队列积压时按优先级调度"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "sending", "sent", "failed"],
+      "default": "pending",
+      "description": "命令状态机：pending=待发送；sending=发送中；sent=已发送（成功）；failed=失败（达 max_attempts）。状态转换：pending→sending→sent（成功）/pending（重试）/failed（达上限）"
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10,
+      "default": 0,
+      "description": "已尝试次数。每次发送失败 +1，达 max_attempts 则 status=failed"
+    },
+    "max_attempts": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 3,
+      "description": "最大尝试次数，默认 3"
+    },
+    "last_error": {
+      "type": ["string", "null"],
+      "default": null,
+      "description": "最近一次失败的错误信息，可空"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "入队时间（ISO 8601 字符串）"
+    },
+    "sent_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "发送成功时间（ISO 8601 字符串），仅 status=sent 时有值"
+    }
+  },
+  "required": ["id", "server_id", "command_text", "priority", "status", "attempts", "max_attempts", "created_at"]
+}

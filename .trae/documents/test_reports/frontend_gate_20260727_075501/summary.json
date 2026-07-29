@@ -1,0 +1,40 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "feature": "v4.28.0 全员服主——玩家↔服主免密快捷切换",
+  "executed_at": "2026-07-27T08:05:00+08:00",
+  "updated_at": "2026-07-27T08:10:00+08:00",
+  "status": "PENDING_TEST2",
+  "tests": {
+    "test1_unit": {
+      "status": "PASS",
+      "evidence": ["test1_streamlit.log", "test1_scoped_pass.log", "test1_backend_pass.log"],
+      "detail": "前端 239/239 通过（21 文件）；后端 533/533 通过（26 文件，含 switch-role 端点与迁移测试）。变更相关新增测试 22/22（Layout/RoleSwitcherModal/Forbidden/GuildBind）。",
+      "known_preexisting_failures": {
+        "file": "src/pages/__tests__/SetupWizard.test.tsx",
+        "count": 29,
+        "verified_at_head": true,
+        "verification": "git stash 全部变更后重跑仍 29 失败 → 属 HEAD(c57577a) 处既有损坏，与本次变更无关",
+        "cause": "Setup Wizard v2（v4.26.0）文案改版后测试匹配器未更新（如 /暂不配置 Daemon/、/生产模式将仅创建…/ 等文本已不存在于实现）",
+        "disposition": "登记为独立技术债，不在本方案范围内修复"
+      }
+    },
+    "test2_e2e": {
+      "status": "PENDING_DEPLOYMENT",
+      "evidence": ["test2_playwright.log"],
+      "spec_written": "panel/frontend/e2e/role-switching.spec.ts（3 用例：一键互切 / 403 引导回跳 / admin 弹窗免密+密码双通道）",
+      "blocker": "E2E 需命中运行中新后端（/api/auth/switch-role 未部署）；按项目既定模式部署后以 test:e2e:prod 对 https://gsp.ecsrz.com:3001 执行",
+      "rerun_entry": "cd panel/frontend && npm run test:e2e:prod -- role-switching.spec.ts"
+    },
+    "test3_mock_regression": {
+      "status": "PASS",
+      "evidence": ["test3_mock_checklist.md"],
+      "detail": "MSW 补 switch-role handler + roles fixtures；全量 MSW 单测 239/239 通过"
+    }
+  },
+  "conclusion": "Test1/Test3 通过；Test2 待部署后执行（spec 已就绪）。部署→E2E 通过后本闸门闭合。",
+  "next_actions": [
+    "版本与文档（v4.28.0、version.md、README）",
+    "部署到服务器并运行迁移",
+    "npm run test:e2e:prod -- role-switching.spec.ts 执行 Test2 并回填本 summary"
+  ]
+}

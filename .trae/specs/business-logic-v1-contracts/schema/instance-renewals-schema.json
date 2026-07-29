@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/instance-renewals-schema.json",
+  "title": "Instance Renewals Schema",
+  "description": "instance_renewals 表数据契约。实例续费记录表，审计追踪每次续费操作（续费时长、扣款金额、新旧过期时间、续费类型）。来源：docs/plans/business-logic-system-completion-plan.md §5.1 步骤 3（决策 V6 全可配定价）。\n\n关联契约：\n- server-schema.json（servers.expires_at / expiry_status / expiry_grace_until 联动）\n- user-wallets-schema.json（amount_paid 从钱包余额扣款）\n- vip-permissions-schema.json（VIP 等级影响 renewal_discount_levels）\n\n状态语义：\n- renewal_type=manual：用户主动续费（POST /api/servers/:id/renew）\n- renewal_type=gift：管理员/系统赠送续费（不扣款，amount_paid=0）\n\n定价模型（决策 V6 全可配）：\n- 基础单价：pack.business.instance.pricing.daily_price（每个 Pack 独立配置）\n- 阶梯折扣：pack.business.instance.pricing.tier_discounts（按 duration_days 匹配）\n- VIP 折扣：vip.renewal_discount_levels（按用户 VIP 等级匹配）\n- 最终金额 = daily_price × duration_days × tier_discount × vip_discount",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "instance_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "续费的实例 ID，引用 servers.id (string UUID)"
+    },
+    "user_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "续费操作发起者用户 ID，引用 users.id (string UUID)"
+    },
+    "duration_days": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 36500,
+      "description": "续费时长（天）。36500=100 年（近似永久）。前端可选 7/30/90/365/36500"
+    },
+    "amount_paid": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "实际扣款点券数。0=免费续费（gift 或 daily_price=0）。已应用所有折扣后的最终金额"
+    },
+    "base_amount": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "基础金额（未应用折扣）= daily_price × duration_days。用于审计折扣效果"
+    },
+    "tier_discount_applied": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "应用的阶梯折扣系数（1.0=无折扣，0.8=8 折）。来自 pack.business.instance.pricing.tier_discounts"
+    },
+    "vip_discount_applied": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1,
+      "description": "应用的 VIP 折扣系数（1.0=无折扣，0.5=5 折）。来自 vip.renewal_discount_levels"
+    },
+    "vip_level_at_renewal": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "description": "续费时的用户 VIP 等级快照（按实例作用域）。用于审计 VIP 折扣依据"
+    },
+    "renewal_type": {
+      "type": "string",
+      "enum": ["manual", "gift"],
+      "default": "manual",
+      "description": "续费类型：manual=用户主动续费（扣款）；gift=管理员/系统赠送续费（amount_paid=0，不扣款）"
+    },
+    "use_wallet": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否从钱包扣款。true=从 user_wallets.balance 扣款；false=仅 gift 类型，不扣款"
+    },
+    "old_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "续费前的过期时间（ISO 8601）。null=原为永久实例"
+    },
+    "new_expires_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "续费后的过期时间（ISO 8601）。null=续费为永久（duration_days=36500 视为永久）。计算规则：未过期时 = old_expires_at + duration_days；已过期时 = now + duration_days"
+    },
+    "renewed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "续费操作时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "instance_id", "user_id", "duration_days", "amount_paid", "base_amount", "renewal_type", "use_wallet", "new_expires_at", "renewed_at"]
+}

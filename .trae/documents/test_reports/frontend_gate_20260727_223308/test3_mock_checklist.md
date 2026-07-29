@@ -1,0 +1,22 @@
+# Test3 Mock Checklist
+
+- Skill: `s0402-frontend-triple-gate`
+- Scope:
+  - `panel/frontend/e2e/helpers.ts`
+  - `panel/frontend/e2e/redirects.spec.ts`
+  - `panel/frontend/e2e/instance-flow.spec.ts`
+- Mock/API contract impact: none
+- MSW/mock handler changes: none
+- Frontend runtime contract changes: none
+- Verification notes:
+  - This round only adjusted E2E navigation assertions and helper timing.
+  - Production trace confirmed the fixed role redirects before heavy target pages crashed in headless Chromium:
+    - `instance_admin /instances -> /store/servers`
+    - `user /instances -> /guild`
+    - `instance_admin /instances/:id -> /store/servers/:id`
+    - `user /instances/:id -> /guild/servers/:id`
+    - `server_admin /servers/:id -> /instances/:id -> /admin/servers/:id`
+    - `user /store -> /forbidden`
+    - `server_admin /dashboard -> /admin`
+- Conclusion:
+  - No mock data, API schema, or contract fixture required synchronization for this change.

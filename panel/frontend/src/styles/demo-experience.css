@@ -1,0 +1,433 @@
+/* ============================================================================
+   DemoExperience (/demo) 样式
+   浅色 Apple 族（2026-07-28 波次2 批次E 改版，方案 homepage-entry-funnel §5.3）
+   与 LandingV6 / Login / SelectIdentity 同源 token：
+     --bg #FBFBFD / --bg2 #F5F5F7 / --t1 #1D1D1F / --t2 #6E6E73 / --t3 #86868B
+     --blue #007AFF / --green #34C759 / --orange #FF9500 / --purple #AF52DE
+   约束：无 blur 滤镜、无 Canvas、无无限 GPU 动画（防黑屏）
+   仅使用 transform/opacity 的轻量动画
+   DemoShowcase 共享组件保留深色作「产品预览框」局部（方案 §4.5 功能理由）
+   ========================================================================== */
+
+.dx-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #FBFBFD;
+  background-image:
+    radial-gradient(ellipse at 10% 20%, rgba(0,122,255,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 80%, rgba(90,200,250,0.06) 0%, transparent 50%);
+  color: #1D1D1F;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ---------- 顶部导航 ---------- */
+
+.dx-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dx-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  color: #6E6E73;
+  font-size: 13px;
+  padding: 7px 14px;
+  cursor: pointer;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  transition: color 0.2s, border-color 0.2s, background 0.2s;
+}
+
+.dx-back-btn:hover {
+  color: #007AFF;
+  border-color: rgba(0,122,255,0.3);
+  background: #fff;
+}
+
+.dx-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dx-brand-logo {
+  font-size: 20px;
+}
+
+.dx-brand-name {
+  font-weight: 700;
+  font-size: 15px;
+  color: #1D1D1F;
+}
+
+.dx-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #34C759;
+  border: 1px solid rgba(52,199,89,0.35);
+  background: rgba(52,199,89,0.08);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+/* ---------- Hero ---------- */
+
+.dx-hero {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 72px 24px 32px;
+  text-align: center;
+}
+
+.dx-hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #007AFF;
+  border: 1px solid rgba(0,122,255,0.3);
+  background: rgba(0,122,255,0.08);
+  border-radius: 999px;
+  padding: 6px 14px;
+  margin: 0 0 24px;
+}
+
+.dx-hero-title {
+  font-size: clamp(30px, 5vw, 48px);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #1D1D1F;
+  margin: 0 0 20px;
+}
+
+.dx-hero-accent {
+  color: #007AFF;
+}
+
+.dx-hero-accent-line {
+  color: #86868B;
+  text-decoration: line-through;
+  text-decoration-color: rgba(0,122,255,0.6);
+  text-decoration-thickness: 3px;
+  margin: 0 4px;
+}
+
+.dx-hero-sub {
+  font-size: 16px;
+  line-height: 1.7;
+  color: #6E6E73;
+  max-width: 620px;
+  margin: 0 auto 32px;
+}
+
+.dx-hero-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 40px;
+}
+
+.dx-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #007AFF;
+  color: #fff;
+  font-weight: 600;
+  font-size: 15px;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,122,255,0.25);
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+}
+
+.dx-btn-primary:hover {
+  background: #0A84FF;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 24px rgba(0,122,255,0.35);
+}
+
+.dx-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.03);
+  color: #1D1D1F;
+  font-weight: 600;
+  font-size: 15px;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 999px;
+  padding: 12px 24px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.dx-btn-ghost:hover {
+  border-color: rgba(0,0,0,0.15);
+  background: rgba(0,0,0,0.06);
+}
+
+/* ---------- 实时动态条 ---------- */
+
+.dx-ticker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 560px;
+  margin: 0 auto;
+  background: rgba(255,255,255,0.85);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 999px;
+  padding: 10px 18px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+
+.dx-ticker-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #34C759;
+  flex-shrink: 0;
+  animation: dx-dot-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dx-dot-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.8); }
+}
+
+.dx-ticker-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #34C759;
+  flex-shrink: 0;
+}
+
+.dx-ticker-text {
+  font-size: 13px;
+  color: #1D1D1F;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: dx-ticker-in 0.3s ease-out;
+}
+
+@keyframes dx-ticker-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- 演示区 ---------- */
+
+.dx-showcase-wrap {
+  /* DemoShowcase 自带 max-width/margin（landing.css 深色样式），此处仅做滚动锚点。
+     DemoShowcase 保留深色作为「产品预览框」局部（方案 §4.5 功能理由）。 */
+  scroll-margin-top: 20px;
+}
+
+.dx-showcase-wrap .demo-showcase {
+  margin-top: 24px;
+}
+
+/* ---------- 角色卡片区 ---------- */
+
+.dx-roles {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px 64px;
+  scroll-margin-top: 20px;
+}
+
+.dx-section-title {
+  font-size: clamp(24px, 3.5vw, 34px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: #1D1D1F;
+  text-align: center;
+  margin: 0 0 12px;
+}
+
+.dx-section-sub {
+  font-size: 15px;
+  color: #6E6E73;
+  text-align: center;
+  margin: 0 auto 40px;
+  max-width: 560px;
+}
+
+.dx-roles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 900px) {
+  .dx-roles-grid {
+    grid-template-columns: 1fr;
+    max-width: 440px;
+    margin: 0 auto;
+  }
+}
+
+.dx-role-card {
+  background: #fff;
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: 20px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04);
+  transition: border-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.dx-role-card:hover {
+  border-color: rgba(0,122,255,0.3);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.08);
+}
+
+.dx-role-card-loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.dx-role-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  margin-bottom: 18px;
+}
+
+.dx-role-title {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #1D1D1F;
+  margin: 0 0 2px;
+}
+
+.dx-role-subtitle {
+  font-size: 12px;
+  color: #86868B;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 0 0 10px;
+}
+
+.dx-role-desc {
+  font-size: 14px;
+  color: #6E6E73;
+  margin: 0 0 16px;
+}
+
+.dx-role-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 22px;
+  display: grid;
+  gap: 8px;
+  flex: 1;
+}
+
+.dx-role-features li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #3a3a3c;
+}
+
+.dx-role-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  border-radius: 999px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: filter 0.2s, transform 0.15s;
+}
+
+.dx-role-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.dx-role-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+/* ---------- 底部 ---------- */
+
+.dx-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 24px;
+  font-size: 12px;
+  color: #86868B;
+  border-top: 1px solid rgba(0,0,0,0.06);
+}
+
+.dx-footer-dot {
+  color: rgba(0,0,0,0.15);
+}
+
+/* ---------- 移动端 ---------- */
+
+@media (max-width: 640px) {
+  .dx-topbar {
+    padding: 12px 16px;
+  }
+
+  .dx-brand-name {
+    display: none;
+  }
+
+  .dx-hero {
+    padding: 48px 16px 24px;
+  }
+
+  .dx-ticker {
+    margin: 0 8px;
+  }
+
+  .dx-roles {
+    padding: 32px 16px 48px;
+  }
+}

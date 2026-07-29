@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/config_template/webhook.config.schema.json",
+  "title": "Webhook Security Configuration Schema",
+  "description": "v4.17.0 Webhook 安全可调参数配置契约。控制签名算法、时间窗口、nonce 去重等防重放与防篡改机制。来源：docs/plans/binding-unification-multi-role-plan.md §2.6 + §10.3。⚠️ 敏感字段 GSP_WEBHOOK_SECRET 从环境变量读取，不入此文件。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "hmac_algorithm": {
+      "type": "string",
+      "enum": ["sha256", "sha384", "sha512"],
+      "default": "sha256",
+      "description": "HMAC 签名算法，默认 sha256（HMAC-SHA256）。sha384/sha512 提供更高安全性但 CPU 开销略高"
+    },
+    "signature_header": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "default": "X-GSP-Signature",
+      "description": "签名 HTTP 头名，默认 X-GSP-Signature。值为 'sha256=<hex>' 格式（与 GitHub Webhook 一致）"
+    },
+    "timestamp_header": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "default": "X-GSP-Timestamp",
+      "description": "时间戳 HTTP 头名，默认 X-GSP-Timestamp。值为 Unix 秒级时间戳字符串"
+    },
+    "nonce_header": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "default": "X-GSP-Nonce",
+      "description": "nonce HTTP 头名，默认 X-GSP-Nonce。值为客户端生成的随机字符串（UUID 或 hex）"
+    },
+    "timestamp_tolerance_seconds": {
+      "type": "integer",
+      "minimum": 30,
+      "maximum": 3600,
+      "default": 300,
+      "description": "时间戳容差窗口（秒），默认 300=5 分钟。超出窗口的请求拒绝（防重放）。需与客户端时钟同步（NTP）"
+    },
+    "nonce_cache_ttl_seconds": {
+      "type": "integer",
+      "minimum": 60,
+      "maximum": 86400,
+      "default": 600,
+      "description": "nonce 去重缓存时长（秒），默认 600=10 分钟。需 ≥ timestamp_tolerance_seconds。缓存满后 LRU 淘汰"
+    },
+    "nonce_cache_max_entries": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 100000,
+      "default": 10000,
+      "description": "nonce 缓存容量上限，默认 10000 条。按峰值 QPS × nonce_cache_ttl_seconds 估算"
+    },
+    "secret_env_var": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "default": "GSP_WEBHOOK_SECRET",
+      "description": "Webhook 密钥的环境变量名，默认 GSP_WEBHOOK_SECRET。密钥本身不入配置文件（rules-3 §三 配置契约安全要求）"
+    },
+    "allowed_event_types": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z_]+\\.[a-z_]+(\\.[a-z_]+)?$"
+      },
+      "default": [
+        "player.join",
+        "player.leave",
+        "player.chat",
+        "player.verify_command",
+        "binding.verify_request"
+      ],
+      "description": "允许的 Webhook 事件类型白名单。不在白名单内的事件类型拒绝（防御深度）"
+    },
+    "max_payload_size_bytes": {
+      "type": "integer",
+      "minimum": 1024,
+      "maximum": 1048576,
+      "default": 65536,
+      "description": "Webhook 请求体最大字节数，默认 64KB。超出拒绝（防 DoS）"
+    }
+  },
+  "required": [
+    "hmac_algorithm",
+    "signature_header",
+    "timestamp_header",
+    "nonce_header",
+    "timestamp_tolerance_seconds",
+    "nonce_cache_ttl_seconds",
+    "secret_env_var"
+  ]
+}

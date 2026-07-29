@@ -1,0 +1,36 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "FAILED",
+  "timestamp": "2026-07-27T22:45:00+08:00",
+  "evidence_path": "/home/airxw/Documents/gsp/gameserver-panel/.trae/documents/test_reports/frontend_gate_20260727_223308",
+  "summary": "角色分流修复已落地，单测通过；生产环境 trace 也确认 /instances、/servers/:id、/store、/dashboard 在 crash 前已跳到正确目标。前端三重闸未完全闭合，因为生产 Playwright 在重页面上仍会遇到 headless Chromium crash，且重复重跑触发了登录限流。",
+  "tests": {
+    "test1": {
+      "status": "PASS",
+      "log": "test1_streamlit.log",
+      "details": "vitest 32/32 通过（role util、Forbidden、Layout）"
+    },
+    "test2": {
+      "status": "FAIL",
+      "log": "test2_playwright.log",
+      "details": "redirect/guard 用例改为尽早捕获目标 URL 后，生产 trace 已确认目标地址正确；但完整 Playwright 重跑仍受 headless Chromium crash 和 PANEL_RATE_LIMITED 影响，未能形成全绿结果。"
+    },
+    "test3": {
+      "status": "PASS",
+      "log": "test3_mock_checklist.md",
+      "details": "本轮未修改 MSW、mock 数据或 API 契约，仅调整 E2E helper 与断言时机。"
+    }
+  },
+  "failed_test_type": "test2_playwright",
+  "failed_cases": [
+    "重复生产重跑后触发 /api/auth/login 限流（PANEL_RATE_LIMITED）",
+    "重页面在服务器 headless Chromium 中会于跳转后快速 crash，导致部分 Playwright 用例无法稳定完成完整页面期望"
+  ],
+  "failure_summary": "业务重定向本身已通过生产 trace 证实，但独立 E2E 闸门仍被环境级不稳定性阻断，当前不能宣告前端闸门已闭合。",
+  "next_actions": [
+    "为生产验证模式增加 token 复用/保活策略，避免 globalSetup 反复触发登录限流",
+    "把纯跳转用例统一收敛为导航级断言，避免目标页资源抖动污染重定向回归",
+    "单独排查 headless Chromium 在 /admin、/store、/guild 重页面上的 crash 根因"
+  ],
+  "rerun_entry": "cd /home/airxw/Documents/gsp/gameserver-panel/panel/frontend && E2E_BASE_URL=https://gsp.ecsrz.com:3001 npx playwright test e2e/redirects.spec.ts --project=chromium --workers=1 && E2E_BASE_URL=https://gsp.ecsrz.com:3001 npx playwright test e2e/instance-flow.spec.ts -g \"跨角色访问门控\" --project=chromium --workers=1"
+}

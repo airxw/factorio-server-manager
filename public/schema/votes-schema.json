@@ -1,0 +1,63 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/votes-schema.json",
+  "title": "Votes Schema",
+  "description": "votes 表数据契约。投票记录头表，记录每次投票踢人的发起、目标、状态。来源：scheme-final-merged.md §4.2.2 P3。factorio 迁移表。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "主键，自增整数"
+    },
+    "server_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "服务器 ID，引用 servers.id (string UUID)"
+    },
+    "initiator": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+      "description": "投票发起者游戏内玩家名"
+    },
+    "target": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 32,
+      "pattern": "^[a-zA-Z0-9_-]{1,32}$",
+      "description": "被投票目标游戏内玩家名（kick 对象）"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "投票原因。实际 kick reason = vote_settings.reason_prefix + ' ' + reason"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "passed", "failed", "cancelled"],
+      "default": "active",
+      "description": "投票状态机：active=进行中；passed=通过（达阈值，已执行 kick）；failed=失败（超时未达阈值）；cancelled=取消（发起者撤回或管理员干预）"
+    },
+    "start_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "投票开始时间（ISO 8601 字符串）"
+    },
+    "end_time": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null,
+      "description": "投票结束时间（ISO 8601 字符串）。null=进行中"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "记录创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "server_id", "initiator", "target", "reason", "status", "start_time", "created_at"]
+}

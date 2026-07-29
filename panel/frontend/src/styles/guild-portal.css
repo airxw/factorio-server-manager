@@ -1,0 +1,2010 @@
+/* ==========================================================================
+ * Guild Portal (玩家门户) — 移动端优先游戏社区商城门户
+ * Apple 浅色系设计语言：#FBFBFD 基底、iOS蓝 #007AFF 强调、纯白卡片+弥散阴影
+ * ========================================================================== */
+
+.gp-theme {
+  /* === 核心色板（Apple 浅色系） === */
+  --gp-bg-0: #FBFBFD;
+  --gp-bg-1: #F5F5F7;
+  --gp-bg-2: rgba(0,0,0,0.03);
+  --gp-bg-card: #FFFFFF;
+  --gp-bg-card-strong: #F5F5F7;
+  --gp-bg-elevated: #FFFFFF;
+  --gp-blue: #007AFF;
+  --gp-cyan: #5AC8FA;
+  --gp-green: #34C759;
+  --gp-orange: #FF9500;
+  --gp-amber: #FF9500;
+  --gp-red: #FF3B30;
+  --gp-rose: #FF3B30;
+  --gp-emerald: #34C759;
+  --gp-purple: #AF52DE;
+  --gp-violet: #AF52DE;
+  --gp-text: #1D1D1F;
+  --gp-text-sec: #6E6E73;
+  --gp-text-tert: #86868B;
+  --gp-text-dim: #AEAEB2;
+  --gp-text-faint: #C7C7CC;
+  --gp-border: rgba(0,0,0,0.08);
+  --gp-border-strong: rgba(0,0,0,0.12);
+  --gp-segment-bg: rgba(0,0,0,0.05);
+  --gp-blue-bg: rgba(0,122,255,0.08);
+  --gp-shadow-sm: 0 2px 6px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.04);
+  --gp-shadow-md: 0 4px 12px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.08);
+  --gp-shadow-lg: 0 8px 20px rgba(0,0,0,0.08), 0 24px 60px rgba(0,0,0,0.12);
+  --gp-shadow-glow: 0 4px 16px rgba(0,122,255,0.3), 0 0 30px rgba(0,122,255,0.1);
+  --gp-grad-primary: linear-gradient(135deg, var(--gp-blue), var(--gp-cyan));
+  --gp-bottom-nav-h: 64px;
+
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+    'PingFang SC', 'Helvetica Neue', 'Microsoft YaHei', sans-serif;
+  color: var(--gp-text);
+  background: var(--gp-bg-0);
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* === 页面渐变氛围背景 === */
+.gp-theme .guild-home-page,
+.gp-theme .guild-shop-page,
+.gp-theme .guild-discover-page,
+.gp-theme .guild-messages-page,
+.gp-theme .guild-profile-page,
+.gp-theme .guild-bind-page,
+.gp-theme .guild-orders-page,
+.gp-theme .guild-cdks-page,
+.gp-theme .server-detail-guild {
+  background: var(--gp-bg-0);
+  background-image:
+    radial-gradient(ellipse at 15% 0%, rgba(0,122,255,0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 20%, rgba(90,200,250,0.04) 0%, transparent 50%);
+  min-height: 100dvh;
+  padding-bottom: calc(var(--gp-bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 20px);
+}
+
+/* === 页面主内容留白（左右 20px） === */
+.gp-theme .guild-main {
+  padding: 0 20px;
+  box-sizing: border-box;
+  max-width: 768px;
+  margin: 0 auto;
+}
+
+/* === 移动端优先顶部导航（非桌面版sidebar） === */
+.gp-theme .guild-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(251,251,253,0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--gp-border);
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 768px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.gp-theme .guild-topbar-left,
+.gp-theme .guild-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.gp-theme .guild-brand {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  background: linear-gradient(135deg, var(--gp-blue) 0%, var(--gp-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.gp-theme .guild-icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--gp-border);
+  background: rgba(255,255,255,0.7);
+  color: var(--gp-text-sec);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  flex-shrink: 0;
+}
+.gp-theme .guild-icon-btn:hover {
+  background: #fff;
+  color: var(--gp-text);
+  border-color: var(--gp-border-strong);
+}
+.gp-theme .guild-icon-btn:active {
+  transform: scale(0.95);
+}
+
+/* 用户头像按钮 */
+.gp-theme .guild-user-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--gp-blue);
+  padding: 0;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--gp-bg-card);
+  transition: transform 0.15s;
+}
+.gp-theme .guild-user-btn:hover {
+  transform: scale(1.05);
+}
+.gp-theme .guild-user-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gp-theme .guild-user-btn .guild-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gp-blue-bg);
+  color: var(--gp-blue);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+/* 未读消息红点 */
+.gp-theme .guild-notif-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  background: var(--gp-red);
+  border-radius: 50%;
+  border: 2px solid var(--gp-bg-0);
+}
+
+/* 搜索框 */
+.gp-theme .guild-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0,0,0,0.04);
+  border-radius: 12px;
+  padding: 8px 12px;
+  flex: 1;
+  min-width: 0;
+}
+.gp-theme .guild-search input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 15px;
+  color: var(--gp-text);
+  font-family: inherit;
+}
+.gp-theme .guild-search input::placeholder {
+  color: var(--gp-text-dim);
+}
+
+/* 用户下拉菜单 */
+.gp-theme .guild-user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--gp-border);
+  border-radius: 16px;
+  box-shadow: var(--gp-shadow-lg);
+  padding: 8px;
+  z-index: 200;
+}
+.gp-theme .guild-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-bottom: 1px solid var(--gp-border);
+  margin-bottom: 6px;
+}
+.gp-theme .guild-dropdown-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--gp-blue);
+  background: var(--gp-blue-bg);
+  flex-shrink: 0;
+}
+.gp-theme .guild-dropdown-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gp-theme .guild-dropdown-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--gp-text);
+}
+.gp-theme .guild-dropdown-role {
+  font-size: 11px;
+  color: var(--gp-text-tert);
+  padding: 1px 6px;
+  background: var(--gp-blue-bg);
+  border-radius: 4px;
+  display: inline-block;
+  margin-top: 2px;
+  color: var(--gp-blue);
+}
+.gp-theme .guild-dropdown-divider {
+  height: 1px;
+  background: var(--gp-border);
+  margin: 4px 0;
+}
+.gp-theme .guild-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--gp-text);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+.gp-theme .guild-dropdown-item:hover {
+  background: rgba(0,0,0,0.04);
+}
+.gp-theme .guild-dropdown-item.danger {
+  color: var(--gp-red);
+}
+.gp-theme .guild-dropdown-item.danger:hover {
+  background: rgba(255,59,48,0.08);
+}
+.gp-theme .guild-dropdown-section-title {
+  font-size: 11px;
+  color: var(--gp-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 6px 10px 4px;
+  font-weight: 600;
+}
+
+/* === iOS风格分段控制器 === */
+.gp-theme .guild-segmented {
+  display: flex;
+  background: var(--gp-segment-bg);
+  border-radius: 10px;
+  padding: 2px;
+  gap: 0;
+}
+.gp-theme .guild-seg-item {
+  flex: 1;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gp-text-sec);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.gp-theme .guild-seg-item.active {
+  background: var(--gp-bg-card);
+  color: var(--gp-text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+/* === 页面标题 === */
+.gp-theme .guild-page-title {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 20px 0 16px;
+  color: var(--gp-text);
+}
+.gp-theme .guild-page-subtitle {
+  font-size: 14px;
+  color: var(--gp-text-sec);
+  margin-top: -10px;
+  margin-bottom: 16px;
+}
+
+/* === 通用卡片（iOS风格圆角白卡） === */
+.gp-theme .gp-card {
+  background: var(--gp-bg-card);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: var(--gp-shadow-sm);
+  border: 1px solid var(--gp-border);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.gp-theme .gp-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--gp-shadow-md);
+}
+
+/* === 首页Hero Bento区域 === */
+.gp-theme .gp-bento {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.gp-theme .gp-bento-main {
+  grid-column: 1 / -1;
+}
+
+/* === 商城大Hero（游戏Banner沉浸区） === */
+.gp-theme .gp-shop-hero {
+  position: relative;
+  height: 220px;
+  border-radius: 24px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  background: linear-gradient(135deg, var(--gp-blue) 0%, var(--gp-cyan) 100%);
+  box-shadow: var(--gp-shadow-md);
+}
+.gp-theme .gp-shop-hero-banner {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.gp-theme .gp-shop-hero-fallback {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, #E3F2FD 0%, #BBDEFB 50%, #F5F5F7 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--gp-blue);
+  gap: 8px;
+}
+.gp-theme .gp-shop-hero-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.1) 40%, transparent 70%);
+  pointer-events: none;
+}
+.gp-theme .gp-shop-hero-content {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px;
+  z-index: 2;
+  color: #fff;
+}
+.gp-theme .gp-shop-hero-name {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0 0 4px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.gp-theme .gp-shop-hero-desc {
+  font-size: 14px;
+  opacity: 0.9;
+  margin: 0;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+.gp-theme .gp-shop-hero-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+/* 服务器横滑卡片（首页发现服务器） */
+.gp-theme .gp-server-card {
+  min-width: 220px;
+  background: var(--gp-bg-card);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--gp-shadow-sm);
+  border: 1px solid var(--gp-border);
+  transition: transform 0.2s, box-shadow 0.2s;
+  flex-shrink: 0;
+}
+.gp-theme .gp-server-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--gp-shadow-md);
+}
+.gp-theme .gp-server-cover {
+  height: 100px;
+  background-size: cover;
+  background-position: center;
+  background: linear-gradient(135deg, var(--gp-blue-bg), rgba(90,200,250,0.15));
+}
+.gp-theme .gp-server-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gp-theme .gp-server-info {
+  padding: 12px;
+}
+.gp-theme .gp-server-name {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--gp-text);
+}
+.gp-theme .gp-server-meta {
+  font-size: 12px;
+  color: var(--gp-text-tert);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* === 商品网格（商城） === */
+.gp-theme .gp-shop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.gp-theme .gp-item-card {
+  background: var(--gp-bg-card);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: var(--gp-shadow-sm);
+  border: 1px solid var(--gp-border);
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.gp-theme .gp-item-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--gp-shadow-md);
+}
+.gp-theme .gp-item-quality-bar {
+  height: 3px;
+}
+.gp-theme .gp-item-img {
+  height: 120px;
+  background: var(--gp-bg-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+}
+.gp-theme .gp-item-info {
+  padding: 10px 12px 12px;
+}
+.gp-theme .gp-item-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--gp-text);
+}
+.gp-theme .gp-item-desc {
+  font-size: 11px;
+  color: var(--gp-text-tert);
+  margin: 0 0 8px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.gp-theme .gp-item-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+}
+.gp-theme .gp-item-price {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--gp-orange);
+  font-variant-numeric: tabular-nums;
+}
+.gp-theme .gp-item-price-free {
+  color: var(--gp-green);
+}
+.gp-theme .gp-buy-btn {
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: none;
+  background: var(--gp-blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.gp-theme .gp-buy-btn:hover {
+  background: var(--gp-cyan);
+  transform: scale(1.02);
+}
+.gp-theme .gp-buy-btn:disabled {
+  background: var(--gp-text-dim);
+  cursor: not-allowed;
+}
+.gp-theme .gp-buy-btn-owned {
+  background: var(--gp-green);
+}
+
+/* === 品质色（仅用于小面积色条/文字/标签） === */
+.gp-theme .quality-normal .gp-item-quality-bar { background: var(--gp-text-tert); }
+.gp-theme .quality-uncommon .gp-item-quality-bar { background: var(--gp-green); }
+.gp-theme .quality-rare .gp-item-quality-bar { background: var(--gp-blue); }
+.gp-theme .quality-epic .gp-item-quality-bar { background: var(--gp-purple); }
+.gp-theme .quality-legendary .gp-item-quality-bar { background: var(--gp-orange); }
+.gp-theme .quality-normal .gp-item-price { color: var(--gp-text-sec); }
+.gp-theme .quality-uncommon .gp-item-price { color: var(--gp-green); }
+.gp-theme .quality-rare .gp-item-price { color: var(--gp-blue); }
+.gp-theme .quality-epic .gp-item-price { color: var(--gp-purple); }
+.gp-theme .quality-legendary .gp-item-price { color: var(--gp-orange); }
+
+/* === 底部Tab导航（iOS风格） === */
+.gp-theme .guild-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: rgba(251,251,253,0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--gp-border);
+  padding: 4px 0 env(safe-area-inset-bottom, 0);
+  height: var(--gp-bottom-nav-h);
+  box-shadow: 0 -2px 20px rgba(0,0,0,0.06);
+  max-width: 768px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+.gp-theme .guild-bottom-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  color: var(--gp-text-dim);
+  cursor: pointer;
+  position: relative;
+  font-family: inherit;
+  min-height: 44px;
+  padding: 6px 0 4px;
+  transition: color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.gp-theme .guild-bottom-item.active {
+  color: var(--gp-blue);
+}
+.gp-theme .guild-bottom-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: var(--gp-blue);
+  border-radius: 0 0 3px 3px;
+}
+.gp-theme .guild-bottom-icon {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gp-theme .guild-bottom-label {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+}
+.gp-theme .guild-bottom-badge {
+  position: absolute;
+  top: 2px;
+  right: calc(50% - 14px);
+  transform: translateX(14px);
+  background: var(--gp-red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 999px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* === 通用按钮样式 === */
+.gp-theme .gp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+.gp-theme .gp-btn-primary {
+  background: linear-gradient(135deg, var(--gp-blue), var(--gp-cyan));
+  color: #fff;
+  box-shadow: var(--gp-shadow-glow);
+}
+.gp-theme .gp-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0,122,255,0.4);
+}
+.gp-theme .gp-btn-primary:active {
+  transform: translateY(0);
+}
+.gp-theme .gp-btn-ghost {
+  background: var(--gp-bg-card);
+  color: var(--gp-text-sec);
+  border: 1px solid var(--gp-border);
+}
+.gp-theme .gp-btn-ghost:hover {
+  background: var(--gp-bg-1);
+  color: var(--gp-text);
+  border-color: var(--gp-border-strong);
+}
+.gp-theme .gp-btn-block {
+  width: 100%;
+}
+
+/* === 图标按钮（圆形，仅图标） === */
+.gp-theme .gp-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: none;
+  background: var(--gp-bg-card);
+  color: var(--gp-text-sec);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid var(--gp-border);
+}
+.gp-theme .gp-icon-btn:hover {
+  background: var(--gp-bg-1);
+  color: var(--gp-text);
+}
+.gp-theme .gp-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* === 搜索框 === */
+.gp-theme .gp-search-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.gp-theme .gp-search-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--gp-text-tert);
+  pointer-events: none;
+}
+.gp-theme .gp-search-input {
+  width: 100%;
+  padding: 10px 14px 10px 42px;
+  border-radius: 12px;
+  border: 1px solid var(--gp-border);
+  background: var(--gp-bg-card);
+  color: var(--gp-text);
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.gp-theme .gp-search-input::placeholder {
+  color: var(--gp-text-dim);
+}
+.gp-theme .gp-search-input:focus {
+  border-color: var(--gp-blue);
+  box-shadow: 0 0 0 3px rgba(0,122,255,0.12);
+}
+
+/* === 内联链接 === */
+.gp-theme .gp-link {
+  color: var(--gp-blue);
+  font-size: inherit;
+  text-decoration: none;
+  font-weight: 500;
+}
+.gp-theme .gp-link:hover {
+  text-decoration: underline;
+}
+
+.gp-theme .gp-btn-ghost:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* === 徽章（状态/分类/品质） === */
+.gp-theme .gp-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.gp-theme .gp-badge-online {
+  background: rgba(52,199,89,0.12);
+  color: var(--gp-green);
+}
+.gp-theme .gp-badge-offline {
+  background: rgba(0,0,0,0.06);
+  color: var(--gp-text-tert);
+}
+.gp-theme .gp-badge-blue {
+  background: var(--gp-blue-bg);
+  color: var(--gp-blue);
+}
+.gp-theme .gp-badge-orange {
+  background: rgba(255,149,0,0.12);
+  color: var(--gp-orange);
+}
+.gp-theme .gp-badge-green {
+  background: rgba(52,199,89,0.12);
+  color: var(--gp-green);
+}
+.gp-theme .gp-badge-purple {
+  background: rgba(175,82,222,0.12);
+  color: var(--gp-purple);
+}
+.gp-theme .gp-badge-red {
+  background: rgba(255,59,48,0.12);
+  color: var(--gp-red);
+}
+
+/* === 横向滚动容器 === */
+.gp-theme .gp-hscroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 20px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.gp-theme .gp-hscroll::-webkit-scrollbar {
+  display: none;
+}
+.gp-theme .gp-hscroll > * {
+  scroll-snap-align: start;
+}
+
+/* === 区块标题 === */
+.gp-theme .gp-section {
+  margin-bottom: 20px;
+}
+.gp-theme .gp-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.gp-theme .gp-section-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  margin: 0;
+  color: var(--gp-text);
+}
+.gp-theme .gp-section-more {
+  font-size: 14px;
+  color: var(--gp-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+}
+
+/* === 表单输入 === */
+.gp-theme .gp-input-group {
+  margin-bottom: 14px;
+}
+.gp-theme .gp-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gp-text-sec);
+  margin-bottom: 6px;
+}
+.gp-theme .gp-input,
+.gp-theme .gp-select,
+.gp-theme .gp-textarea {
+  width: 100%;
+  padding: 12px 14px;
+  background: var(--gp-bg-card);
+  border: 1px solid var(--gp-border);
+  border-radius: 14px;
+  color: var(--gp-text);
+  font-size: 15px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.15s;
+  box-sizing: border-box;
+}
+.gp-theme .gp-input:focus,
+.gp-theme .gp-select:focus,
+.gp-theme .gp-textarea:focus {
+  border-color: var(--gp-blue);
+  box-shadow: 0 0 0 3px rgba(0,122,255,0.12);
+}
+.gp-theme .gp-input::placeholder {
+  color: var(--gp-text-dim);
+}
+
+/* === 空状态 === */
+.gp-theme .gp-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--gp-text-dim);
+}
+.gp-theme .gp-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+.gp-theme .gp-empty-text {
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+
+/* === 骨架屏 === */
+.gp-theme .gp-skeleton {
+  background: linear-gradient(90deg, var(--gp-bg-1) 25%, rgba(0,0,0,0.04) 50%, var(--gp-bg-1) 75%);
+  background-size: 200% 100%;
+  animation: gp-skeleton-shimmer 1.5s infinite;
+  border-radius: 10px;
+}
+@keyframes gp-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* === 消息页气泡 === */
+.gp-theme .gp-msg-item {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--gp-border);
+}
+.gp-theme .gp-msg-item:last-child { border-bottom: none; }
+.gp-theme .gp-msg-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--gp-bg-1);
+}
+.gp-theme .gp-msg-avatar img { width:100%; height:100%; object-fit:cover; }
+.gp-theme .gp-msg-body { flex: 1; min-width: 0; }
+.gp-theme .gp-msg-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.gp-theme .gp-msg-name { font-size: 15px; font-weight: 600; color: var(--gp-text); }
+.gp-theme .gp-msg-time { font-size: 12px; color: var(--gp-text-dim); }
+.gp-theme .gp-msg-preview {
+  font-size: 14px;
+  color: var(--gp-text-sec);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gp-theme .gp-msg-unread {
+  width: 8px;
+  height: 8px;
+  background: var(--gp-red);
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+/* === 个人中心 === */
+.gp-theme .gp-profile-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: var(--gp-bg-card);
+  border-radius: 24px;
+  margin-bottom: 20px;
+  box-shadow: var(--gp-shadow-sm);
+  border: 1px solid var(--gp-border);
+}
+.gp-theme .gp-profile-avatar {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 3px solid var(--gp-blue);
+  flex-shrink: 0;
+  background: var(--gp-blue-bg);
+}
+.gp-theme .gp-profile-avatar img { width:100%; height:100%; object-fit:cover; }
+.gp-theme .gp-profile-info { flex: 1; }
+.gp-theme .gp-profile-name { font-size: 22px; font-weight: 700; margin: 0 0 4px; color: var(--gp-text); letter-spacing: -0.02em; }
+.gp-theme .gp-profile-bio { font-size: 13px; color: var(--gp-text-sec); margin: 0 0 6px; }
+.gp-theme .gp-profile-stats {
+  display: flex;
+  gap: 16px;
+}
+.gp-theme .gp-stat-item {
+  text-align: center;
+}
+.gp-theme .gp-stat-num {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gp-text);
+  font-variant-numeric: tabular-nums;
+}
+.gp-theme .gp-stat-label {
+  font-size: 11px;
+  color: var(--gp-text-dim);
+}
+
+/* === 功能列表（设置式列表） === */
+.gp-theme .gp-list-group {
+  background: var(--gp-bg-card);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  box-shadow: var(--gp-shadow-sm);
+  border: 1px solid var(--gp-border);
+}
+.gp-theme .gp-list-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--gp-border);
+  cursor: pointer;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  width: 100%;
+  font-family: inherit;
+  color: var(--gp-text);
+  font-size: 15px;
+  transition: background 0.12s;
+}
+.gp-theme .gp-list-item:last-child { border-bottom: none; }
+.gp-theme .gp-list-item:hover {
+  background: rgba(0,0,0,0.02);
+}
+.gp-theme .gp-list-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 16px;
+}
+.gp-theme .gp-list-text { flex: 1; text-align: left; }
+.gp-theme .gp-list-arrow { color: var(--gp-text-dim); font-size: 14px; }
+
+/* === 订单列表 === */
+.gp-theme .gp-order-item {
+  background: var(--gp-bg-card);
+  border-radius: 16px;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: var(--gp-shadow-sm);
+  border: 1px solid var(--gp-border);
+}
+.gp-theme .gp-order-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--gp-text-dim);
+}
+.gp-theme .gp-order-body {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.gp-theme .gp-order-img {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  background: var(--gp-bg-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  flex-shrink: 0;
+}
+.gp-theme .gp-order-info { flex:1; min-width:0; }
+.gp-theme .gp-order-name { font-size: 15px; font-weight: 600; color: var(--gp-text); margin-bottom: 2px; }
+.gp-theme .gp-order-meta { font-size: 12px; color: var(--gp-text-dim); }
+.gp-theme .gp-order-price { font-size: 18px; font-weight: 800; color: var(--gp-orange); font-variant-numeric: tabular-nums; }
+
+/* === CDK页面 === */
+.gp-theme .gp-cdk-box {
+  background: var(--gp-bg-1);
+  border-radius: 14px;
+  padding: 16px;
+  font-family: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.1em;
+  color: var(--gp-blue);
+  border: 2px dashed rgba(0,122,255,0.3);
+  margin: 12px 0;
+  word-break: break-all;
+}
+
+/* === 发现页筛选chips === */
+.gp-theme .gp-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 16px;
+  scrollbar-width: none;
+}
+.gp-theme .gp-chips::-webkit-scrollbar { display: none; }
+.gp-theme .gp-chip {
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--gp-bg-card);
+  border: 1px solid var(--gp-border);
+  color: var(--gp-text-sec);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.gp-theme .gp-chip.active {
+  background: var(--gp-blue);
+  color: #fff;
+  border-color: var(--gp-blue);
+  box-shadow: var(--gp-shadow-glow);
+}
+
+/* === 服务器详情页（玩家视角） === */
+.gp-theme .gp-detail-banner {
+  height: 180px;
+  border-radius: 24px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  position: relative;
+  background: linear-gradient(135deg, var(--gp-blue), var(--gp-cyan));
+  box-shadow: var(--gp-shadow-md);
+}
+.gp-theme .gp-detail-banner img { width:100%; height:100%; object-fit:cover; }
+.gp-theme .gp-detail-banner-shade {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
+}
+.gp-theme .gp-detail-title {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  color: #fff;
+  z-index: 2;
+}
+.gp-theme .gp-detail-title h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  letter-spacing: -0.02em;
+}
+.gp-theme .gp-detail-title p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  opacity: 0.9;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+}
+
+/* === 玩家信息卡 === */
+.gp-theme .gp-player-card {
+  background: var(--gp-bg-card);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: var(--gp-shadow-sm);
+  border: 1px solid var(--gp-border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.gp-theme .gp-player-card .gp-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--gp-blue-bg);
+}
+.gp-theme .gp-player-card .gp-avatar img { width:100%; height:100%; object-fit:cover; }
+
+/* === Toast/提示 === */
+.gp-theme .gp-toast {
+  position: fixed;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(29,29,31,0.9);
+  color: #fff;
+  padding: 12px 24px;
+  border-radius: 14px;
+  font-size: 14px;
+  z-index: 9999;
+  backdrop-filter: blur(20px);
+  box-shadow: var(--gp-shadow-lg);
+  animation: gp-toast-in 0.3s ease;
+}
+@keyframes gp-toast-in {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* === 登录页浅色适配 === */
+.gp-theme .login-page {
+  background: var(--gp-bg-0);
+  background-image:
+    radial-gradient(ellipse at 10% 20%, rgba(0,122,255,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 90% 80%, rgba(90,200,250,0.06) 0%, transparent 50%);
+}
+
+.gp-theme .login-title {
+  background: linear-gradient(135deg, var(--gp-blue) 0%, var(--gp-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* === 返回按钮（浅色） === */
+.gp-theme .login-back-btn {
+  border-color: var(--gp-border);
+  background: rgba(255,255,255,0.85);
+  color: var(--gp-text);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.gp-theme .login-back-btn:hover {
+  background: #fff;
+  border-color: rgba(0,122,255,0.3);
+  color: var(--gp-blue);
+}
+
+/* === Layout 组件兼容样式（匹配 Layout.tsx 中使用的 class 名） === */
+
+/* 根容器背景与文字颜色 */
+.gp-theme.app-layout,
+.gp-theme.guild-layout {
+  background: var(--gp-bg-0);
+  color: var(--gp-text);
+}
+
+/* 顶部栏按钮（搜索/通知） */
+.gp-theme .guild-topbar-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid var(--gp-border);
+  background: rgba(255,255,255,0.7);
+  color: var(--gp-text-sec);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+.gp-theme .guild-topbar-btn:hover {
+  background: #fff;
+  color: var(--gp-text);
+  border-color: var(--gp-border-strong);
+}
+.gp-theme .guild-topbar-btn:active {
+  transform: scale(0.95);
+}
+
+/* 顶部栏按钮 badge */
+.gp-theme .guild-topbar-badge {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  min-width: 16px;
+  height: 16px;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 16px;
+  padding: 0 4px;
+  background: var(--gp-red);
+  color: #fff;
+  border-radius: 999px;
+  text-align: center;
+}
+
+/* 头像按钮 */
+.gp-theme .guild-avatar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--gp-blue);
+  background: var(--gp-blue-bg);
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.15s, border-color 0.15s;
+}
+.gp-theme .guild-avatar-btn:hover {
+  transform: scale(1.05);
+  border-color: var(--gp-cyan);
+}
+.gp-theme .guild-avatar {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gp-blue);
+  line-height: 1;
+}
+
+/* 用户下拉菜单（Layout结构） */
+.gp-theme .guild-user-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 220px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--gp-border);
+  border-radius: 16px;
+  box-shadow: var(--gp-shadow-lg);
+  z-index: 200;
+  padding: 8px;
+  animation: gp-dropdown-in 0.15s ease-out;
+}
+@keyframes gp-dropdown-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.gp-theme .guild-user-dropdown-info {
+  padding: 10px 12px;
+}
+.gp-theme .guild-user-dropdown-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gp-text);
+}
+.gp-theme .guild-user-dropdown-role {
+  display: block;
+  font-size: 11px;
+  color: var(--gp-blue);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  background: var(--gp-blue-bg);
+  border-radius: 4px;
+  display: inline-block;
+}
+.gp-theme .guild-user-dropdown-divider {
+  height: 1px;
+  background: var(--gp-border);
+  margin: 4px 0;
+}
+.gp-theme .guild-user-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--gp-text);
+  font-size: 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s;
+  text-align: left;
+  font-family: inherit;
+}
+.gp-theme .guild-user-dropdown-item:hover {
+  background: rgba(0,0,0,0.04);
+}
+.gp-theme .guild-user-dropdown-logout {
+  color: var(--gp-red);
+}
+.gp-theme .guild-user-dropdown-logout:hover {
+  background: rgba(255,59,48,0.08);
+}
+
+/* === 底部 Tab 导航（修复 mobile-bottom-item 样式） === */
+.gp-theme .guild-bottom-nav,
+.gp-theme .mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: rgba(251,251,253,0.9);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--gp-border);
+  padding: 4px 0 env(safe-area-inset-bottom, 0);
+  height: var(--gp-bottom-nav-h);
+  box-shadow: 0 -2px 20px rgba(0,0,0,0.06);
+  max-width: 768px;
+  margin: 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.gp-theme .mobile-bottom-item,
+.gp-theme .guild-bottom-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  color: var(--gp-text-dim);
+  cursor: pointer;
+  position: relative;
+  font-family: inherit;
+  min-height: 44px;
+  padding: 6px 0 4px;
+  transition: color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.gp-theme .mobile-bottom-item.active,
+.gp-theme .guild-bottom-item.active {
+  color: var(--gp-blue);
+}
+.gp-theme .mobile-bottom-item.active::before,
+.gp-theme .guild-bottom-item.active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 24px;
+  height: 3px;
+  background: var(--gp-blue);
+  border-radius: 0 0 3px 3px;
+}
+
+.gp-theme .mobile-bottom-label,
+.gp-theme .guild-bottom-label {
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.gp-theme .mobile-bottom-badge,
+.gp-theme .guild-bottom-badge {
+  position: absolute;
+  top: 2px;
+  right: calc(50% - 14px);
+  transform: translateX(14px);
+  background: var(--gp-red);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 999px;
+  min-width: 16px;
+  text-align: center;
+  line-height: 1.4;
+}
+
+/* 页面标题（浅色） */
+.gp-theme .mobile-page-title {
+  color: var(--gp-text);
+  font-weight: 700;
+  padding: 8px 0 12px;
+  margin: 0;
+}
+
+/* 加载屏（浅色适配） */
+.gp-theme .loading-screen {
+  background: transparent;
+  color: var(--gp-text-sec);
+}
+.gp-theme .loading-spinner {
+  border-color: var(--gp-border);
+  border-top-color: var(--gp-blue);
+}
+
+/* === 桌面端适配（保留底部导航，C端风格常驻） === */
+@media (min-width: 769px) {
+  .gp-theme .guild-bottom-nav,
+  .gp-theme .mobile-bottom-nav.guild-bottom-nav {
+    display: flex;
+    max-width: 768px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-radius: 16px 16px 0 0;
+    border-left: 1px solid var(--gp-border);
+    border-right: 1px solid var(--gp-border);
+  }
+  .gp-theme .guild-content {
+    padding-bottom: calc(var(--gp-bottom-nav-h) + env(safe-area-inset-bottom, 0px) + 20px);
+  }
+}
+
+/* === 兼容旧类名（深色遗留别名映射到浅色主题） === */
+
+/* 等宽数字 */
+.gp-theme .gp-mono-num {
+  font-family: 'SF Mono', 'JetBrains Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 文字淡色 */
+.gp-theme .gp-text-faint {
+  color: var(--gp-text-faint);
+}
+
+/* 强卡片（浅灰底） */
+.gp-theme .gp-card-strong {
+  background: var(--gp-bg-1);
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: var(--gp-shadow-sm);
+  border: 1px solid var(--gp-border);
+}
+
+/* Hero 区域（渐变头部） */
+.gp-theme .gp-hero {
+  background: linear-gradient(135deg, rgba(0,122,255,0.06) 0%, rgba(90,200,250,0.06) 100%);
+  border-radius: 24px;
+  border: 1px solid rgba(0,122,255,0.1);
+}
+
+/* 卡片悬停效果 */
+.gp-theme .gp-card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  background: var(--gp-bg-card);
+  border: 1px solid var(--gp-border);
+}
+.gp-theme .gp-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--gp-shadow-md);
+}
+
+/* 在线状态点 */
+.gp-theme .gp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.gp-theme .gp-dot-online {
+  background: var(--gp-green);
+  box-shadow: 0 0 0 2px rgba(52,199,89,0.2);
+}
+.gp-theme .gp-dot-offline {
+  background: var(--gp-text-tert);
+}
+
+/* 统计数字/标签（首页概览） */
+.gp-theme .gp-stat-value {
+  font-weight: 800;
+  color: var(--gp-text);
+  letter-spacing: -0.02em;
+}
+.gp-theme .gp-stat-label {
+  color: var(--gp-text-sec);
+  font-weight: 500;
+}
+
+/* Badge 颜色别名（兼容旧代码 emerald/amber/rose/violet） */
+.gp-theme .gp-badge-emerald { background: rgba(52,199,89,0.12); color: var(--gp-green); }
+.gp-theme .gp-badge-amber   { background: rgba(255,149,0,0.12); color: var(--gp-orange); }
+.gp-theme .gp-badge-rose    { background: rgba(255,59,48,0.12); color: var(--gp-red); }
+.gp-theme .gp-badge-violet  { background: rgba(175,82,222,0.12); color: var(--gp-purple); margin-left: 6px; }
+
+/* 旋转动画 */
+.gp-theme .gp-spin {
+  animation: gp-spin 1s linear infinite;
+}
+@keyframes gp-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* Pop-in 领取成功动效 */
+.gp-theme .gp-pop-in {
+  animation: gp-pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes gp-pop-in {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.03); box-shadow: 0 0 0 4px rgba(0,122,255,0.15); }
+  100% { transform: scale(1); }
+}
+
+/* 空状态图标容器 */
+.gp-theme .gp-empty-icon-wrap {
+  margin: 0 auto 12px;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: var(--gp-blue-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gp-blue);
+}
+
+/* ==========================================================================
+ * v4.17.0: RoleSwitcherModal — 多角色切换弹窗（Apple 浅色系）
+ * 设计语言：iOS/macOS 蓝 #007AFF、白底 #FBFBFD、圆角 12-16px、弥散阴影
+ * ========================================================================== */
+
+.role-switcher-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  animation: role-switcher-fade-in 0.2s ease-out;
+}
+
+@keyframes role-switcher-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.role-switcher-modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+  background: var(--gp-bg-card, #FFFFFF);
+  border-radius: 16px;
+  box-shadow: var(--gp-shadow-lg, 0 8px 20px rgba(0,0,0,0.08), 0 24px 60px rgba(0,0,0,0.12));
+  animation: role-switcher-slide-up 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes role-switcher-slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.role-switcher-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid var(--gp-border, rgba(0,0,0,0.08));
+}
+
+.role-switcher-header h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gp-text, #1D1D1F);
+  letter-spacing: -0.01em;
+}
+
+.role-switcher-close {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--gp-bg-card-strong, #F5F5F7);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gp-text-sec, #6E6E73);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.role-switcher-close:hover:not(:disabled) {
+  background: rgba(0, 122, 255, 0.08);
+  color: var(--gp-blue, #007AFF);
+}
+
+.role-switcher-close:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.role-switcher-body {
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.role-switcher-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--gp-blue-bg, rgba(0,122,255,0.08));
+  border-radius: 10px;
+}
+
+.role-switcher-current-label {
+  font-size: 12px;
+  color: var(--gp-text-sec, #6E6E73);
+  font-weight: 500;
+}
+
+.role-switcher-current-value {
+  font-size: 13px;
+  color: var(--gp-blue, #007AFF);
+  font-weight: 700;
+}
+
+.role-switcher-prompt {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gp-text-sec, #6E6E73);
+  font-weight: 500;
+}
+
+.role-switcher-role-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.role-switcher-role-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  background: var(--gp-bg-card, #FFFFFF);
+  border: 1px solid var(--gp-border, rgba(0,0,0,0.08));
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+}
+
+.role-switcher-role-card:hover {
+  border-color: var(--gp-blue, #007AFF);
+  box-shadow: 0 2px 8px rgba(0, 122, 255, 0.08);
+}
+
+.role-switcher-role-card:active {
+  transform: scale(0.99);
+}
+
+.role-switcher-role-card-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.role-switcher-role-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gp-text, #1D1D1F);
+}
+
+.role-switcher-role-desc {
+  font-size: 11px;
+  color: var(--gp-text-faint, #C7C7CC);
+  line-height: 1.4;
+}
+
+.role-switcher-role-icon {
+  color: var(--gp-blue, #007AFF);
+  flex-shrink: 0;
+}
+
+.role-switcher-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.role-switcher-target {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--gp-bg-card-strong, #F5F5F7);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+
+.role-switcher-target-label {
+  font-size: 12px;
+  color: var(--gp-text-sec, #6E6E73);
+}
+
+.role-switcher-target-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gp-text, #1D1D1F);
+  flex: 1;
+}
+
+.role-switcher-target-change {
+  border: none;
+  background: none;
+  color: var(--gp-blue, #007AFF);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+
+.role-switcher-target-change:hover:not(:disabled) {
+  background: var(--gp-blue-bg, rgba(0,122,255,0.08));
+}
+
+.role-switcher-target-change:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.role-switcher-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.role-switcher-field-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gp-text-sec, #6E6E73);
+}
+
+.role-switcher-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--gp-border-strong, rgba(0,0,0,0.12));
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--gp-text, #1D1D1F);
+  background: var(--gp-bg-card, #FFFFFF);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.role-switcher-input:focus {
+  border-color: var(--gp-blue, #007AFF);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.12);
+}
+
+.role-switcher-input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.role-switcher-input-readonly {
+  background: var(--gp-bg-card-strong, #F5F5F7);
+  color: var(--gp-text-sec, #6E6E73);
+  cursor: not-allowed;
+}
+
+.role-switcher-password-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.role-switcher-password-wrapper .role-switcher-input {
+  padding-right: 40px;
+}
+
+.role-switcher-password-toggle {
+  position: absolute;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: none;
+  color: var(--gp-text-faint, #C7C7CC);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.role-switcher-password-toggle:hover {
+  color: var(--gp-blue, #007AFF);
+  background: var(--gp-blue-bg, rgba(0,122,255,0.08));
+}
+
+.role-switcher-error {
+  padding: 10px 12px;
+  background: rgba(255, 59, 48, 0.08);
+  border: 1px solid rgba(255, 59, 48, 0.2);
+  border-radius: 10px;
+  color: var(--gp-rose, #FF3B30);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.role-switcher-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.role-switcher-btn {
+  padding: 9px 18px;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease, transform 0.1s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+}
+
+.role-switcher-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.role-switcher-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.role-switcher-btn-secondary {
+  background: var(--gp-bg-card-strong, #F5F5F7);
+  color: var(--gp-text-sec, #6E6E73);
+}
+
+.role-switcher-btn-secondary:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.role-switcher-btn-primary {
+  background: var(--gp-blue, #007AFF);
+  color: #FFFFFF;
+}
+
+.role-switcher-btn-primary:hover:not(:disabled) {
+  background: #0066D6;
+}
+
+.role-switcher-spinner {
+  animation: role-switcher-spin 0.8s linear infinite;
+}
+
+@keyframes role-switcher-spin {
+  to { transform: rotate(360deg); }
+}
+
+.role-switcher-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--gp-text-faint, #C7C7CC);
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* 移动端适配：弹窗占满宽度并贴底（safe-area-inset-bottom） */
+@media (max-width: 480px) {
+  .role-switcher-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  .role-switcher-modal {
+    max-width: 100%;
+    max-height: 92dvh;
+    border-radius: 20px 20px 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation: role-switcher-slide-up-mobile 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+  @keyframes role-switcher-slide-up-mobile {
+    from { transform: translateY(100%); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  .role-switcher-header,
+  .role-switcher-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .role-switcher-actions {
+    flex-direction: column-reverse;
+  }
+
+  .role-switcher-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 12px 18px;
+  }
+}

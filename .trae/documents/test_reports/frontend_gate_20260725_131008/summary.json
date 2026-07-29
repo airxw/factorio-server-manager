@@ -1,0 +1,44 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "timestamp": "2026-07-25T13:10:08+08:00",
+  "status": "当前不可判定",
+  "evidence_path": "/home/airxw/Documents/gsp/gameserver-panel/.trae/documents/test_reports/frontend_gate_20260725_131008",
+  "summary": "Test1 通过，Test3 通过；Test2 因当前未正式部署且项目约束禁止本地预览站替代验证，无法对新 BUILD 的浏览器级结果形成可靠结论。",
+  "tests": {
+    "test1": {
+      "status": "PASS",
+      "file": "test1_streamlit.log",
+      "details": [
+        "frontend typecheck passed",
+        "MarketingPages.test.tsx passed (2 tests)",
+        "vite build passed",
+        "dist verify passed"
+      ]
+    },
+    "test2": {
+      "status": "当前不可判定",
+      "file": "test2_playwright.log",
+      "failed_cases": [
+        "未部署 BUILD 20260725-011，线上 Playwright 不能验证本次本地样式改动"
+      ]
+    },
+    "test3": {
+      "status": "PASS",
+      "file": "test3_mock_checklist.md",
+      "details": [
+        "no API contract changes",
+        "no mock handler changes required"
+      ]
+    }
+  },
+  "failed_cases": [
+    "Test2 未执行，原因是浏览器级验证缺少可访问的新部署目标"
+  ],
+  "failure_summary": "前端三重闸门未达到“已闭合”，阻断点仅在浏览器级验证目标缺失，不在本地代码质量。",
+  "next_actions": [
+    "按正式部署流程发布 BUILD 20260725-011",
+    "部署后执行 marketing-pages.spec.ts 做浏览器级回归",
+    "使用内置浏览器核对 /、/home、/player 三页首屏是否统一"
+  ],
+  "rerun_entry": "E2E_BASE_URL=https://gsp.ecsrz.com:3001 npm run test:e2e --workspace @gameserver-panel/frontend -- e2e/marketing-pages.spec.ts"
+}

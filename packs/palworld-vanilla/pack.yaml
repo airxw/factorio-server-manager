@@ -1,0 +1,307 @@
+# ============================================================================
+# Palworld Vanilla Pack — GameServer Panel 3.0.0
+# 依据：public/schema/pack-schema.ts（必须通过 zod 校验）
+# 协议：RCON（Palworld 支持标准 Source RCON 协议）
+# 参考：https://tech.palworldgame.com/ + Palworld Wiki
+# verified: 2026-07-24 https://tech.palworldgame.com/ (v1.0 正式版,App ID 2374020)
+#
+# 重要说明:
+#   - Palworld 原版 RCON 不支持发放物品(无 give_item 命令),shop/cdk 设为 disabled
+#   - 命令严格对照官方文档:ShowPlayers/KickPlayer/BanPlayer/Broadcast/Save/Shutdown
+#   - 不做 uMod variant(无原厂支持,避免假数据)
+# ============================================================================
+
+pack:
+  id: palworld-vanilla
+  game: palworld
+  variant: vanilla
+  display_name: 幻兽帕鲁 (专用服务器)
+  version: '1.0'
+
+startup:
+  # Linux 专用服务端启动脚本（Steam App ID: 2374020）
+  binary: './PalServer.sh'
+  args:
+    - '-port={{game_port}}'
+    - '-queryport=27015'
+    - '-server'
+    - '-log'
+    - '-useperf'
+    - '-NoAsyncLoadingThread'
+  working_dir: '{{instance_root}}'
+  # Palworld 就绪日志：服务端世界加载完成
+  ready_pattern: 'World Settings Loaded|StartListenServer'
+  # v4.13.1（2026-07-29）：stop_command 改为 'Shutdown'（无变量）
+  # 原因：doStop 的 RCON 路径（manager.ts:501）未通过 renderTemplate 渲染变量，
+  #       发送字面量 'Shutdown {{seconds}} {{message}}' 会导致 RCON 拒绝。
+  #       Palworld RCON 接受 'Shutdown'（无参数时立即关闭，等同 Shutdown 0）。
+  #       若需延迟关闭+广播消息，可走 sendCommand 调用 commands.shutdown（含变量，由业务层渲染）。
+  stop_command: 'Shutdown'
+  stop_timeout: 30
+  # Palworld 默认游戏端口（UDP）
+  default_game_port: 8211
+  # v4.12.0 步骤8: 端口声明
+  required_ports:
+    - { port: 8211, protocol: udp, name: game, primary: true }
+    - { port: 25575, protocol: tcp, name: rcon, primary: false }
+  # v4.12.0 步骤9: 停止方法
+  stop_method: rcon
+  failure_pattern: 'FATAL|Failed to start|Segmentation fault'
+
+protocol:
+  type: rcon
+  # v4.12.0 步骤4.3: RCON 端口改为 25585 避免与 Minecraft 25575 冲突
+  default_port: 25585
+  auth: password
+  encrypt: none
+  config_key:
+    file: Pal/Saved/Config/LinuxServer/PalWorldSettings.ini
+    enable_key: RCONEnabled
+    port_key: RCONPort
+    password_key: AdminPassword
+
+# Palworld 不使用旧版 config 字段，用 config_files 代替
+# v4.12.0 步骤6: 命令严格对照官方 RCON 文档,移除编造的 /AdminCommand 前缀
+commands:
+  broadcast: 'Broadcast {{message}}'
+  # Palworld 原版 RCON 不支持发放物品 — give_item 留空占位,business.shop.enabled=false
+  give_item: ''
+  kick_player: 'KickPlayer {{player}}'
+  ban_player: 'BanPlayer {{player}}'
+  list_players: 'ShowPlayers'
+  save_world: 'Save'
+  shutdown: 'Shutdown {{seconds}} {{message}}'
+
+versions:
+  # v4.12.0 步骤1/3: 版本源改为 steamcmd:// 协议 + official-site provider
+  source: 'steamcmd://2374020'
+  type: steamcmd
+  eula_required: true
+  eula_file: eula.txt
+  provider: official-site
+  official_url: 'https://tech.palworldgame.com/'
+  version_regex: '(\d+\.\d+(?:\.\d+)?)'
+  fallback_buildid: ''
+  steam_login: anonymous
+
+# ---- 游戏更新 ----
+# v4.12.0 步骤3: Steam 游戏走 steam-install 流程,不需要 install_command/current_version_command
+update:
+  source_url: 'https://tech.palworldgame.com/'
+  download_dir: '{{instance_root}}'
+
+backup:
+  world_dir: Pal/Saved/SaveGames
+  # v4.2.0: Save 命令已迁移至 backupService GAME_BACKUP_PROTOCOLS（通过 sendCommand 发送）
+  pre_backup_commands: []
+  post_backup_commands: []
+
+ui:
+  tabs:
+    # v3.7.0: 对象格式——group/order/require_state
+    # v4.12.0: shop-admin/cdk-admin 移除(原版不支持物品发放)
+    - { tab: console,      group: runtime,  order: 10, require_state: [stopped, starting, running, stopping, error] }
+    - { tab: config-files, group: config,   order: 10, require_state: [stopped, starting, running, error] }
+    - { tab: players,      group: runtime,  order: 40, require_state: [stopped, running, stopping, error] }
+    - { tab: saves,        group: ops,      order: 10, require_state: [stopped, error] }
+    - { tab: mods,         group: ops,      order: 20, require_state: [stopped, error] }
+    - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
+    - { tab: update,       group: ops,      order: 30, require_state: [stopped, error] }
+
+resources:
+  min_ram: '4G'
+  recommended_ram: '8G'
+  min_disk: '5G'
+
+# ============================================================================
+# 扩展字段（pack-schema-extension.json）
+# Palworld 无品质概念：qualities=[], quality_tiers=0
+# ============================================================================
+
+# ---- 物品池配置 ----
+# v4.12.0 步骤5: Palworld 原版 RCON 不支持发放物品,static_list 移除(无意义)。
+# 若未来 uMod 插件支持物品发放,可在此补充真实物品 ID(格式 Item_PalSphere_01 等)。
+items:
+  source:
+    type: static
+  qualities: []
+  quality_tiers: 0
+  categories: []
+  # static_list 留空 — shop/cdk 已禁用,物品池无意义
+
+# ---- stdout 事件解析规则 ----
+event_parsers:
+  chat:
+    pattern: '^\[Chat\] ([^:]+): (.+)$'
+    groups: [player, message]
+  join:
+    pattern: '^([^ ]+) joined the game$'
+    player_group: 1
+  leave:
+    pattern: '^([^ ]+) left the game$'
+    player_group: 1
+
+# ---- 业务能力声明 ----
+# v4.12.0 步骤6: 如实告知 — Palworld 原版 RCON 不支持物品发放
+business:
+  shop:
+    enabled: false                 # 原版不支持 give_item
+    quality_tiers: 0
+    support_quality: false
+  cdk:
+    enabled: false                 # 原版不支持物品发放,CDK 兑换无意义
+  chat_enhancement:
+    welcome:
+      enabled: false               # 无法发放欢迎礼物
+    periodic_messages:
+      enabled: true
+      broadcast_command: 'Broadcast {{message}}'
+    response_rules:
+      enabled: false
+  players:
+    kick_command: 'KickPlayer {{player}}'
+    ban_command: 'BanPlayer {{player}}'
+  lists:
+    banlist_add: 'BanPlayer {{player}}'
+  verify:
+    enabled: true
+
+# ============================================================================
+# Palworld 扩展字段（Factorio 集成扩展字段，全部 optional）
+# ============================================================================
+
+# ---- 多配置文件 ----
+# PalWorldSettings.ini 主配置文件（INI 格式，单行 OptionSettings）
+config_files:
+  - name: palworld-settings
+    path: '{{instance_root}}/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini'
+    format: ini
+    group: server
+    schema:
+      ServerName:
+        type: string
+        description: 服务器名称
+      ServerDescription:
+        type: string
+        description: 服务器描述
+      PublicPort:
+        type: integer
+        description: 公开端口
+      MaxPlayers:
+        type: integer
+        description: 最大玩家数
+      ServerPassword:
+        type: string
+        description: 服务器密码
+        sensitive: true
+      ServerAdminPassword:
+        type: string
+        description: 管理员密码
+        sensitive: true
+      ServerHardcore:
+        type: boolean
+        description: 硬核模式
+      Difficulty:
+        type: string
+        description: 难度
+      RCONEnabled:
+        type: boolean
+        description: 启用 RCON
+      RCONPort:
+        type: integer
+        description: RCON 端口
+      DayTimeSpeedRate:
+        type: number
+        description: 白天时间流速
+      NightTimeSpeedRate:
+        type: number
+        description: 夜晚时间流速
+      ExpRate:
+        type: number
+        description: 经验获取倍率
+      PalCaptureRate:
+        type: number
+        description: 帕鲁捕获倍率
+      PalSpawnNumRate:
+        type: number
+        description: 帕鲁生成数量倍率
+      PalEggDefaultHatchingTime:
+        type: number
+        description: 帕鲁蛋默认孵化时间
+      bEnablePlayerToPlayerDamage:
+        type: boolean
+        description: 启用玩家间伤害
+      bEnableFriendlyFire:
+        type: boolean
+        description: 启用友军伤害
+      bEnableAfkKick:
+        type: boolean
+        description: 启用挂机踢出
+    read_only: false
+
+# ---- 存档管理 ----
+# Palworld 存档目录：Pal/Saved/SaveGames/0/.../Level.sav
+saves:
+  dir: '{{instance_root}}/Pal/Saved/SaveGames'
+  extension: '.sav'
+  create_command: 'Save'
+  activate_command: 'Save'
+
+# ---- 聊天日志解析 ----
+chat_log:
+  pattern: '^\[Chat\] ([^:]+): (.+)$'
+  storage_enabled: true
+  retention_days: 30
+
+# ---- Mod 管理 ----
+# Palworld 通过 UE4SS 加载 PAK mod，文件位于 Pal/Content/Paks/~mods/
+mods:
+  list_file: '{{instance_root}}/Pal/Content/Paks/~mods/mod-list.json'
+  list_format: json
+  dependency_check: false              # UE4SS mod 无标准依赖声明
+  download_enabled: false
+  download_source: 'https://nexusmods.com/palworld/'
+
+# ---- 启动前置引导（首次启动前向导，v4.x 新增）----
+startup_guide:
+  enabled: true
+  steps:
+    - key: world-setup
+      title: 服务器基础设置
+      description: 设置服务器名称与密码（写入 PalWorldSettings.ini）
+      fields:
+        - key: server_name
+          type: server_name
+          label: 服务器名称
+          description: 显示在服务器列表的名称
+          required: true
+          default: 'Palworld Server'
+        - key: server_password
+          type: password
+          label: 服务器密码
+          description: 玩家加入密码（可留空）
+          required: false
+    - key: server-settings
+      title: 服务器设置
+      description: 最大玩家数
+      fields:
+        - key: max_players
+          type: config_ref
+          label: 最大玩家数
+          config_ref:
+            file: palworld-settings
+            key: MaxPlayers
+          required: true
+          default: 32
+          min: 1
+          max: 32
+  config_writes:
+    - field_key: server_name
+      file: palworld-settings
+      config_key: ServerName
+    - field_key: server_password
+      file: palworld-settings
+      config_key: ServerPassword
+    - field_key: max_players
+      file: palworld-settings
+      config_key: MaxPlayers

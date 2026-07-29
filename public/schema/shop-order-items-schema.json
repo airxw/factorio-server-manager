@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/shop-order-items-schema.json",
+  "title": "Shop Order Items Schema",
+  "description": "shop_order_items 表数据契约。订单明细表，记录每个订单包含的物品列表。来源：scheme-final-merged.md §4.2.2 P2。order_id 不变（integer），与 factorio 原表对齐。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "明细主键，自增整数"
+    },
+    "order_id": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "订单 ID，引用 shop_orders.id (integer)。不变（与 factorio 原表对齐）"
+    },
+    "item_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "pattern": "^[a-zA-Z0-9_.-]{1,64}$",
+      "description": "物品名，应 ∈ Pack.items。允许点号（Rust 物品 shortname 用点分隔）"
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999999,
+      "description": "物品数量，1-999999"
+    },
+    "price": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0,
+      "description": "下单时单价快照（点券）。防止后续改价影响历史订单。0=免费"
+    },
+    "quality": {
+      "type": "string",
+      "enum": ["normal", "uncommon", "rare", "epic", "legendary"],
+      "default": "normal",
+      "description": "品质。应 ∈ Pack.items.qualities"
+    }
+  },
+  "required": ["id", "order_id", "item_name", "count", "quality"]
+}

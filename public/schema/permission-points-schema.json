@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/permission-points-schema.json",
+  "title": "Permission Points Schema",
+  "description": "v4.17.0 权限点字典数据契约。权限点（permission_point）是细粒度权限的原子单位，与角色解耦。角色通过 role_permission_templates 引用权限点。来源：docs/plans/binding-unification-multi-role-plan.md §3.3。约 90 个权限点覆盖 30+ 类资源。\n\n[v4.28.0] 新增 9 个腐竹经济域权限点（种子数据见 definitions.predefined_points，来源 docs/plans/role-permission-economy-system-plan.md §1.3）。category 枚举无需变更（wallet/quota/cdk/node 既有类目覆盖）。",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "code": {
+      "type": "string",
+      "pattern": "^[a-z_]+\\.[a-z_]+(\\.[a-z_]+)?$",
+      "maxLength": 64,
+      "description": "权限点代码（PK），命名约定 '<category>.<action>[.<sub_action>]'，如 instance.create / binding.verify / wallet.claim_daily"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "权限点描述（无歧义的人类可读说明）"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "instance",
+        "binding",
+        "wallet",
+        "vip",
+        "user",
+        "node",
+        "asset",
+        "pack",
+        "cdk",
+        "store",
+        "shop",
+        "backup",
+        "save",
+        "mod",
+        "file",
+        "cleanup",
+        "batch",
+        "operation",
+        "chat",
+        "vote",
+        "periodic_message",
+        "player",
+        "lists",
+        "system",
+        "quota",
+        "monitor",
+        "maintenance",
+        "apikey",
+        "ssl",
+        "tunnel",
+        "webhook",
+        "audit",
+        "settings",
+        "discover",
+        "platform_stats"
+      ],
+      "description": "权限点分类（用于 UI 分组展示和管理）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["code", "description", "category", "created_at"],
+  "definitions": {
+    "predefined_points": {
+      "type": "object",
+      "description": "v4.28.0 新增腐竹经济域权限点种子清单（文档参考用，实际落库由 migration 种子脚本执行；与 error-codes-schema.json definitions.predefined_codes 同模式）。角色关联见 role-permission-templates-schema.json definitions.recommended_seed_associations。",
+      "properties": {
+        "admin_wallet.view": {
+          "code": "admin_wallet.view",
+          "category": "wallet",
+          "description": "查看腐竹账户余额与流水（instance_admin 查自己，server_admin 查全部）"
+        },
+        "admin_wallet.withdraw": {
+          "code": "admin_wallet.withdraw",
+          "category": "wallet",
+          "description": "腐竹账户提现申请（仅 instance_admin 本人）"
+        },
+        "admin_wallet.settle": {
+          "code": "admin_wallet.settle",
+          "category": "wallet",
+          "description": "平台执行分账结算（仅 server_admin；含 settlementRunner 手动触发与规则配置）"
+        },
+        "admin_tier.assign": {
+          "code": "admin_tier.assign",
+          "category": "quota",
+          "description": "分配/调整腐竹等级（仅 server_admin）"
+        },
+        "recharge_cdk_batch.create": {
+          "code": "recharge_cdk_batch.create",
+          "category": "cdk",
+          "description": "生成充值 CDK 批次（仅 server_admin；批次可授权给指定 instance_admin）"
+        },
+        "recharge_cdk_batch.audit": {
+          "code": "recharge_cdk_batch.audit",
+          "category": "cdk",
+          "description": "审计充值 CDK 批次（instance_admin 查自己授权批次，server_admin 查全部）"
+        },
+        "platform_fee.collect": {
+          "code": "platform_fee.collect",
+          "category": "wallet",
+          "description": "平台资源费扣收（扣 admin_wallets.balance，针对 node_source=platform_managed 实例）"
+        },
+        "platform_fee.exempt": {
+          "code": "platform_fee.exempt",
+          "category": "wallet",
+          "description": "豁免资源费（自带节点场景，amount_paid=0 写入 instance_renewals 审计快照）"
+        },
+        "node.self_hosted.manage": {
+          "code": "node.self_hosted.manage",
+          "category": "node",
+          "description": "自带节点自主管理（接入申请/进程/文件/备份，需 server_admin 审核通过且 admin_tier ≥ 2）"
+        }
+      }
+    }
+  }
+}

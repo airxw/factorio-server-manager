@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gameserver-panel/public/schema/instance-billing-settings-schema.json",
+  "title": "Instance Billing Settings Schema",
+  "description": "instance_billing_settings 表数据契约。实例计费设置表——每个实例一行的计费配置（类型/覆盖月费/豁免标记/自动续扣）。VPS 式预付费计费的实例级配置。\n\n来源：docs/plans/instance-billing-rules-plan.md §2.2（VPS 式简化定稿，2026-07-28）。\n\n关联契约：\n- instance-type-pricing-schema.json（instance_type 字段引用此表的 instance_type 枚举）\n- server-schema.json（instance_id 引用 servers.id，一对一）\n- instance-renewals-schema.json（last_billing_cycle_months 决定自动续扣周期）\n\n约束：\n- UNIQUE(instance_id)（一对一，每个实例仅一行计费设置）\n- custom_monthly_price=null 时用 instance_type_pricing.monthly_price（类型默认）\n- billing_exempt=true 时所有计费操作返回 amount=0\n- auto_renew_enabled=true 时到期前自动续扣（沿用 last_billing_cycle_months）\n\n免计费判定优先级（见方案 §5）：\n  1. billing_exempt=true → 豁免（exempt_reason 标识原因）\n  2. node_source=self_hosted 且 approval_status=approved → 豁免\n  3. servers.owner_user_id == 操作者 user_id → 豁免（创建时自动设置 billing_exempt=true, exempt_reason='owner_self'）",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "主键，UUID 字符串"
+    },
+    "instance_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "实例 ID，引用 servers.id (string UUID)。UNIQUE 约束：一对一"
+    },
+    "instance_type": {
+      "type": "string",
+      "enum": ["micro", "small", "medium", "large", "xlarge"],
+      "default": "small",
+      "description": "实例类型。引用 instance_type_pricing.instance_type。创建实例时由腐竹选择，后续可更新"
+    },
+    "custom_monthly_price": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "default": null,
+      "description": "实例级覆盖月费（点券）。null=用类型默认月费（instance_type_pricing.monthly_price）；整数=覆盖为指定月费（0=免费实例）。用于大客户特殊定价"
+    },
+    "billing_exempt": {
+      "type": "boolean",
+      "default": false,
+      "description": "免计费标记。true=该实例不计费（amount=0）。创建腐竹自有实例时自动设为 true（exempt_reason='owner_self'）"
+    },
+    "exempt_reason": {
+      "type": ["string", "null"],
+      "enum": ["owner_self", "self_hosted_node", "manual", null],
+      "default": null,
+      "description": "免计费原因。owner_self=腐竹自有实例；self_hosted_node=自带节点；manual=系统管理员手动豁免。仅 billing_exempt=true 时有值"
+    },
+    "auto_renew_enabled": {
+      "type": "boolean",
+      "default": true,
+      "description": "是否启用到期自动续扣。true=到期前自动续扣（沿用 last_billing_cycle_months）；false=需手动续费。首次创建实例时 UI 应明确告知腐竹'将开启自动续扣'"
+    },
+    "last_billing_cycle_months": {
+      "type": ["integer", "null"],
+      "enum": [1, 3, 6, 12, null],
+      "default": null,
+      "description": "上次续费周期（月）。1=月付/3=季付/6=半年付/12=年付。自动续扣沿用此值。null=尚未续费过（首次自动续扣默认 1=月付）"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "创建时间（ISO 8601 字符串）"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "更新时间（ISO 8601 字符串）"
+    }
+  },
+  "required": ["id", "instance_id", "instance_type", "billing_exempt", "auto_renew_enabled", "created_at", "updated_at"]
+}
