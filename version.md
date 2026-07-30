@@ -1,4 +1,45 @@
-4.39.1
+4.39.2
+
+## v4.39.2 (2026-07-31) — PATCH：生产运行时迁移 node dist/（build pipeline 重构）+ fresh install 迁移崩溃修复
+
+**类型：** PATCH（现有构建/部署机制改进 + bug 修复，小版本号 +1，4.39.1 → 4.39.2，bb.md 规则）
+
+**背景：** 落地 v4.39.0 登记的 build pipeline 重构 TODO——生产运行时从 `npx tsx src/index.ts` 迁移到 `node dist/index.js`（esbuild 单文件 bundle），消除 tsx 运行时依赖与 v4.39.0 首次尝试 `node dist/` 失败的两个根因（tsc 嵌套输出路径 + @public 路径别名运行时不可解析）。
+
+**本次变更：**
+
+### 一、build pipeline 重构（Panel Backend + Daemon）
+
+1. **esbuild 单文件 bundle**：
+   - 新增 [panel/backend/scripts/build-dist.mjs](panel/backend/scripts/build-dist.mjs)：应用入口 `src/index.ts` → `dist/index.js`（约 1.6MB）；`--packages=external`（node_modules 保持外部依赖——sqlite3 原生模块 / knex 动态 dialect / pino worker transport 不打入 bundle）；`alias @public` 编译期解析，运行时无别名依赖
+   - 新增 [daemon/scripts/build-dist.mjs](daemon/scripts/build-dist.mjs)：`src/index.ts` → `dist/index.js`（约 180K）；adapters 字面量动态导入自动内联；`package.json` 版本号 import 编译期内联
+   - 两端新增 `build:bundle` / `start:dist` 脚本 + `esbuild ^0.28.1` devDependency
+
+2. **migrations 编译与双模式加载**：
+   - build-dist.mjs 将 `src/db/migrations/*.ts`（29 个）多入口编译至 `dist/db/migrations/*.js`，共享 chunk 隔离至 `dist/db/chunks/`（避免 knex 误载）
+   - [connection.ts](panel/backend/src/db/connection.ts) 新增 `resolveMigrationsConfig()`：按目录存在性自动切换——tsx/dev 模式加载 `src/db/migrations`（.ts），node dist 生产模式加载 `dist/db/migrations`（.js）；启动时自动迁移行为两端一致保留
+
+3. **路径深度修复**：
+   - daemon [ExecutionEngine.ts](daemon/src/modules/execution_engine/ExecutionEngine.ts) schema 路径从 `__dirname` 相对（bundle 后深度变化失效）改为 `process.cwd()` 相对（tsx / node dist / systemd 三模式 cwd 均为 daemon/）
+   - backend changelog-parser.ts 经核实 src 与 dist 同为一级子目录深度，`../../../version.md` 解析天然兼容，无需改动
+
+4. **deploy.sh / systemd 切换**：
+   - `build()` 新增 `npm run build:bundle` 步骤（backend + daemon；保留 `npm run build` tsc 作为类型门禁，esbuild 不做类型检查）
+   - 两个 systemd 单元 `ExecStart` 从 `/usr/bin/npx tsx src/index.ts` 切换为 `/usr/bin/node dist/index.js`，v4.39.0 TODO 注释闭合
+
+### 二、附带缺陷修复：fresh install 迁移崩溃（DEF-008）
+
+- **问题**：迁移 `20260730000006_adjust_pricing_divide_100` 直接 UPDATE `instance_type_pricing` 表，但其文件名时序（2026-07-30）先于建表迁移 `20260830000002`（2026-08-30）。fresh install 时调整迁移先执行 → `SQLITE_ERROR: no such table: instance_type_pricing` → Panel 启动失败。该缺陷自 v4.35.4 起存在于全新安装路径（存量库不受影响，故未被部署暴露），由本次 dist 临时库启动测试首次暴露。
+- **修复**：up/down 均增加 `hasTable` 幂等防护——fresh install 跳过（后续 seed 迁移 `20260830000005` 插入的已是调整后新值），存量库行为不变。与 DEF-006 同类（迁移防护缺失），预防措施已在 defect-log 登记强化。
+
+**验证：**
+
+- backend dist 临时库 fresh install 启动：29 个迁移全部从 `dist/db/migrations`（编译 JS）按序执行成功（含 baseline 113 DDL），服务监听 3999，`/api/health` ok、`/api/version`=4.39.x、`/api/version/changelog` 正常、前端静态 200
+- daemon dist 启动：`/health` ok + version 正确（JSON 内联），`/api/instances` 鉴权双向（带 token 200 / 无 token 401 missing_authorization）
+- 三端 `tsc --noEmit` 0 错误；后端 vitest 705/705 PASS；daemon vitest PASS；前端 build 通过；dist 无 `localhost:3000` / `127.0.0.1:3000` 违规
+- BUILD_ID 更新为 20260731-002；check:version 12 源全绿
+
+---
 
 ## v4.39.1 (2026-07-31) — PATCH：前端清新设计语言对齐（Apple HIG）
 

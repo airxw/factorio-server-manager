@@ -112,3 +112,18 @@
 | 预防措施 | 新增表查询时先核对 baseline schema 实际表名；调度任务连续报错应上升为可见告警而非每日静默 warn |
 | 转化状态 | 已转化 |
 | 转化产物 | scheduler-init.ts:546 + operationsService.ts:386 已改 db('backup_records')；后端 tsc 0 错误 + vitest 705/705 PASS（2026-07-31） |
+
+### DEF-008: fresh install 时 Panel 启动失败：migration 20260730000
+
+| 字段 | 值 |
+|------|-----|
+| ID | DEF-008 |
+| 等级 | P1严重 |
+| 类别 | code |
+| 首次发生版本 | v4.36.0（migration 文件随 749c572 入库） |
+| 现象 | fresh install 时 Panel 启动失败：migration 20260730000006_adjust_pricing_divide_100 报 SQLITE_ERROR: no such table: instance_type_pricing |
+| 根因 | 该迁移文件名时序（20260730）先于建表迁移 20260830000002（20260830），fresh install 按名序先执行 UPDATE 时表尚不存在；迁移缺 hasTable 防护（与 DEF-006 同类），且 fresh install 路径自 v4.35.4 起无测试覆盖 |
+| 解决方案 | 20260730000006 迁移 up/down 增加 hasTable 幂等防护——fresh install 跳过（后续 seed 迁移 20260830000005 插入的已是调整后新值），存量库行为不变 |
+| 预防措施 | 所有直接 UPDATE/DELETE 业务表的迁移必须先 hasTable 防护；fresh install 全链路（空库按文件名序执行全部迁移）已有回归测试覆盖，新增迁移若缺防护会被测试拦截 |
+| 转化状态 | 已转化 |
+| 转化产物 | test:panel/backend/src/db/__tests__/fresh-install-migrations.test.ts（4 用例：空库全链路按序执行 29 迁移不抛错 + seed 调整后定价断言 + 20260730000006 无表跳过 + 存量库 up/down 行为不变）——2026-07-31 验证 4/4 PASS |

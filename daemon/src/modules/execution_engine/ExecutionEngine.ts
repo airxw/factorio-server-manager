@@ -1,10 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import type { IExecutionEngine } from '../../../../public/interface_stub/asset_interfaces.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export interface IInstanceCommandSender {
   sendCommand(id: string, command: string): Promise<string | null>;
@@ -19,7 +15,9 @@ export class ExecutionEngine implements IExecutionEngine {
 
   private loadAllowedPatterns() {
     try {
-      const schemaPath = path.resolve(__dirname, '../../../../public/config_template/commercial_config.schema.json');
+      // v4.39.2: 改为 cwd 相对解析——bundle 后 import.meta.url 深度变化导致
+      // 原 __dirname 相对路径失效；cwd 在 tsx / node dist / systemd 下均为 daemon/
+      const schemaPath = path.resolve(process.cwd(), '../public/config_template/commercial_config.schema.json');
       const content = fs.readFileSync(schemaPath, 'utf8');
       const schema = JSON.parse(content);
       const patterns = schema.properties?.rcon_sandbox_allowed_patterns?.default as string[];

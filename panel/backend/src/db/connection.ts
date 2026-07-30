@@ -14,6 +14,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 let dbInstance: Knex | null = null;
 
 /**
+ * v4.39.2: 迁移目录双模式解析（build pipeline 重构）
+ * - tsx/dev 模式：__dirname = src/db → src/db/migrations（.ts 源文件，tsx 加载）
+ * - node dist 生产模式：__dirname = dist → dist/db/migrations（esbuild 编译的 .js）
+ * 通过目录存在性判定，不依赖硬编码路径假设。
+ */
+function resolveMigrationsConfig(): { directory: string; extension: string } {
+  const bundledDir = path.join(__dirname, 'db', 'migrations');
+  if (fs.existsSync(bundledDir)) {
+    return { directory: bundledDir, extension: 'js' };
+  }
+  return { directory: path.join(__dirname, 'migrations'), extension: 'ts' };
+}
+
+/**
  * 解析 SQLite 数据库文件路径，确保父目录存在
  */
 function resolveDbPath(databaseUrl: string): string {
@@ -49,8 +63,7 @@ export function initDatabase(databaseUrl: string = './data/panel.db'): Knex {
       client: 'pg',
       connection: { connectionString: databaseUrl },
       migrations: {
-        directory: path.join(__dirname, 'migrations'),
-        extension: 'ts',
+        ...resolveMigrationsConfig(),
         // v4.21.1: 旧 v4.17 前的 58 个增量 migration 已归档到 docs/archive/，
         //   baseline_v4_post_demo.ts 接管所有 schema 建立。
         //   knex_migrations 表残留旧记录会导致 validateMigrationList 抛错，
@@ -65,8 +78,7 @@ export function initDatabase(databaseUrl: string = './data/panel.db'): Knex {
       connection: { filename },
       useNullAsDefault: true,
       migrations: {
-        directory: path.join(__dirname, 'migrations'),
-        extension: 'ts',
+        ...resolveMigrationsConfig(),
         disableMigrationsListValidation: true,
       },
     });

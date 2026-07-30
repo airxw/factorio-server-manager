@@ -9,7 +9,13 @@ GSP 是一款面向下一代游戏私服生态的 **B2B2C 商业化 SaaS 操作�
 - **普通用户（玩家）**：体验纯粹的“玩家自助充值门户”，账号绑定、充值消费、自动下发特权与道具一气呵成。
 
 ## 🚀 当前版本
-**v4.39.1** - 前端清新设计语言对齐（Apple HIG） (2026-07-31)
+**v4.39.2** - 生产运行时迁移 node dist/（build pipeline 重构） (2026-07-31)
+- 生产运行时从 `npx tsx src/index.ts` 迁移为 `node dist/index.js`（esbuild 单文件 bundle，Panel + Daemon）
+- migrations 自动编译至 `dist/db/migrations/`，启动迁移双模式自动切换（tsx 开发 / node dist 生产）
+- 修复 fresh install 迁移时序崩溃（DEF-008：adjust_pricing 迁移补 hasTable 防护）
+- deploy.sh build() 新增 build:bundle 步骤，systemd ExecStart 全面切换 node dist/
+
+**上一版本 v4.39.1** - 前端清新设计语言对齐（Apple HIG）
 - 全面对齐苹果清新设计语言，统一圆角三级体系（16px/12px/8px）
 - 移除按钮彩色发光阴影和 hover translateY 跳跃效果
 - 全局行高 1.5 优化中文阅读，字距从 0.18em 降至 0.08em
@@ -670,7 +676,7 @@ A: 检查：
 
 ## 版本
 
-- **当前版本**：4.39.1
+- **当前版本**：4.39.2
 - **基线**：Panel-Daemon 主从集群架构 + 全量业务功能迁移 + 前后端分离架构
 - **多游戏支持**：内置 12 款游戏 Pack，配置驱动、零硬编码
 - **项目主页**：未登录用户访问根路径会跳转到 `/home` 项目介绍主页（深色科技风单页着陆页），已登录用户直接进入实例列表

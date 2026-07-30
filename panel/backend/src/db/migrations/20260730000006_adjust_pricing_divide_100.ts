@@ -44,6 +44,17 @@ const ORIGINAL_PRICES: Record<string, number> = {
 };
 
 export async function up(knex: Knex): Promise<void> {
+  // v4.39.2 修复（fresh install 启动崩溃）：本 migration 文件名时序（20260730）
+  // 先于 20260830000002（建 instance_type_pricing 表）执行，fresh install 时
+  // 直接 UPDATE 会报 SQLITE_ERROR: no such table。fresh install 的 seed
+  // （20260830000005）插入的已是调整后新值，此处无表时跳过即可。
+  if (!(await knex.schema.hasTable('instance_type_pricing'))) {
+    console.log(
+      '[migration 20260730000006] instance_type_pricing 表不存在（fresh install），跳过——seed 已插入调整后定价',
+    );
+    return;
+  }
+
   const now = new Date().toISOString();
   let updated = 0;
 
@@ -60,6 +71,11 @@ export async function up(knex: Knex): Promise<void> {
 }
 
 export async function down(knex: Knex): Promise<void> {
+  // 同 up：fresh install 无表时跳过（无可还原对象）
+  if (!(await knex.schema.hasTable('instance_type_pricing'))) {
+    return;
+  }
+
   const now = new Date().toISOString();
   let restored = 0;
 

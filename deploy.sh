@@ -45,7 +45,7 @@ DAEMON_PORT=8080  # 与 deploy.md 规则 #7 一致，8080 对公网禁用，仅 
 INSTALL_DIR="/opt/gameserver-panel"
 PANEL_USER="gameserver"
 NODE_VERSION="20"
-DEPLOY_VERSION="4.39.1"
+DEPLOY_VERSION="4.39.2"
 
 # 备份目录（P4: update 时备份代码 + DB 到此目录，失败时回滚）
 BACKUP_DIR="$INSTALL_DIR/.backup"
@@ -458,11 +458,14 @@ build() {
 
     log_info "编译后端..."
     cd "$INSTALL_DIR/panel/backend"
+    # tsc 作为类型门禁（esbuild 不做类型检查）；build:bundle 产出生产运行产物 dist/index.js
     npm run build || { log_error "后端编译失败"; return 1; }
+    npm run build:bundle || { log_error "后端打包失败"; return 1; }
 
     log_info "编译 Daemon..."
     cd "$INSTALL_DIR/daemon"
     npm run build || { log_error "Daemon 编译失败"; return 1; }
+    npm run build:bundle || { log_error "Daemon 打包失败"; return 1; }
 
     log_success "构建完成"
 }
@@ -482,9 +485,8 @@ Type=simple
 User=$PANEL_USER
 Group=$PANEL_USER
 WorkingDirectory=$INSTALL_DIR/daemon
-# v4.39.0: tsx（非 watch）作为生产运行时合规——rules-0 §3.1.2 仅禁止 tsx watch / npm run dev
-# TODO: 迁移到 node dist/ 需先重构 build pipeline（rootDir + 路径别名解析 + .ts 扩展名解析）
-ExecStart=/usr/bin/npx tsx src/index.ts
+# v4.39.2: 生产运行时切换为 node dist/（esbuild 单文件 bundle，详见 daemon/scripts/build-dist.mjs）
+ExecStart=/usr/bin/node dist/index.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production
@@ -504,9 +506,8 @@ Type=simple
 User=$PANEL_USER
 Group=$PANEL_USER
 WorkingDirectory=$INSTALL_DIR/panel/backend
-# v4.39.0: tsx（非 watch）作为生产运行时合规——rules-0 §3.1.2 仅禁止 tsx watch / npm run dev
-# TODO: 迁移到 node dist/ 需先重构 build pipeline（rootDir + 路径别名解析 + .ts 扩展名解析）
-ExecStart=/usr/bin/npx tsx src/index.ts
+# v4.39.2: 生产运行时切换为 node dist/（esbuild 单文件 bundle，详见 panel/backend/scripts/build-dist.mjs）
+ExecStart=/usr/bin/node dist/index.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production

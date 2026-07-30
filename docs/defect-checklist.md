@@ -1,7 +1,7 @@
 # 隐患转化检查清单
 
-> 生成时间：2026-07-30 23:04:40
-> 总条目：7（P0: 0 / P1: 2 / P2: 5）
+> 生成时间：2026-07-30 23:43:54
+> 总条目：8（P0: 0 / P1: 3 / P2: 5）
 
 ## P0
 
@@ -20,6 +20,9 @@
 - ✅ `DEF-006` migration 20260823000000_add_link_key_expires_at
   - 转化状态：已转化
   - 转化产物：20260823000000_add_link_key_expires_at_to_nodes 迁移 up/down 均已加 hasColumn 幂等检查（23/46 行），重复执行不再崩溃——2026-07-31 核实
+- ✅ `DEF-008` fresh install 时 Panel 启动失败：migration 20260730000
+  - 转化状态：已转化
+  - 转化产物：test:panel/backend/src/db/__tests__/fresh-install-migrations.test.ts（4 用例：空库全链路按序执行 29 迁移不抛错 + seed 调整后定价断言 + 20260730000006 无表跳过 + 存量库 up/down 行为不变）——2026-07-31 验证 4/4 PASS
 
 ## P2
 
