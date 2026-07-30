@@ -4,7 +4,8 @@
 // 风格：明亮游戏风，感性利益导向
 // ============================================================================
 
-import { lazy, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { lazyWithRetry as lazy } from '../utils/lazyWithRetry';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,

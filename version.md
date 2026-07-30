@@ -1,4 +1,17 @@
-4.36.0
+4.36.1
+
+## v4.36.1 (2026-07-30) — 修复部署后 lazy chunk 加载失败导致页面白屏
+
+**问题：** 部署新版本后，浏览器缓存的旧 index.html 引用了不存在的 chunk hash（如 `AdminDashboard-7cWmUAxh.js`），React `lazy()` 动态导入抛出 `Failed to fetch dynamically imported module`，ErrorBoundary 捕获后显示"页面渲染时发生错误"。用户手动刷新后恢复正常，但首次访问体验受损。
+
+**修复：** 新增 [lazyWithRetry.ts](panel/frontend/src/utils/lazyWithRetry.ts) 工具函数，包装 `React.lazy`：
+- 检测到 chunk 加载失败时，通过 `sessionStorage` 标记防止无限循环，自动 `window.location.reload()` 加载新 HTML
+- App 根组件 mount 成功后清除标记，允许下次部署再次触发
+- 替换 App.tsx + ServerDetailCore/ServerDetailAdmin/ServerDetailStore/PlayerHome/Home 共 6 个文件中所有 `lazy(() => import(...))` 调用
+
+**验证：** tsc 0 错误；前端 316/316 测试全绿；build 通过；dist 无违规地址。
+
+---
 
 ## v4.36.0 (2026-07-30) — 技术债全量治理（38 项债务 11 波落地）+ Pack variant 标签 + Friends 同实例推荐
 
@@ -31,7 +44,15 @@
 **已知遗留（不阻断）：**
 - L8 store_shop_config.ts 命名 / L9 路由测试比 / L16 DST token 占位 → 已登记 `docs/plans/pending-requirements-tech-debt.md`
 - quotaService 注释代码块（L4）保留——决策留痕式保留，合规
-- 本版本未部署，待用户决定部署时机
+
+**追加修复（v4.36.0 部署时一并上线）：**
+
+12. **RCON 连接重试机制**（daemon）：[daemon/src/instances/manager.ts](daemon/src/instances/manager.ts) 新增 `connectRconWithRetry` 方法，解决 Minecraft/Factorio 等"ready_pattern 先于 RCON 端口就绪"的时序 bug。
+    - **根因**：daemon 在 ready_pattern 命中后立即连接 RCON，但此时 RCON 端口可能还未绑定（毫秒级差异），导致 `ECONNREFUSED`，命令通道永久不可用（发送 `list` 报错）。
+    - **修复策略**：仅对 `ECONNREFUSED` 重试（端口未就绪），密码错误/超时不重试；5 次重试，间隔 1s/2s/3s/4s/5s（总最长 15s）；每次重试前检查实例状态是否仍为 running（停止时取消）；连接成功后才设置 `instance.protocol`。
+    - **验证**：Minecraft 实例启动后发送 `list` 命令成功返回 `There are 0 of a max of 20 players online:`（内置浏览器核对通过）。
+
+**部署状态：** 已部署至生产（2026-07-30），s0701 前置自检 7 项全通过，健康检查通过，RCON 命令验证通过。
 
 ---
 

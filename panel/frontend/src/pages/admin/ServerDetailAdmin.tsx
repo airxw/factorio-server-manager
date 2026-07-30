@@ -10,7 +10,8 @@
 // v4.36.0-B6: 改为直接消费 ServerDetailCore（pages/ServerDetail 降为兼容再导出层）。
 // ============================================================================
 
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
+import { lazyWithRetry as lazy } from '../../utils/lazyWithRetry';
 import { Skeleton } from '../../components/ui';
 
 const ServerDetailCore = lazy(() => import('../instance-detail/ServerDetailCore'));

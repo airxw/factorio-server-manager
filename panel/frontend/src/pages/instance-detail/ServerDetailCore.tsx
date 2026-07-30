@@ -8,7 +8,6 @@
 
 import {
   Suspense,
-  lazy,
   useCallback,
   useEffect,
   useMemo,
@@ -17,6 +16,7 @@ import {
   type ReactNode,
   type KeyboardEvent,
 } from 'react';
+import { lazyWithRetry as lazy } from '../../utils/lazyWithRetry';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { RefreshCw, AlertTriangle, Pencil, Wallet } from 'lucide-react';
 import type { InstanceState } from '@public/schema/daemon-api-types';

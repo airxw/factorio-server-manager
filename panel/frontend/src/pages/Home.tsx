@@ -4,7 +4,8 @@
 // BUILD: 见 buildInfo.ts（BUILD_ID 单一来源）
 // ============================================================================
 
-import { lazy, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { lazyWithRetry as lazy } from '../utils/lazyWithRetry';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowRight,

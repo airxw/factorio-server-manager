@@ -12,7 +12,8 @@
 // 重定向：/servers/* → /instances/*，已移除的 /admin/* 子页 → /instances
 // ============================================================================
 
-import { lazy, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+import { lazyWithRetry as lazy, clearChunkReloadFlag } from './utils/lazyWithRetry';
 import { Navigate, Outlet, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './api/auth';
 import Layout from './components/Layout';
@@ -306,6 +307,11 @@ function InstanceListRoleRedirect() {
 }
 
 export default function App() {
+  // 部署后首次加载成功 → 清除 chunk 刷新标记，允许下次部署再次触发自动刷新
+  useEffect(() => {
+    clearChunkReloadFlag();
+  }, []);
+
   return (
     <AuthProvider>
       <AppVersionProvider>
