@@ -291,7 +291,12 @@ export default function Packs() {
                 <tr key={p.id}>
                   <td className="mono">{p.id}</td>
                   <td>{p.game}</td>
-                  <td>{p.variant}</td>
+                  <td>
+                    {/* v4.36.0-D7: 变体标签化，便于区分同 game 的不同变体（vanilla/tshock） */}
+                    <span className="badge badge-variant" title={`Pack 变体：${p.variant}`}>
+                      {p.variant}
+                    </span>
+                  </td>
                   <td>{p.display_name}</td>
                   <td className="mono">{p.version}</td>
                   <td>

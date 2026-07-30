@@ -9,6 +9,17 @@ GSP 是一款面向下一代游戏私服生态的 **B2B2C 商业化 SaaS 操作�
 - **普通用户（玩家）**：体验纯粹的“玩家自助充值门户”，账号绑定、充值消费、自动下发特权与道具一气呵成。
 
 ## 🚀 当前版本
+**v4.36.0** - 技术债全量治理（38 项债务 11 波落地）+ Pack variant 标签 + Friends 同实例推荐 (2026-07-30)
+- 38 项技术债（7 高/14 中/17 低）按方案 B 分 11 波全部落地：git 基线、daemon 编译修复、契约漂移统一、孤岛接入、资金测试补齐、E2E 修复、文档归档
+- ServerDetail 抽离 ServerDetailCore（Admin/Store 包装复用），VirtualTable 虚拟滚动推广到审计日志/用户/绑定三列表
+- 新功能：Packs 列表 variant 标签徽章；Friends 同实例玩家推荐（`GET /api/friends/recommendations` + 前端推荐区块）
+- 三端 tsc 0 错误；后端 682/682、前端 316/316 单测全绿；build 无违规地址；check:version 12 源全对齐
+
+**v4.35.x** - VPS 式预付费实例计费 + 定价校准 + Minecraft/Factorio Pack 修复 (2026-07-30)
+- 实例创建接入预付费扣款（类型定价 × 周期折扣 × VIP 折扣），CreateServer 实时价格预览，ServerDetail 计费/续费管理
+- 默认定价整体除以 100（micro=15 点券/月起），migration 幂等更新 + down 可还原
+- Minecraft Pack 升级 OpenJDK 25 兼容 26.2；Factorio server-settings 默认值修正（visibility.public=false）
+
 **v4.34.0** - Mod 管理多游戏自适应（修复 Mod 系统仅支持 Minecraft 的问题）(2026-07-30)
 - Mod 系统从 Minecraft 专用扩展为支持 9 款游戏的自适应架构
 - 契约扩展 `PackModsSchema` 新增 `mechanism` / `file_extensions` / `mods_dir` 字段（向后兼容）

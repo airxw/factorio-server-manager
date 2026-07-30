@@ -1000,15 +1000,82 @@ export class InstanceManager {
     const ctx = this.buildProtocolContext(pack, instance);
     if (ctx) {
       const protocol = ProtocolFactory.create(pack.protocol, ctx);
-      instance.protocol = protocol;
-      // RCON 需要异步建连；stdin connect 为空操作
-      protocol.connect().catch((err: unknown) => {
-        // RCON 建连失败不阻断 running，命令通道降级为不可用（sendCommand 抛错）
+      // v4.35.4: RCON 连接失败后带重试（指数退避），解决 Minecraft 等"ready_pattern
+      //   先于 RCON 端口就绪"的时序问题。stdin connect 为空操作不会失败。
+      //   - 重试条件：仅 ECONNREFUSED（端口未就绪），密码错误等不重试
+      //   - 重试次数：5 次（1s/2s/3s/4s/5s，总最长 15s）
+      //   - 实例停止时取消重试（检查 status !== 'running'）
+      //   - 重试期间不设置 instance.protocol（sendCommand 报 "no protocol"）
+      this.connectRconWithRetry(instance.id, protocol).catch((err: unknown) => {
         this.logger.warn(
           { instance_id: instance.id, err: String(err) },
-          'protocol connect failed; command channel unavailable',
+          'protocol connect failed (all retries exhausted); command channel unavailable',
         );
       });
+    }
+  }
+
+  /**
+   * v4.35.4: RCON 连接带重试（解决 ready_pattern 先于 RCON 端口就绪的时序问题）。
+   *
+   * 场景：Minecraft 的 `Done (Xs)!` 日志与 `RCON running` 几乎同时输出，
+   *   但 daemon 在 ready_pattern 命中后立即连接 RCON 时，端口可能还未绑定（毫秒级差异）。
+   *   Factorio 也有类似情况：ready_pattern `to(InGame)` 先于 RCON 监听就绪。
+   *
+   * 重试策略：
+   *   - 仅对 ECONNREFUSED 重试（端口未就绪），密码错误/超时/其他错误不重试
+   *   - 5 次重试，间隔 1s/2s/3s/4s/5s（总最长 15s）
+   *   - 每次重试前检查实例状态是否仍为 running（停止时取消）
+   *   - 连接成功后设置 instance.protocol
+   */
+  private async connectRconWithRetry(
+    instanceId: string,
+    protocol: import('@public/interface_stub/command-protocol').CommandProtocol,
+  ): Promise<void> {
+    const MAX_RETRIES = 5;
+    const BASE_DELAY_MS = 1000;
+    const isRetryable = (err: unknown): boolean => {
+      const msg = String(err);
+      // ECONNREFUSED = 端口未就绪（可重试）；ECONNRESET/密码错误/超时 = 不可重试
+      return msg.includes('ECONNREFUSED');
+    };
+    const isInstanceRunning = (): boolean => {
+      const record = this.managed.get(instanceId);
+      return record?.instance.status === 'running';
+    };
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      // 实例已停止 → 取消重试
+      if (!isInstanceRunning()) {
+        throw new Error(`instance ${instanceId} no longer running; aborting RCON connect`);
+      }
+
+      try {
+        await protocol.connect();
+        // 连接成功：设置 instance.protocol 供 sendCommand 使用
+        const record = this.managed.get(instanceId);
+        if (record && record.instance.status === 'running') {
+          record.instance.protocol = protocol;
+          this.logger.info(
+            { instance_id: instanceId, attempt: attempt + 1 },
+            'protocol connect succeeded; command channel ready',
+          );
+        } else {
+          // 连接成功但实例已停止 → 立即断开
+          await protocol.disconnect().catch(() => {});
+        }
+        return;
+      } catch (err) {
+        if (!isRetryable(err) || attempt === MAX_RETRIES) {
+          throw err;
+        }
+        const delay = BASE_DELAY_MS * (attempt + 1);
+        this.logger.info(
+          { instance_id: instanceId, attempt: attempt + 1, delay_ms: delay, err: String(err) },
+          'protocol connect failed (ECONNREFUSED); retrying',
+        );
+        await new Promise((r) => setTimeout(r, delay));
+      }
     }
   }
 

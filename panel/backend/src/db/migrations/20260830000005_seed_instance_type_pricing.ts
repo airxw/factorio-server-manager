@@ -9,13 +9,14 @@
 // 默认定价（与 instance-billing-mock.ts DEFAULT_TYPE_PRICINGS 对齐）：
 //   | 类型    | 月费（点券） | 季付折扣 | 半年付折扣 | 年付折扣 | 推荐人数 |
 //   |---------|------------|---------|-----------|---------|---------|
-//   | micro   | 1500       | 0.95    | 0.90      | 0.80    | 5       |
-//   | small   | 3000       | 0.95    | 0.90      | 0.80    | 15      |
-//   | medium  | 9000       | 0.95    | 0.90      | 0.80    | 30      |
-//   | large   | 24000      | 0.95    | 0.90      | 0.80    | 60      |
-//   | xlarge  | 60000      | 0.95    | 0.90      | 0.80    | 120     |
+//   | micro   | 15         | 0.95    | 0.90      | 0.80    | 5       |
+//   | small   | 30         | 0.95    | 0.90      | 0.80    | 15      |
+//   | medium  | 90         | 0.95    | 0.90      | 0.80    | 30      |
+//   | large   | 240        | 0.95    | 0.90      | 0.80    | 60      |
+//   | xlarge  | 600        | 0.95    | 0.90      | 0.80    | 120     |
 //
 // 100 点券 = 1 元，所有金额为整数点券。
+// v4.35.1: 原 v4.35.0 定价（1500/3000/9000/24000/60000）整体除以 100 调整为现值。
 //
 // 兼容性：
 //   - up：仅当表为空时 INSERT（幂等）
@@ -47,7 +48,7 @@ const SEED_DATA: TypePricingSeed[] = [
     id: 'seed-tp-micro',
     instance_type: 'micro',
     display_name: '微型',
-    monthly_price: 1500,
+    monthly_price: 15,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,
@@ -61,7 +62,7 @@ const SEED_DATA: TypePricingSeed[] = [
     id: 'seed-tp-small',
     instance_type: 'small',
     display_name: '小型',
-    monthly_price: 3000,
+    monthly_price: 30,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,
@@ -75,7 +76,7 @@ const SEED_DATA: TypePricingSeed[] = [
     id: 'seed-tp-medium',
     instance_type: 'medium',
     display_name: '标准',
-    monthly_price: 9000,
+    monthly_price: 90,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,
@@ -89,7 +90,7 @@ const SEED_DATA: TypePricingSeed[] = [
     id: 'seed-tp-large',
     instance_type: 'large',
     display_name: '大型',
-    monthly_price: 24000,
+    monthly_price: 240,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,
@@ -103,7 +104,7 @@ const SEED_DATA: TypePricingSeed[] = [
     id: 'seed-tp-xlarge',
     instance_type: 'xlarge',
     display_name: '超大',
-    monthly_price: 60000,
+    monthly_price: 600,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,

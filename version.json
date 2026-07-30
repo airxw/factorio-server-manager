@@ -1,6 +1,6 @@
 {
-  "version": "4.34.0",
-  "daemon": "4.34.0",
-  "panel_backend": "4.34.0",
-  "panel_frontend": "4.34.0"
+  "version": "4.36.0",
+  "daemon": "4.36.0",
+  "panel_backend": "4.36.0",
+  "panel_frontend": "4.36.0"
 }

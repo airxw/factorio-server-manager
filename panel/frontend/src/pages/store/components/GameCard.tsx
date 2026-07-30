@@ -1,5 +1,5 @@
 import React from 'react';
-import { Download, Info, Server } from 'lucide-react';
+import { Download, Info } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import type { PackSummary } from '@public/schema/panel-api-types';
@@ -80,13 +80,16 @@ export const GameCard: React.FC<GameCardProps> = ({ pack, onClickInstall }) => {
               >
                 {pack.display_name}
               </h4>
-              <p className="mt-1 flex items-center text-sm text-slate-500 dark:text-slate-400">
-                <Server className="mr-1.5 h-4 w-4" />
-                {pack.variant}
-              </p>
             </div>
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
+            {/* v4.36.0-D7: 变体标签（描边 chip，与版本/UI 填充 chip 区分，如 vanilla/tshock） */}
+            <span
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-600 dark:border-slate-600 dark:bg-transparent dark:text-slate-300"
+              title={`Pack 变体：${pack.variant}`}
+            >
+              {pack.variant}
+            </span>
             <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
               v{pack.version}
             </span>

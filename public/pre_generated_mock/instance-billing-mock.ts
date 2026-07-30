@@ -47,13 +47,14 @@ import {
 /** 默认 days_per_month（与 system_config.instance.billing.days_per_month 默认值一致） */
 const DEFAULT_DAYS_PER_MONTH = 30;
 
-/** 默认 5 种类型定价（与模块B seed_instance_type_pricing 对齐） */
+/** 默认 5 种类型定价（与模块B seed_instance_type_pricing 对齐）
+ * v4.35.1: 原 v4.35.0 定价整体除以 100（用户反馈过贵） */
 const DEFAULT_TYPE_PRICINGS: InstanceTypePricing[] = [
   {
     id: 'mock-tp-micro',
     instance_type: 'micro',
     display_name: '微型',
-    monthly_price: 1500,
+    monthly_price: 15,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,
@@ -71,7 +72,7 @@ const DEFAULT_TYPE_PRICINGS: InstanceTypePricing[] = [
     id: 'mock-tp-small',
     instance_type: 'small',
     display_name: '小型',
-    monthly_price: 3000,
+    monthly_price: 30,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,
@@ -89,7 +90,7 @@ const DEFAULT_TYPE_PRICINGS: InstanceTypePricing[] = [
     id: 'mock-tp-medium',
     instance_type: 'medium',
     display_name: '标准',
-    monthly_price: 9000,
+    monthly_price: 90,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,
@@ -107,7 +108,7 @@ const DEFAULT_TYPE_PRICINGS: InstanceTypePricing[] = [
     id: 'mock-tp-large',
     instance_type: 'large',
     display_name: '大型',
-    monthly_price: 24000,
+    monthly_price: 240,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,
@@ -125,7 +126,7 @@ const DEFAULT_TYPE_PRICINGS: InstanceTypePricing[] = [
     id: 'mock-tp-xlarge',
     instance_type: 'xlarge',
     display_name: '超大',
-    monthly_price: 60000,
+    monthly_price: 600,
     quarterly_discount: 0.95,
     semiannual_discount: 0.9,
     annual_discount: 0.8,

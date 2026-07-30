@@ -5,13 +5,18 @@
 // - 待处理请求（GET /api/friends/pending）：发送者 + 接受/拒绝
 // - 在线好友筛选（GET /api/friends/online）：切换显示在线好友
 // - 添加好友入口：输入用户 ID + 发送请求
+// - 推荐好友（v4.36.0-D8）：GET /api/friends/recommendations 同实例已绑定玩家推荐
 // 注：Friendship 契约不含 vip/online 字段，在线状态由 /friends/online 列表派生
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { UserPlus, Users } from 'lucide-react';
-import type { Friendship, PendingFriendRequest } from '@public/schema/panel-api-types';
+import type {
+  FriendRecommendation,
+  Friendship,
+  PendingFriendRequest,
+} from '@public/schema/panel-api-types';
 import { useAuth } from '../api/auth';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { EmptyState, ErrorState, Skeleton, useToast } from '../components/ui';
@@ -38,6 +43,8 @@ export default function Friends() {
   const [friends, setFriends] = useState<Friendship[]>([]);
   const [pending, setPending] = useState<PendingFriendRequest[]>([]);
   const [onlineIds, setOnlineIds] = useState<Set<string>>(new Set());
+  // v4.36.0-D8: 同实例玩家推荐
+  const [recommendations, setRecommendations] = useState<FriendRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('all');
@@ -47,21 +54,25 @@ export default function Friends() {
   const [sending, setSending] = useState(false);
   // 操作中的好友 ID（accept/reject/remove），禁用对应按钮
   const [actioningId, setActioningId] = useState<string | null>(null);
+  // 推荐区添加中的用户 ID
+  const [addingId, setAddingId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [friendsRes, pendingRes, onlineRes] = await Promise.all([
+      const [friendsRes, pendingRes, onlineRes, recRes] = await Promise.all([
         api.listFriends(),
         api.listPendingFriendRequests(),
         api.listOnlineFriends(),
+        api.listFriendRecommendations(),
       ]);
       setFriends(friendsRes.friends);
       setPending(pendingRes.requests);
       // 在线好友按 friend_user_id 收集（listOnlineFriends 返回的 Friendship 中
       // friend_user_id 是当前用户的在线好友）
       setOnlineIds(new Set(onlineRes.friends.map((f) => f.friend_user_id)));
+      setRecommendations(recRes.recommendations);
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载好友列表失败');
     } finally {
@@ -162,6 +173,20 @@ export default function Friends() {
       toast.error('删除好友失败', err instanceof Error ? err.message : String(err));
     } finally {
       setActioningId(null);
+    }
+  };
+
+  // v4.36.0-D8: 推荐区一键发送好友请求（成功后该用户因 pending 关系被排除出推荐）
+  const handleAddRecommendation = async (rec: FriendRecommendation) => {
+    setAddingId(rec.user_id);
+    try {
+      await api.sendFriendRequest(rec.user_id);
+      toast.success(`已向「${rec.username}」发送好友请求`);
+      await refresh();
+    } catch (err) {
+      toast.error('发送好友请求失败', err instanceof Error ? err.message : String(err));
+    } finally {
+      setAddingId(null);
     }
   };
 
@@ -364,13 +389,64 @@ export default function Friends() {
             )}
           </div>
 
-          {/* 推荐好友区（无后端支持，显示提示） */}
+          {/* 推荐好友区（v4.36.0-D8：同实例已绑定玩家推荐） */}
           <div className="info-card">
-            <h3 className="card-title">推荐好友</h3>
-            <EmptyState
-              title="推荐功能暂未开放"
-              description="同实例玩家推荐功能尚在开发中，可先通过用户 ID 添加好友。"
-            />
+            <h3 className="card-title">推荐好友（{recommendations.length}）</h3>
+            {recommendations.length === 0 ? (
+              <EmptyState
+                title="暂无可推荐玩家"
+                description="与你在同一游戏实例中绑定过玩家角色的用户会出现在这里。"
+              />
+            ) : (
+              <div className="table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>用户名</th>
+                      <th>共同实例</th>
+                      <th className="col-actions">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {recommendations.map((rec) => (
+                      <tr key={rec.user_id}>
+                        <td className="cell-name">
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/players/${rec.user_id}`)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              padding: 0,
+                              color: 'var(--color-primary, #2563eb)',
+                              cursor: 'pointer',
+                              font: 'inherit',
+                            }}
+                          >
+                            {rec.username}
+                          </button>
+                        </td>
+                        <td>
+                          <span className="badge">{rec.shared_instance_count} 个</span>{' '}
+                          <span className="muted" style={{ fontSize: 12 }}>
+                            {rec.shared_server_names.join('、')}
+                          </span>
+                        </td>
+                        <td className="col-actions">
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => void handleAddRecommendation(rec)}
+                            disabled={addingId === rec.user_id}
+                          >
+                            {addingId === rec.user_id ? '发送中…' : '加好友'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       )}

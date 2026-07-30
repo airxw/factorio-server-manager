@@ -1,5 +1,16 @@
 # 契约变更记录 (Changelog)
 
+## [v4.36.0] - 2026-07-30 - 好友推荐契约（D8 同实例玩家推荐）
+
+> **变更类型**: MINOR（新增 2 个 TS 类型，向后兼容，无破坏性变更）
+> **决策来源**: `docs/plans/tech-debt-remediation-plan.md`（W9-D8，人类 2026-07-29 整体授权）
+
+### 一、MINOR：好友推荐类型
+
+- 新增 `FriendRecommendation`（同实例已绑定玩家推荐项：`user_id / username / shared_instance_count / shared_server_names`）。
+- 新增 `FriendRecommendationsResponse`（`GET /api/friends/recommendations` 响应包裹）。
+- **规则**：与当前用户在同一实例持有 verified 玩家绑定（`bindings.binding_type='player', scope_type='instance'`）的其他用户，排除已是好友/待处理/已拉黑。最小落地，不做算法推荐。
+
 ## [v4.33.0] - 2026-07-29 - 技术债治理：契约漂移统一（s0601）
 
 > **变更类型**: MAJOR ×1（VerifyBindingViaWebhookRequest 删字段）+ MINOR ×3（新增类型/契约文件，向后兼容）

@@ -1249,6 +1249,13 @@ a.cell-name:focus-visible {
   color: #374151;
 }
 
+/* v4.36.0-D7: Pack 变体标签（中性描边，区别于状态色 badge，如 vanilla/tshock） */
+.badge-variant {
+  background: transparent;
+  border: 1px solid var(--color-border, #d2d2d7);
+  color: var(--color-text, #1d1d1f);
+}
+
 .badge-stopped {
   background: #e5e7eb;
   color: #4b5563;

@@ -1,6 +1,8 @@
 ---
-status: approved-for-execution
+status: completed
 created: 2026-07-29
+completed: 2026-07-30
+released_in: v4.36.0
 source_scan: .trae/documents/tech-debt-scan-20260729.md
 authorization: 人类 2026-07-29 裁决「方案审批后批量执行 + 方案论证后直接修，不要问我」（对全部 38 项债务的整体显式授权；public/ 契约变更走 s0601 分析流程）
 ---

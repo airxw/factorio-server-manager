@@ -24,6 +24,7 @@ import { useAuth } from '../../api/auth';
 import { PanelApiError } from '../../api/client';
 import { getEffectiveRole, isAdminRole } from '../../utils/role';
 import { ListSkeleton, MobileCardList, Pagination } from '../../components/ui';
+import VirtualTable, { type VirtualColumn } from '../../components/VirtualTable';
 
 /** 批量操作单次上限（与后端硬约束对齐） */
 const BATCH_LIMIT = 100;
@@ -519,179 +520,208 @@ export default function Users() {
       ) : (
         <>
         <div className="desktop-only">
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th className="col-checkbox">
-                  <input
-                    type="checkbox"
-                    aria-label="全选当前过滤结果"
-                    checked={allFilteredSelected}
-                    onChange={toggleSelectAll}
-                    disabled={selectableFilteredIds.length === 0}
-                  />
-                </th>
-                <th>Email</th>
-                <th>用户名</th>
-                <th>角色</th>
-                <th>状态</th>
-                <th>显示名</th>
-                <th>创建时间</th>
-                <th className="col-actions">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((u) => {
-                const isEditing = editingId === u.id;
+        {(() => {
+          // v4.36.0-B5: 桌面表格迁移 VirtualTable（与 AuditLogs 对齐，行高动态测量）
+          const columns: VirtualColumn<AdminUserSummary>[] = [
+            {
+              key: 'select',
+              header: (
+                <input
+                  type="checkbox"
+                  aria-label="全选当前过滤结果"
+                  checked={allFilteredSelected}
+                  onChange={toggleSelectAll}
+                  disabled={selectableFilteredIds.length === 0}
+                />
+              ),
+              width: '44px',
+              render: (u) => {
                 const isDeleted = u.status === 'deleted';
                 const selectable = isSelectable(u);
                 return (
-                  <tr key={u.id} className={isDeleted ? 'row-disabled' : undefined}>
-                    <td className="col-checkbox">
-                      <input
-                        type="checkbox"
-                        aria-label={`选择用户 ${u.username}`}
-                        checked={selectedIds.has(u.id)}
-                        onChange={() => toggleSelectOne(u.id)}
-                        disabled={!selectable}
-                        title={
-                          u.id === user?.id
-                            ? '不能选择自己'
-                            : u.is_built_in === 1
-                              ? '系统内置账号不可批量操作'
-                              : isDeleted
-                                ? '已删除用户不可选'
-                                : undefined
-                        }
-                      />
-                    </td>
-                    <td>
-                      {u.email}
-                      {/* v4.0.2: 演示账号（系统内置）展示 🔒 标识 */}
-                      {u.is_built_in === 1 && (
-                        <span
-                          className="badge badge-built-in"
-                          title="系统内置账号，密码不可修改（演示场景）"
-                          style={{ marginLeft: 8 }}
-                        >
-                          🔒 系统内置
-                        </span>
-                      )}
-                    </td>
-                    <td>{u.username}</td>
-                    <td>
-                      {isEditing ? (
-                        <select
-                          value={draft.role ?? u.role}
-                          onChange={(e) =>
-                            setDraft((d) => ({ ...d, role: e.target.value as UserRole }))
-                          }
-                        >
-                          {ROLE_OPTIONS.map((r) => (
-                            <option key={r} value={r}>
-                              {ROLE_LABEL[r]}（{r}）
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span className="badge" title={u.role}>
-                          {ROLE_LABEL[u.role] ?? u.role}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {isEditing ? (
-                        <select
-                          value={draft.status ?? u.status}
-                          onChange={(e) =>
-                            setDraft((d) => ({
-                              ...d,
-                              status: e.target.value as 'active' | 'disabled',
-                            }))
-                          }
-                        >
-                          {STATUS_OPTIONS.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span
-                          className={
-                            isDeleted
-                              ? 'badge badge-error'
-                              : u.status === 'active'
-                                ? 'badge badge-running'
-                                : 'badge badge-error'
-                          }
-                        >
-                          {u.status}
-                        </span>
-                      )}
-                    </td>
-                    <td>
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={draft.display_name ?? ''}
-                          placeholder="留空表示无"
-                          onChange={(e) =>
-                            setDraft((d) => ({ ...d, display_name: e.target.value || null }))
-                          }
-                        />
-                      ) : (
-                        (u.display_name ?? '—')
-                      )}
-                    </td>
-                    <td>{new Date(u.created_at).toLocaleString('zh-CN')}</td>
-                    <td className="col-actions">
-                      {isEditing ? (
-                        <>
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => void handleSave(u.id)}
-                            disabled={saving}
-                          >
-                            保存
-                          </button>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={cancelEdit}
-                            disabled={saving}
-                          >
-                            取消
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => startEdit(u)}
-                            disabled={isDeleted}
-                          >
-                            编辑
-                          </button>
-                          {isServerAdmin && !isDeleted && (
-                            <button
-                              className="btn btn-danger btn-sm"
-                              onClick={() => confirmDelete(u.id)}
-                              disabled={u.id === user?.id}
-                              title={u.id === user?.id ? '不能删除自己' : '软删除该用户'}
-                            >
-                              删除
-                            </button>
-                          )}
-                        </>
-                      )}
-                    </td>
-                  </tr>
+                  <input
+                    type="checkbox"
+                    aria-label={`选择用户 ${u.username}`}
+                    checked={selectedIds.has(u.id)}
+                    onChange={() => toggleSelectOne(u.id)}
+                    disabled={!selectable}
+                    title={
+                      u.id === user?.id
+                        ? '不能选择自己'
+                        : u.is_built_in === 1
+                          ? '系统内置账号不可批量操作'
+                          : isDeleted
+                            ? '已删除用户不可选'
+                            : undefined
+                    }
+                  />
                 );
-              })}
-            </tbody>
-          </table>
-        </div>
+              },
+            },
+            {
+              key: 'email',
+              header: 'Email',
+              width: '1.6fr',
+              render: (u) => (
+                <>
+                  {u.email}
+                  {/* v4.0.2: 演示账号（系统内置）展示 🔒 标识 */}
+                  {u.is_built_in === 1 && (
+                    <span
+                      className="badge badge-built-in"
+                      title="系统内置账号，密码不可修改（演示场景）"
+                      style={{ marginLeft: 8 }}
+                    >
+                      🔒 系统内置
+                    </span>
+                  )}
+                </>
+              ),
+            },
+            { key: 'username', header: '用户名', width: '1fr', render: (u) => u.username },
+            {
+              key: 'role',
+              header: '角色',
+              width: '1.3fr',
+              render: (u) => {
+                const isEditing = editingId === u.id;
+                return isEditing ? (
+                  <select
+                    value={draft.role ?? u.role}
+                    onChange={(e) => setDraft((d) => ({ ...d, role: e.target.value as UserRole }))}
+                  >
+                    {ROLE_OPTIONS.map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABEL[r]}（{r}）
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="badge" title={u.role}>
+                    {ROLE_LABEL[u.role] ?? u.role}
+                  </span>
+                );
+              },
+            },
+            {
+              key: 'status',
+              header: '状态',
+              width: '0.9fr',
+              render: (u) => {
+                const isEditing = editingId === u.id;
+                const isDeleted = u.status === 'deleted';
+                return isEditing ? (
+                  <select
+                    value={draft.status ?? u.status}
+                    onChange={(e) =>
+                      setDraft((d) => ({
+                        ...d,
+                        status: e.target.value as 'active' | 'disabled',
+                      }))
+                    }
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span
+                    className={
+                      isDeleted
+                        ? 'badge badge-error'
+                        : u.status === 'active'
+                          ? 'badge badge-running'
+                          : 'badge badge-error'
+                    }
+                  >
+                    {u.status}
+                  </span>
+                );
+              },
+            },
+            {
+              key: 'display_name',
+              header: '显示名',
+              width: '1.1fr',
+              render: (u) => {
+                const isEditing = editingId === u.id;
+                return isEditing ? (
+                  <input
+                    type="text"
+                    value={draft.display_name ?? ''}
+                    placeholder="留空表示无"
+                    onChange={(e) =>
+                      setDraft((d) => ({ ...d, display_name: e.target.value || null }))
+                    }
+                  />
+                ) : (
+                  (u.display_name ?? '—')
+                );
+              },
+            },
+            {
+              key: 'created_at',
+              header: '创建时间',
+              width: '1.3fr',
+              render: (u) => new Date(u.created_at).toLocaleString('zh-CN'),
+            },
+            {
+              key: 'actions',
+              header: '操作',
+              width: '1.4fr',
+              render: (u) => {
+                const isEditing = editingId === u.id;
+                const isDeleted = u.status === 'deleted';
+                return isEditing ? (
+                  <>
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => void handleSave(u.id)}
+                      disabled={saving}
+                    >
+                      保存
+                    </button>
+                    <button className="btn btn-ghost btn-sm" onClick={cancelEdit} disabled={saving}>
+                      取消
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => startEdit(u)}
+                      disabled={isDeleted}
+                    >
+                      编辑
+                    </button>
+                    {isServerAdmin && !isDeleted && (
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => confirmDelete(u.id)}
+                        disabled={u.id === user?.id}
+                        title={u.id === user?.id ? '不能删除自己' : '软删除该用户'}
+                      >
+                        删除
+                      </button>
+                    )}
+                  </>
+                );
+              },
+            },
+          ];
+          return (
+            <VirtualTable<AdminUserSummary>
+              columns={columns}
+              rows={filtered}
+              rowKey={(u) => u.id}
+              estimateRowHeight={48}
+              maxHeight={640}
+              rowClassName={(u) => (u.status === 'deleted' ? 'row-disabled' : '')}
+            />
+          );
+        })()}
         </div>
 
         {/* 移动端卡片列表（B1.0：复用 MobileCardList 共享组件） */}

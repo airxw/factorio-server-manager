@@ -11,6 +11,7 @@
 //   GET    /                     — 好友列表
 //   GET    /pending              — 待处理请求列表
 //   GET    /online               — 在线好友列表
+//   GET    /recommendations      — 同实例已绑定玩家推荐（v4.36.0-D8）
 //   DELETE /:friendUserId        — 删除好友
 //   GET    /:friendUserId/status — 查询两人关系状态
 // ============================================================================
@@ -28,6 +29,7 @@ import {
 import type {
   FriendActionResponse,
   FriendListResponse,
+  FriendRecommendationsResponse,
   FriendStatusResponse,
   FriendStatusType,
   PanelErrorResponse,
@@ -194,6 +196,27 @@ export function createFriendsRouter(
       }
       const friends = await friendService.listOnlineFriends(userId);
       const response: FriendListResponse = { friends };
+      res.json(response);
+    } catch (err) {
+      handleError(res, err, logger);
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // GET /recommendations — 同实例已绑定玩家推荐（v4.36.0-D8）
+  // ----------------------------------------------------------------
+  router.get('/recommendations', async (req, res) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        const body: PanelErrorResponse = {
+          error: { code: 'PANEL_UNAUTHORIZED', message: '未认证' },
+        };
+        res.status(401).json(body);
+        return;
+      }
+      const recommendations = await friendService.listRecommendations(userId);
+      const response: FriendRecommendationsResponse = { recommendations };
       res.json(response);
     } catch (err) {
       handleError(res, err, logger);

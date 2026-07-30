@@ -253,6 +253,8 @@ export interface AdminApi {
   listFriends(): Promise<import('@public/schema/panel-api-types').FriendListResponse>;
   listPendingFriendRequests(): Promise<import('@public/schema/panel-api-types').PendingFriendRequestsResponse>;
   listOnlineFriends(): Promise<import('@public/schema/panel-api-types').FriendListResponse>;
+  /** v4.36.0-D8: 同实例已绑定玩家推荐 */
+  listFriendRecommendations(): Promise<import('@public/schema/panel-api-types').FriendRecommendationsResponse>;
   removeFriend(
     friendUserId: string,
   ): Promise<import('@public/schema/panel-api-types').FriendActionResponse>;

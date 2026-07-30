@@ -62,6 +62,16 @@ export interface PendingFriendRequest {
   created_at: string;
 }
 
+/**
+ * v4.36.0-D8: 好友推荐项（同实例已绑定玩家，与 panel-api-types.FriendRecommendation 对齐）
+ */
+export interface FriendRecommendation {
+  user_id: string;
+  username: string;
+  shared_instance_count: number;
+  shared_server_names: string[];
+}
+
 export type FriendshipStatus = 'none' | 'pending' | 'accepted' | 'blocked';
 
 // ---------------------------------------------------------------------------
@@ -334,5 +344,85 @@ export class FriendService {
       .first();
     if (!row) return 'none';
     return row.status as FriendshipStatus;
+  }
+
+  /**
+   * v4.36.0-D8: 同实例已绑定玩家推荐（最小落地，不做算法推荐）
+   *
+   * 规则：
+   * 1. 当前用户在实例上持有 verified 玩家绑定
+   *    （bindings.binding_type='player', scope_type='instance', scope_ref=server_id）
+   * 2. 推荐同一实例上其他 verified 绑定用户
+   * 3. 排除已是好友 / 待处理请求 / 已拉黑（任一方向）
+   *
+   * @returns 按共同实例数降序、用户名升序，上限 20 条
+   */
+  async listRecommendations(userId: string): Promise<FriendRecommendation[]> {
+    // 1. 我 verified 绑定的实例集合
+    const myBindings = await this.db<{ scope_ref: string }>('bindings')
+      .select('scope_ref')
+      .where('user_id', userId)
+      .andWhere('binding_type', 'player')
+      .andWhere('scope_type', 'instance')
+      .andWhere('verify_status', 'verified')
+      .whereNotNull('scope_ref');
+    const myServerIds = [...new Set(myBindings.map((r) => r.scope_ref))];
+    if (myServerIds.length === 0) return [];
+
+    // 2. 与我有关系（任一方向、任一状态）的用户集合——全部排除
+    const related = await this.db<{ user_id: string; friend_user_id: string }>('friendships')
+      .select('user_id', 'friend_user_id')
+      .where(function () {
+        this.where('user_id', userId).orWhere('friend_user_id', userId);
+      });
+    const excludedIds = new Set<string>([userId]);
+    for (const r of related) {
+      excludedIds.add(r.user_id);
+      excludedIds.add(r.friend_user_id);
+    }
+
+    // 3. 同实例其他 verified 绑定用户（JOIN users 取用户名，JOIN servers 取实例名）
+    const rows = await this.db<{
+      user_id: string;
+      username: string;
+      scope_ref: string;
+      server_name: string | null;
+    }>('bindings as b')
+      .select('b.user_id', 'u.username', 'b.scope_ref', 's.name as server_name')
+      .leftJoin('users as u', 'b.user_id', 'u.id')
+      .leftJoin('servers as s', 'b.scope_ref', 's.id')
+      .where('b.binding_type', 'player')
+      .andWhere('b.scope_type', 'instance')
+      .andWhere('b.verify_status', 'verified')
+      .whereIn('b.scope_ref', myServerIds)
+      .whereNotIn('b.user_id', [...excludedIds]);
+
+    // 4. 按用户聚合：共同实例去重计数 + 实例名收集（每用户最多 3 个）
+    const SERVER_NAMES_CAP = 3;
+    const byUser = new Map<string, { username: string; serverNames: Set<string> }>();
+    for (const r of rows) {
+      const entry = byUser.get(r.user_id) ?? { username: r.username, serverNames: new Set() };
+      entry.username = r.username;
+      if (r.server_name) entry.serverNames.add(r.server_name);
+      byUser.set(r.user_id, entry);
+    }
+
+    const RECOMMENDATIONS_LIMIT = 20;
+    return [...byUser.entries()]
+      .map(([uid, e]) => {
+        const names = [...e.serverNames].sort();
+        return {
+          user_id: uid,
+          username: e.username,
+          shared_instance_count: e.serverNames.size,
+          shared_server_names: names.slice(0, SERVER_NAMES_CAP),
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.shared_instance_count - a.shared_instance_count ||
+          a.username.localeCompare(b.username),
+      )
+      .slice(0, RECOMMENDATIONS_LIMIT);
   }
 }

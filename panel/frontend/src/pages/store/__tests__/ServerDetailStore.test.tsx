@@ -7,7 +7,7 @@ vi.mock('../components/InstanceEconomyConfig', () => ({
   default: ({ serverId }: { serverId: string }) => <div>economy:{serverId}</div>,
 }));
 
-vi.mock('../../ServerDetail', () => ({
+vi.mock('../../instance-detail/ServerDetailCore', () => ({
   default: () => <div>store-detail-body</div>,
 }));
 

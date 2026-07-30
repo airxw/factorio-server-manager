@@ -2343,6 +2343,12 @@ export function createApiClient(opts: ApiClientOptions = {}): PanelApiClient {
         '/friends/online',
       );
     },
+    // v4.36.0-D8: 同实例已绑定玩家推荐
+    listFriendRecommendations() {
+      return request<import('@public/schema/panel-api-types').FriendRecommendationsResponse>(
+        '/friends/recommendations',
+      );
+    },
     removeFriend(friendUserId) {
       return request<import('@public/schema/panel-api-types').FriendActionResponse>(
         `/friends/${encodeURIComponent(friendUserId)}`,

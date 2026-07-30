@@ -16,6 +16,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../api/auth';
 import { getEffectiveRole, isAdminRole } from '../../utils/role';
 import { MobileCardList, useConfirm } from '../../components/ui';
+import VirtualTable, { type VirtualColumn } from '../../components/VirtualTable';
 
 type ServerBindingItem = ListServerPlayerBindingsResponse['bindings'][number];
 
@@ -181,44 +182,65 @@ export default function PlayerBindings() {
       ) : (
         <>
         <div className="desktop-only">
-        <div className="table-wrap">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>游戏玩家名</th>
-                <th>用户名</th>
-                <th>游戏类型</th>
-                <th>状态</th>
-                <th>绑定时间</th>
-                <th className="col-actions">操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              {bindings.map((b) => (
-                <tr key={b.id}>
-                  <td>{b.id}</td>
-                  <td>{b.player_name ?? ''}</td>
-                  <td>{b.username}</td>
-                  <td>{b.scope_ref ?? ''}</td>
-                  <td>
-                    <span className={statusClass(b.verify_status)}>{STATUS_LABEL[b.verify_status]}</span>
-                  </td>
-                  <td className="mono">{b.verified_at ?? b.created_at}</td>
-                  <td className="col-actions">
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => void handleUnbind(b.id)}
-                      disabled={unbindingId === b.id}
-                    >
-                      {unbindingId === b.id ? '解绑中…' : '解绑'}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {(() => {
+          // v4.36.0-B5: 桌面表格迁移 VirtualTable（与 AuditLogs/Users 对齐）
+          const columns: VirtualColumn<ServerBindingItem>[] = [
+            { key: 'id', header: 'ID', width: '64px', render: (b) => b.id },
+            {
+              key: 'player_name',
+              header: '游戏玩家名',
+              width: '1.3fr',
+              render: (b) => b.player_name ?? '',
+            },
+            { key: 'username', header: '用户名', width: '1.2fr', render: (b) => b.username },
+            {
+              key: 'scope_ref',
+              header: '游戏类型',
+              width: '1fr',
+              render: (b) => b.scope_ref ?? '',
+            },
+            {
+              key: 'verify_status',
+              header: '状态',
+              width: '0.8fr',
+              render: (b) => (
+                <span className={statusClass(b.verify_status)}>
+                  {STATUS_LABEL[b.verify_status]}
+                </span>
+              ),
+            },
+            {
+              key: 'verified_at',
+              header: '绑定时间',
+              width: '1.6fr',
+              className: 'mono',
+              render: (b) => b.verified_at ?? b.created_at,
+            },
+            {
+              key: 'actions',
+              header: '操作',
+              width: '0.8fr',
+              render: (b) => (
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => void handleUnbind(b.id)}
+                  disabled={unbindingId === b.id}
+                >
+                  {unbindingId === b.id ? '解绑中…' : '解绑'}
+                </button>
+              ),
+            },
+          ];
+          return (
+            <VirtualTable<ServerBindingItem>
+              columns={columns}
+              rows={bindings}
+              rowKey={(b) => b.id}
+              estimateRowHeight={44}
+              maxHeight={640}
+            />
+          );
+        })()}
         </div>
 
         {/* 移动端卡片降级（B1.4 批次） */}

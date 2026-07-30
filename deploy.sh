@@ -45,7 +45,7 @@ DAEMON_PORT=8080  # 与 deploy.md 规则 #7 一致，8080 对公网禁用，仅 
 INSTALL_DIR="/opt/gameserver-panel"
 PANEL_USER="gameserver"
 NODE_VERSION="20"
-DEPLOY_VERSION="4.35.2"
+DEPLOY_VERSION="4.36.0"
 
 # 备份目录（P4: update 时备份代码 + DB 到此目录，失败时回滚）
 BACKUP_DIR="$INSTALL_DIR/.backup"

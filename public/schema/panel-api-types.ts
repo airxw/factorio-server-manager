@@ -3266,6 +3266,25 @@ export interface FriendStatusResponse {
   status: FriendStatusType;
 }
 
+/**
+ * v4.36.0-D8: 好友推荐项（同实例已绑定玩家推荐）
+ * 规则：与当前用户在同一实例（server）上持有 verified 玩家绑定的其他用户，
+ * 排除已是好友 / 待处理请求 / 已拉黑的用户。最小落地，不做算法推荐。
+ */
+export interface FriendRecommendation {
+  user_id: string;
+  username: string;
+  /** 与当前用户共同绑定（verified）的实例数 */
+  shared_instance_count: number;
+  /** 共同实例名称（最多 3 个，按实例名升序） */
+  shared_server_names: string[];
+}
+
+/** GET /api/friends/recommendations 响应 */
+export interface FriendRecommendationsResponse {
+  recommendations: FriendRecommendation[];
+}
+
 // ============================================================================
 // v4.8.0: 玩家档案（L2 — /api/players/:userId/profile）
 // ============================================================================

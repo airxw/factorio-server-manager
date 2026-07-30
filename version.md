@@ -1,4 +1,100 @@
-4.35.2
+4.36.0
+
+## v4.36.0 (2026-07-30) — 技术债全量治理（38 项债务 11 波落地）+ Pack variant 标签 + Friends 同实例推荐
+
+**背景：** 2026-07-29 全仓技术债扫描（`.trae/documents/tech-debt-scan-20260729.md`）识别 38 项债务（7 高 / 14 中 / 17 低），经多方案对抗论证采纳方案 B（全量治理、按风险分批递进），按 `docs/plans/tech-debt-remediation-plan.md` 分 W0-W10 共 11 波推进，人类整体授权「方案论证后直接修」。
+
+**本次变更（按波次）：**
+
+1. **W0 基线**：git init + 基线 commit（治愈 H6 无版本控制）；`.gitignore` 覆盖 node_modules/dist/data。
+2. **W1 速赢批**：daemon 依赖补齐 + tsconfig include 收窄（H1/H2 daemon tsc 0 错误）；Servers.test fixture 补 `node_name`（H5 前端红测修复）；删除 FormSkeleton/TabSkeleton/parallelDownloader/mock-pgrep/update-help.js 死文件；dev.sh/serve.sh 归档 docs/archive；.pids 清理；errors.ts 陈旧注释修正。
+3. **W2 契约批（s0601）**：`PendingWithdrawItem`/`ListPendingWithdrawsResponse`/`CleanupAllPreviewResponse` 上推 public 契约（唯一真相源）；新建 `public/schema/settings.ts` 统一 SettingSchemaItem 双端引用；`VerifyBindingViaWebhookRequest` 移除冗余 `game_type` 字段（BREAKING，无运行时消费方）；新增 preflight 预生成 Mock；CHANGELOG v4.33.0 记录。
+4. **W3 提炼批**：新建 `utils/pagination.ts`（parsePagination）替换 5 处内联；新建 `utils/date.ts`（utcDateKey）替换 6 处内联。
+5. **W4 孤岛治理**：itemAttributeResolver 接入 give-item 命令渲染链（resolveGiveCommandVars + stripHiddenPlaceholders 真实调用，治愈 H3 孤岛）；JwtPayload.role 等 4 处 @deprecated 注释按实际语义修订。
+6. **W5**：`!uptime` 游戏内命令接 daemon 真实 uptime（InstanceSummaryWithUptime），移除 3 处 TODO。
+7. **W6 测试补齐**：9 个资金服务核心路径单测（balance/withdraw/wallet/cdk/vip/shop/integral/points/pricing，治愈 H4 资金零测试）；StartupGuideWizard 前端单测。
+8. **W7 E2E 修复**：/admin /store /guild 首屏 body empty 根因定位并修复（H7）。
+9. **W8 文档批**：docs/plans 14 篇 status 校正；.trae/documents test_reports 按月归档；backup/logs 用途登记。
+10. **W9 大项最小落地**：B6 ServerDetail 抽离 [ServerDetailCore.tsx](panel/frontend/src/pages/instance-detail/ServerDetailCore.tsx)（+ ExpiryEditModal 独立组件，Admin/Store 包装复用，不改行为）；B5 `<VirtualTable>`（@tanstack/react-virtual）推广到 AuditLogs/Users/PlayerBindings 三列表；**D7 新功能**——Packs 列表/详情 variant 标签徽章展示（partial 闭合 pending-requirements.md 第 1 条）；**D8 新功能**——Friends 同实例玩家推荐（`GET /api/friends/recommendations`：同实例 verified 玩家绑定的其他用户，排除已是好友/待处理，聚合共同实例计数排序取前 20；前端 Friends 页面推荐区块 + 一键加好友；契约 `FriendRecommendation`/`FriendRecommendationsResponse`，CHANGELOG v4.36.0 MINOR 记录 + 6 单测）。
+11. **W10 收尾**：current-note L17 四处过时记录修正（SetupWizard 29 失败→实测全过 / startup_guide 12 缺失→9/9 全有 / VirtualList 技术栈误记→VirtualTable @tanstack/react-virtual / defect:query 缺失→已补齐）；L8/L9/L16 登记 `docs/plans/pending-requirements-tech-debt.md`；12 版本源统一 4.36.0。
+
+**版本递增依据：** D7/D8 为全新功能 → 中版本号 +1（4.35.4 → 4.36.0，bb.md 规则）。
+
+**验证：**
+- 三端 tsc --noEmit 0 错误（panel/backend + panel/frontend + daemon）
+- 后端 vitest 682/682 全绿（含新增资金服务 + 好友推荐测试）
+- 前端 vitest 316/316 全绿（含 SetupWizard 全套件）
+- 前端 build 通过；dist 无 `localhost:3000` / `127.0.0.1:3000` 违规引用（0.md §五）
+- `npm run check:version` 12 版本源全对齐 4.36.0
+- 运行时接入校验（rules-0 §四-13）：好友推荐路由已注册 routes-registry；VirtualTable 被 3 页面引用；ServerDetailCore 被 Admin/Store 包装引用
+
+**已知遗留（不阻断）：**
+- L8 store_shop_config.ts 命名 / L9 路由测试比 / L16 DST token 占位 → 已登记 `docs/plans/pending-requirements-tech-debt.md`
+- quotaService 注释代码块（L4）保留——决策留痕式保留，合规
+- 本版本未部署，待用户决定部署时机
+
+---
+
+## v4.35.4 (2026-07-30) — 实例类型定价整体除以 100（用户反馈原价过贵）
+
+**背景：** v4.35.0 上线的默认定价（micro=1500 / small=3000 / medium=9000 / large=24000 / xlarge=60000 点券）经用户反馈过贵，要求整体除以 100。
+
+**本次调整：**
+
+1. **新 migration（更新存量库）：**
+   - [panel/backend/src/db/migrations/20260730000006_adjust_pricing_divide_100.ts](panel/backend/src/db/migrations/20260730000006_adjust_pricing_divide_100.ts) 按 id 精确 UPDATE 5 条 seed 记录的 `monthly_price`，不影响用户自定义定价；down 可还原原价。
+
+2. **seed migration 同步（fresh install 一致性）：**
+   - [panel/backend/src/db/migrations/20260830000005_seed_instance_type_pricing.ts](panel/backend/src/db/migrations/20260830000005_seed_instance_type_pricing.ts) 5 条 seed 数据 `monthly_price` 同步调整为新值。
+
+3. **Mock 同步（并行开发适配层）：**
+   - [public/pre_generated_mock/instance-billing-mock.ts](public/pre_generated_mock/instance-billing-mock.ts) `DEFAULT_TYPE_PRICINGS` 5 条定价同步调整。
+
+**调整后定价（100 点券 = 1 元）：**
+
+| 类型 | 原月费(点券) | 调整后(点券) | 折合人民币 |
+|------|------------|------------|-----------|
+| micro | 1500 | 15 | ¥0.15 |
+| small | 3000 | 30 | ¥0.30 |
+| medium | 9000 | 90 | ¥0.90 |
+| large | 24000 | 240 | ¥2.40 |
+| xlarge | 60000 | 600 | ¥6.00 |
+
+**验证：** migration 执行成功（5 条记录更新）；sqlite 确认新价格；前端 tsc exit 0；后端 tsc exit 0；服务层无硬编码价格（从 DB 读取）。
+
+---
+
+## v4.35.3 (2026-07-30) — Minecraft Pack 修复（Java 25 兼容 Minecraft 26.2）
+
+**背景：** 创建 Minecraft 实例并启动时，java 进程立即 exit code 1。手动运行捕获到错误：
+```
+Error: LinkageError occurred while loading main class net.minecraft.bundler.Main
+        java.lang.UnsupportedClassVersionError: net/minecraft/bundler/Main has been compiled by a more recent version of the Java Runtime (class file version 69.0), this version of the Java Runtime only recognizes class file versions up to 65.0
+```
+
+**根因：** bootstrap 自动下载最新稳定版 Minecraft 26.2（daemon 日志 `releaseVersion: 26.2`），而 Minecraft 26.x 编译目标为 Java 25（class file version 69.0），系统原有 Java 21（class file version 65.0）不兼容。
+
+**本次修复：**
+
+1. **安装 OpenJDK 25 JRE（headless）：**
+   - `sudo apt install -y openjdk-25-jre-headless`（Ubuntu 26.04 官方源，版本 25.0.3+9）
+   - `sudo update-alternatives --set java /usr/lib/jvm/java-25-openjdk-amd64/bin/java` 设为系统默认
+   - 保留 Java 21 不卸载（其他应用可能依赖）
+
+2. **重启 daemon 使其使用新 Java：**
+   - `sudo systemctl restart gameserver-daemon`（旧 daemon 进程缓存了旧 PATH）
+
+**验证：**
+- `java -version` → `openjdk version "25.0.3" 2026-04-21`
+- 手动运行 `java -Xmx2G -Xms1G -jar server.jar nogui` → 成功解压 libraries + `Starting net.minecraft.server.Main`
+- 通过 API 创建 Minecraft 实例（`7ecb6c27-c36a-4386-a2c4-ace1ec7b5dc5`，端口 25584/RCON 25766）并启动
+- `logs/latest.log` 确认：`Done (0.321s)! For help, type "help"` + `RCON running on 0.0.0.0:25766`
+- 浏览器核对：实例状态 running，控制台显示启动日志
+
+**已知遗留（非本次阻断点）：**
+- daemon 在实例启动初期（Minecraft 初始化期间，RCON 未就绪）尝试连接 RCON 时 `ECONNREFUSED`，之后未重试，导致 RCON 命令通道不可用。需后续修复 daemon RCON 连接重试机制。
+
+---
 
 ## v4.35.2 (2026-07-30) — Factorio Pack 修复三（visibility.public 默认值导致启动失败）
 
@@ -59,6 +155,8 @@ Error CommandLineMultiplayer.cpp:183: require_user_verification must be enabled 
 5. **现有实例修复（手动生成配置 + 建图）：**
    - 为实例 `56ffdce7` 的 `config/` 目录生成 `server-settings.json` + `map-gen-settings.json` + `map-settings.json`（使用官方示例文件）。
    - 成功执行 `--create` 生成 `saves/world.zip`（614KB）。
+
+---
 
 ## v4.35.0 (2026-07-30) — VPS 式预付费实例计费（修复创建实例不扣费、付费信息不可见）
 
