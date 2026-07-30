@@ -13,10 +13,12 @@ import type { ModMetadata } from '../../api/client';
 
 export interface ModsPageProps {
   serverId: string;
+  gameType?: string;
 }
 
-export default function Mods({ serverId }: ModsPageProps) {
+export default function Mods({ serverId, gameType }: ModsPageProps) {
   const { api } = useAuth();
+  const modConfig = getModUIConfig(gameType);
 
   const [mods, setMods] = useState<ModRecordSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -316,7 +318,7 @@ export default function Mods({ serverId }: ModsPageProps) {
         </table>
       )}
 
-      {/* v4.3.0-H2: 文件系统级 Mod 管理（扫描 mods/ 目录） */}
+      {/* v4.3.0-H2: 文件系统级 Mod 管理 / v4.33.0 多游戏自适应 */}
       <div className="page-header" style={{ marginTop: 32 }}>
         <h3 className="page-title">Mod 文件管理（文件系统）</h3>
         <div className="page-actions">
@@ -325,14 +327,13 @@ export default function Mods({ serverId }: ModsPageProps) {
             onClick={() => void refreshModFiles()}
             disabled={filesLoading}
           >
-            {filesLoading ? '加载中…' : '扫描 mods/ 目录'}
+            {filesLoading ? '加载中…' : `扫描 ${modConfig.modsDirLabel || 'mod'} 目录`}
           </button>
-          {/* L4: jar 元数据扫描按钮，需先有 mod 文件列表才能匹配 */}
           <button
             className="btn btn-info"
             onClick={() => void handleScanMetadata()}
             disabled={metadataScanning || modFiles.length === 0}
-            title={modFiles.length === 0 ? '请先扫描 mods/ 目录' : '解析 .jar 内的 fabric.mod.json / mods.toml / mcmod.info'}
+            title={modFiles.length === 0 ? '请先扫描 mod 目录' : modConfig.metadataTooltip}
           >
             {metadataScanning ? '扫描元数据中…' : '扫描元数据'}
           </button>
@@ -340,11 +341,7 @@ export default function Mods({ serverId }: ModsPageProps) {
       </div>
 
       <p className="text-muted" style={{ fontSize: 13, marginBottom: 12 }}>
-        直接操作 mods/ 目录下的 .jar / .jar.disabled 文件，适用于 Minecraft Forge/Fabric 等「文件即 Mod」的场景。
-        切换状态会重命名文件（.jar ↔ .jar.disabled），无需重启服务即可生效（下次启动时加载）。
-        <br />
-        <strong>扫描元数据</strong>：解析 .jar 内的 mod 元数据（fabric.mod.json / mods.toml / mcmod.info），
-        自动识别客户端 mod（如 OptiFine、光影 mod），避免误装到服务端导致启动失败。
+        {modConfig.description}
       </p>
 
       {filesError && <div className="alert alert-error">{filesError}</div>}
@@ -512,4 +509,84 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+// v4.33.0: 各游戏 mod 机制 UI 配置
+interface ModUIConfig {
+  showMetadataColumns: boolean;
+  showClientModWarning: boolean;
+  modsDirLabel: string;
+  metadataTooltip: string;
+  description: string;
+}
+
+function getModUIConfig(gameType?: string): ModUIConfig {
+  switch (gameType) {
+    case 'minecraft':
+      return {
+        showMetadataColumns: true,
+        showClientModWarning: true,
+        modsDirLabel: 'mods/',
+        metadataTooltip: '解析 .jar 内的 fabric.mod.json / mods.toml / mcmod.info',
+        description: '直接操作 mods/ 目录下的 .jar / .jar.disabled 文件。切换状态会重命名文件（.jar ↔ .jar.disabled），无需重启服务即可生效。\n扫描元数据：解析 .jar 内的 mod 元数据，自动识别客户端 mod（如 OptiFine、光影 mod），避免误装到服务端导致启动失败。',
+      };
+    case 'factorio':
+      return {
+        showMetadataColumns: false,
+        showClientModWarning: false,
+        modsDirLabel: 'mods/',
+        metadataTooltip: '解析 .zip 内的 info.json',
+        description: 'Factorio 通过 mod-list.json 控制 mod 启停，文件系统管理仅用于查看 mods/ 目录下的 .zip 文件。请在上方 Mod 记录管理中切换启停状态。',
+      };
+    case 'rust':
+      return {
+        showMetadataColumns: false,
+        showClientModWarning: false,
+        modsDirLabel: 'oxide/plugins/',
+        metadataTooltip: '扫描 .cs 插件文件',
+        description: '直接操作 oxide/plugins/ 目录下的 .cs 插件文件。切换状态会重命名文件（加/去 .disabled 后缀）。',
+      };
+    case 'valheim':
+      return {
+        showMetadataColumns: false,
+        showClientModWarning: false,
+        modsDirLabel: 'BepInEx/plugins/',
+        metadataTooltip: '扫描 .dll 插件文件',
+        description: '直接操作 BepInEx/plugins/ 目录下的 .dll 插件文件。切换状态会重命名文件（加/去 .disabled 后缀）。',
+      };
+    case 'palworld':
+      return {
+        showMetadataColumns: false,
+        showClientModWarning: false,
+        modsDirLabel: 'Pal/Content/Paks/~mods/',
+        metadataTooltip: '扫描 .pak mod 文件',
+        description: '直接操作 ~mods/ 目录下的 .pak mod 文件。切换状态会重命名文件（加/去 .disabled 后缀）。',
+      };
+    case 'terraria':
+    case 'terraria-tshock':
+      return {
+        showMetadataColumns: false,
+        showClientModWarning: false,
+        modsDirLabel: 'Mods/',
+        metadataTooltip: '扫描 .tmod mod 文件',
+        description: 'Terraria 通过 enabled.json 控制 mod 启停，文件系统管理仅用于查看 Mods/ 目录下的 .tmod 文件。请在上方 Mod 记录管理中切换启停状态。',
+      };
+    case 'ark':
+    case 'zomboid':
+      return {
+        showMetadataColumns: false,
+        showClientModWarning: false,
+        modsDirLabel: '',
+        metadataTooltip: 'Steam Workshop mod',
+        description: '此游戏通过 Steam Workshop ID 管理 mod，不支持文件系统级 mod 管理。请在上方 Mod 记录管理中添加 Workshop ID。',
+      };
+    default:
+      return {
+        showMetadataColumns: true,
+        showClientModWarning: true,
+        modsDirLabel: 'mods/',
+        metadataTooltip: '解析 mod 元数据',
+        description: '直接操作 mods/ 目录下的 mod 文件。切换状态会重命名文件（加/去 .disabled 后缀），无需重启服务即可生效。',
+      };
+  }
 }

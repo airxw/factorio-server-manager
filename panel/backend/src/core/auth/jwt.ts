@@ -5,7 +5,10 @@
 // v4.17.0 升级：多角色支持
 //   - 新增 roles: Role[]（角色集合，至少一个）
 //   - 新增 active_role: Role（当前活动角色，会话级）
-//   - role 字段保留为 @deprecated，等同 active_role（过渡期 v4.18.0 删除）
+//   - role 字段保留为 @deprecated，等同 active_role
+//     （v4.33.0 修订：原"v4.18.0 删除"承诺作废——API key 流程 middleware/auth.ts:167、
+//      maintenance.ts:63 及多条路由 req.user?.role 仍真实消费本字段，且旧 JWT 降级依赖它；
+//      字段长期保留，新代码应优先使用 active_role）
 //   - 旧 JWT（无 roles/active_role）由 auth 中间件降级处理：role → [role], active_role = role
 // ============================================================================
 
@@ -29,7 +32,12 @@ export interface JwtPayload {
   userId: string;
   email: string;
   username: string;
-  /** @deprecated v4.17.0 过渡期保留，等同 active_role；v4.18.0 删除 */
+  /**
+   * @deprecated 等同 active_role，仅为向后兼容保留。
+   * v4.33.0 修订：原"v4.18.0 删除"承诺作废——API key 流程（middleware/auth.ts:167）、
+   * maintenance 中间件与旧 JWT 降级路径仍真实消费本字段，字段长期保留；
+   * 新代码应优先读取 active_role。
+   */
   role: Role;
   token_version?: number;
   /** v4.17.0 新增：角色集合（多值） */

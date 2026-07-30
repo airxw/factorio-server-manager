@@ -2,7 +2,7 @@
 type: plan
 title: 配额管理简化方案（仅保留磁盘配额）
 date: 2026-07-29
-status: draft
+status: deployed（v4.29.13 上线，见 version.md）
 related:
   - panel/backend/src/services/quotaService.ts
   - panel/frontend/src/pages/admin/Quotas.tsx

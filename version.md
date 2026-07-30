@@ -1,4 +1,193 @@
-4.32.4
+4.35.2
+
+## v4.35.2 (2026-07-30) — Factorio Pack 修复三（visibility.public 默认值导致启动失败）
+
+**背景：** v4.35.1 修复了 binary 路径与 map-settings 格式后，Factorio 服务器仍 exit code 1。查 `logs/server.log` 捕获到 Factorio 2.0 的硬性校验报错：
+```
+Error CommandLineMultiplayer.cpp:183: require_user_verification must be enabled for public games.
+```
+
+**根因：** bootstrap 生成的 `server-settings.json` 同时设置了 `visibility.public: true` + `require_user_verification: false`，而 Factorio 2.0 强制要求 `visibility.public=true` 时 `require_user_verification` 必须为 `true`（且需 Factorio 账号 + username/token 才能发布到官方匹配服务器）。
+
+**本次修复：**
+
+1. **bootstrap.ts 默认值修正（`visibility.public: true` → `false`）：**
+   - [daemon/src/instances/bootstrap.ts](daemon/src/instances/bootstrap.ts) `writeFactorioServerSettings` 生成的 `server-settings.json` 默认 `visibility.public` 从 `true` 改为 `false`。
+   - 自托管面板默认 LAN-only（`public: false, lan: true`），用户需要公网可见时须手动设置 `public=true` + `require_user_verification=true` + 填写 `username/token`。
+
+2. **pack.yaml schema 默认值同步：**
+   - [packs/factorio-vanilla/pack.yaml](packs/factorio-vanilla/pack.yaml) `config_files.server-settings.schema.visibility.default` 从 `{ public: true, lan: true }` 改为 `{ public: false, lan: true }`。
+   - `visibility.public` 字段描述补充"需同时设置 require_user_verification=true + username/token"提示。
+
+3. **现有实例配置修复：**
+   - 直接修改 `/opt/gameserver-panel/instances/56ffdce7-.../config/server-settings.json` 的 `visibility.public` 从 `true` 改为 `false`（bootstrap 幂等不会覆盖已存在文件，需手动修复）。
+
+**验证：**
+- `npm run packs:validate`：9/9 通过。
+- `daemon npx tsc --noEmit`：退出码 0。
+- 手动以 `gameserver` 用户运行 `./bin/factorio/bin/x64/factorio --start-server saves/world.zip --server-settings config/server-settings.json --port 25652 --rcon-port 25744 --rcon-password ***`：
+  - 成功加载 mod（base/elevated-rails/quality/space-age 2.0.77）
+  - 状态转换 `Ready → PreparedToHostGame → CreatingGame → InGame`（命中 `ready_pattern`）
+  - RCON 在 0.0.0.0:25744 监听成功
+  - 持续运行 20s 收到 SIGTERM 后正常保存退出（无 exit code 1）
+
+---
+
+## v4.35.1 (2026-07-30) — Factorio Pack 修复二（binary 路径 + checkBinaryEnvironment 相对路径 + map-settings 2.0 格式）
+
+**背景：** v4.33.0 修复了 server-settings schema 和 bootstrap 路径错位，但 Factorio 服务器仍无法启动。深入调研发现 3 项残留阻断点：binary 路径与实际安装布局不匹配、checkBinaryEnvironment 不处理相对路径、bootstrap 写的 map-settings/map-gen-settings 是 Factorio 1.1 格式（2.0 不兼容）。
+
+**本次修复：**
+
+1. **pack.yaml binary 路径修正（`./bin/x64/factorio` → `./bin/factorio/bin/x64/factorio`）：**
+   - [packs/factorio-vanilla/pack.yaml](packs/factorio-vanilla/pack.yaml) 的 `startup.binary` 从 `./bin/x64/factorio` 改为 `./bin/factorio/bin/x64/factorio`。
+   - 根因：factorio-official provider 下载的 tar.xz 解压到 `{{instance_root}}/bin/` 后产生 `bin/factorio/` 子目录，实际二进制在 `bin/factorio/bin/x64/factorio`，而非 SteamCMD 布局的 `bin/x64/factorio`。
+
+2. **checkBinaryEnvironment 新增相对路径处理（daemon/src/instances/manager.ts）：**
+   - 旧逻辑：`./bin/...` 被当命令名在 PATH 中搜索，必然失败。
+   - 新逻辑：含 `/` 的相对路径基于 `workingDir` 解析后检查 `X_OK`，与 `spawn(binary, args, { cwd: workingDir })` 行为一致。
+
+3. **writeFactorioMapSettings 对齐 Factorio 2.0 官方格式（daemon/src/instances/bootstrap.ts）：**
+   - 旧代码写的 map-gen-settings 用 `terrain_segmentation: 'normal'` / `water: 'normal'` / `starting_area: 'normal'`（1.1 字符串枚举格式），2.0 不认。
+   - 旧代码写的 map-settings 用 `expected_max_per_peak: 10000`（1.1 字段名），2.0 改为 `expected_max_per_chunk: 150`，且缺失多个必填字段导致 `--create` 报错 `Key "expected_max_per_chunk" not found`。
+   - 新代码对齐 [Factorio 2.0 data/map-gen-settings.example.json](https://github.com/wube/factorio-data) + `map-settings.example.json` 完整字段集。
+
+4. **pack.yaml world_generation schema 对齐 2.0：**
+   - map-gen-settings schema 从 `terrain_segmentation/water/starting_area(string)` 改为 `starting_area(integer)/peaceful_mode/seed/autoplace_controls`。
+   - map-settings schema 新增 `difficulty_settings/enemy_expansion`。
+
+5. **现有实例修复（手动生成配置 + 建图）：**
+   - 为实例 `56ffdce7` 的 `config/` 目录生成 `server-settings.json` + `map-gen-settings.json` + `map-settings.json`（使用官方示例文件）。
+   - 成功执行 `--create` 生成 `saves/world.zip`（614KB）。
+
+## v4.35.0 (2026-07-30) — VPS 式预付费实例计费（修复创建实例不扣费、付费信息不可见）
+
+**背景：** 用户反馈创建实例时未进行扣费，且付费信息在详情页不可见。根因：实例计费服务未接入创建流程，前端未展示计费状态。本版本实现完整 VPS 式预付费计费链路。
+
+**本次新增：**
+
+1. **后端计费服务（instanceBillingService.ts）：**
+   - [panel/backend/src/services/instanceBillingService.ts](panel/backend/src/services/instanceBillingService.ts) 实现定价查询、计费设置读写、金额计算（周期折扣 + 等级/VIP 折扣）、豁免判定（腐竹自有/自带节点/手动豁免）、创建扣款与续费扣款。
+   - 定义 `InstanceTypePricingNotFoundError` / `InstanceBillingSettingsNotFoundError` / `InstanceExpiredNotRenewedError` 等错误类。
+
+2. **创建实例接入扣款（servers.ts）：**
+   - [panel/backend/src/api/routes/servers.ts](panel/backend/src/api/routes/servers.ts) 创建实例流程新增 `instance_type` / `billing_cycle_months` 入参，创建成功后调用 `chargeInstanceCreation` 预付费扣款；计费失败自动回滚删除实例行，避免孤儿实例；响应附带 `billing`（扣款金额/豁免/到期时间）。
+
+3. **计费管理路由（instance-billing.ts）：**
+   - [panel/backend/src/api/routes/instance-billing.ts](panel/backend/src/api/routes/instance-billing.ts) 提供 `/admin/instance-billing/*` 端点：类型定价 CRUD、金额预览、计费设置读写、手动续费、续费记录查询。
+   - [panel/backend/src/routes-registry.ts](panel/backend/src/routes-registry.ts) 挂载路由并注入服务。
+
+4. **定时任务（scheduler）：**
+   - [panel/backend/src/services/scheduler.ts](panel/backend/src/services/scheduler.ts) + `scheduler-init.ts` 注册自动续扣与到期预警扫描任务。
+
+5. **前端创建表单（CreateServer.tsx）：**
+   - [panel/frontend/src/pages/CreateServer.tsx](panel/frontend/src/pages/CreateServer.tsx) 新增实例类型选择卡（micro/small/medium/large/xlarge）与计费周期按钮（月/季/半年/年），实时价格预览；提交携带计费参数，创建成功 Toast 展示扣款金额。
+
+6. **前端详情页计费展示（ServerDetail.tsx）：**
+   - [panel/frontend/src/pages/ServerDetail.tsx](panel/frontend/src/pages/ServerDetail.tsx) 信息卡新增实例计费行（类型/周期/自动续扣/豁免状态）、手动续费操作行（周期选择 + 立即续费 + 记录入口）、续费记录列表（展开显示最近 20 条扣款明细）。
+
+7. **前端 API 切片（instance-billing.ts + client.ts）：**
+   - [panel/frontend/src/api/modules/instance-billing.ts](panel/frontend/src/api/modules/instance-billing.ts) 定义计费 API 接口与类型；[panel/frontend/src/api/client.ts](panel/frontend/src/api/client.ts) 扩展 `PanelApiClient` 实现计费方法。
+
+**验证：**
+- 前端 `tsc --noEmit` 退出码 0；`vite build` 成功（6.72s）。
+- 后端 `tsc --noEmit` 退出码 0。
+- `dist/` 无 `localhost:3000` / `127.0.0.1:3000` 违规引用（符合 0.md 服务器地址最高规则）。
+
+---
+
+## v4.34.0 (2026-07-30) — Mod 管理多游戏自适应（修复 Mod 系统仅支持 Minecraft 的问题）
+
+**背景：** 用户反馈 `https://gsp.ecsrz.com:3001/admin/servers/...?tab=mods` 的 Mod 管理功能存在问题——不同游戏的 Mod 机制差异巨大（Minecraft 用 `.jar` 重命名启停、Factorio 用 `mod-list.json`、Rust 用文件存在性等），但原系统硬编码 Minecraft 的 `.jar` 文件扩展名、`mods/` 目录和 `fabric.mod.json` 元数据解析，导致非 Minecraft 游戏的 Mod 管理完全不可用。本版本将 Mod 系统扩展为支持 9 款游戏的自适应架构。
+
+**本次修复：**
+
+1. **契约扩展（pack-schema.ts）：**
+   - [public/schema/pack-schema.ts](public/schema/pack-schema.ts) `PackModsSchema` 新增 3 个 optional 字段（向后兼容）：`mechanism`（`jar-rename` / `list-file` / `file-presence` / `workshop-id`）、`file_extensions`（文件扩展名数组）、`mods_dir`（Mod 目录相对路径）。
+
+2. **9 个 Pack YAML 配置补全：**
+   - 为全部 9 个 pack（minecraft-vanilla / factorio-vanilla / palworld-vanilla / ark-vanilla / rust-vanilla / dst-vanilla / terraria-vanilla / valheim-vanilla / zomboid-vanilla）补充 `mechanism` / `file_extensions` / `mods_dir` 字段，各自对齐游戏真实 Mod 机制。
+
+3. **Daemon 层多游戏扫描（modScanner.ts + fileManager.ts + server.ts）：**
+   - [daemon/src/files/modScanner.ts](daemon/src/files/modScanner.ts) 新增 `gameTypeToLoader` 与 `scanFactorioInfo`，`scanModsDir` 支持 `fileExtensions` 多扩展名过滤与 `gameType` 分流元数据解析。
+   - [daemon/src/files/fileManager.ts](daemon/src/files/fileManager.ts) `toggleModFile` 接收 `modsDir` 参数，替代硬编码 `mods/`。
+   - [daemon/src/server.ts](daemon/src/server.ts) `scanMods` / `toggleModFile` 端点接收 `dir` / `ext` / `game` 查询参数。
+
+4. **服务层适配（modService.ts）：**
+   - [panel/backend/src/services/modService.ts](panel/backend/src/services/modService.ts) `listModFiles` / `toggleModFile` / `scanMods` 改读 Pack 配置的 `mods_dir` / `file_extensions` / `mechanism`；`isModFileName` 按配置扩展名过滤；依赖检测 `gameTypeToModInfoFormat` 扩展支持 Factorio `info.json`。
+
+5. **契约签名同步（daemon-client.d.ts + daemonClient + daemonClientService）：**
+   - [public/interface_stub/daemon-client.d.ts](public/interface_stub/daemon-client.d.ts) `scanMods` / `toggleModFile` 签名新增 optional 参数。
+   - [panel/backend/src/daemonClient/client.ts](panel/backend/src/daemonClient/client.ts) + [panel/backend/src/services/daemonClientService.ts](panel/backend/src/services/daemonClientService.ts) 实现新签名。
+
+6. **前端 UI 自适应（Mods.tsx）：**
+   - [panel/frontend/src/pages/instance-detail/Mods.tsx](panel/frontend/src/pages/instance-detail/Mods.tsx) 新增 `getModUIConfig(gameType)` 按 game_type 返回 UI 配置（元数据列显隐、客户端 Mod 警告、目录标签、描述文案），Minecraft 显示完整元数据列 + 客户端 Mod 警告，Factorio / Rust 等隐藏不适用的列与提示。
+
+**验证：**
+- panel/backend `tsc --noEmit` — exit 0
+- daemon `tsc --noEmit` — exit 0
+- panel/frontend `tsc --noEmit` — 我的改动零错误（CreateServer.tsx 7 个预存 unused 错误与本次无关）
+- panel/backend `npm run build` — PASS
+- daemon `npm run build` — PASS
+- panel/frontend `npm run build` — PASS
+- dist/ 无 `localhost:3000` / `127.0.0.1:3000` — 合规通过
+- .env.production 无 localhost — 合规通过
+
+---
+
+## v4.33.0 (2026-07-30) — Factorio Pack 修复（配置文件路径错位 + 字段对齐 2.0 + 自动建图 + 路径渲染）
+
+**背景：** 用户反馈 Factorio 服务器实例的配置文件 JSON 有误，导致服务器无法启动。经调研发现 9 项阻断点，本版本逐项修复 Factorio pack 的核心启动链路。
+
+**本次修复：**
+
+1. **pack.yaml server-settings schema 对齐 Factorio 2.0（28 字段）：**
+   - [packs/factorio-vanilla/pack.yaml](packs/factorio-vanilla/pack.yaml) 的 `config_files.server-settings.schema` 从 11 字段补齐到 28 字段，对齐 [wube/factorio-data server-settings.example.json](https://github.com/wube/factorio-data/blob/master/server-settings.example.json)。
+   - 修复 `allowed_commands: 'admins'` → `allow_commands: 'admins-only'`（2.0 字段名 + 枚举值）。
+   - `credentials: {username, password, token}` 嵌套对象 → 顶层 `username`/`password`/`token` 字段。
+   - 新增 `requires_restart` 元数据指导前端校验。
+
+2. **bootstrap.ts 修复路径错位 + 字段名/结构 + 新增 map-gen/map-settings 生成：**
+   - [daemon/src/instances/bootstrap.ts](daemon/src/instances/bootstrap.ts) `writeFactorioServerSettings` 原写 `<workdir>/server-settings.json`，但启动参数引用 `{{config_dir}}/server-settings.json` = `<workdir>/config/server-settings.json`，导致 Factorio 找不到 `--server-settings` 指定文件而报错。修复为写入 `config/` 子目录。
+   - 移除 2.0 不存在的字段：`enable_pwhashing` / `sim_tick_rate` / `disallow_commands` / `enable_script_circuit_networks` / `load_scenario` / `autocreate_modules`（旧值为字符串 `'true'`，应为布尔且 2.0 已移除）。
+   - 新增 `writeFactorioMapSettings`：预生成 `map-gen-settings.json` 和 `map-settings.json` 默认值，确保 `world_generation.create_command` 引用的文件存在。
+
+3. **manager.ts save_path 默认值追加 .zip 扩展名：**
+   - [daemon/src/instances/manager.ts](daemon/src/instances/manager.ts) `save_path` 默认值 `${workdir}/saves/world` 缺少 `.zip` 扩展名，导致 Factorio `--start-server` 找不到存档文件。修复为追加 `pack.saves?.extension`（Factorio = `.zip`）。
+
+4. **bootstrap 首次启动自动建图：**
+   - 新增 `createFactorioInitialSave`：检测 `saves/` 下无 `.zip` 存档时，调用 `factorio --create` 生成默认存档，确保首次 `--start-server` 可用。已有存档时跳过（幂等），二进制不存在时跳过（让 spawn 报更明确的 ENOENT）。
+
+5. **configFileService listConfigFiles 返回渲染后的 path：**
+   - [panel/backend/src/services/configFileService.ts](panel/backend/src/services/configFileService.ts) `listConfigFiles` 原返回原始模板 `{{config_dir}}/server-settings.json`，前端无法展示真实文件位置。修复为返回渲染后的相对路径 `config/server-settings.json`。提取 `buildPathVars` 公共方法消除与 `resolveConfigRelPath` 的重复代码。
+
+**验证：**
+- `npm run packs:validate` — 9 个 Pack 全部通过（含 factorio-vanilla）
+- `daemon npm run typecheck` — PASS
+- `daemon npm test` — 20/20 PASS
+- `panel/backend npm run typecheck` — PASS
+
+---
+
+## v4.32.5 (2026-07-30) — 实例详情 Tab 拆分为 2 级菜单
+
+**背景：** 实例详情页 Tab 条把 4 个分组（运行时/配置/运维/业务运营）的所有子 tab 平铺在单行，tab 数量多时显得拥挤且需要换行。用户反馈希望拆成 2 级菜单：第一级是分组 pill，第二级是当前分组下的子 tab。
+
+**变更：**
+- `panel/frontend/src/pages/ServerDetail.tsx`：
+  - 新增 `activeGroup`（由 `activeTab` 反推所在分组）、`activeGroupTabs`（当前分组子 tab 列表）派生 memo
+  - 新增 `lastTabByGroup` 状态 + 跟踪 effect：记忆每个分组最后访问的 tab，切换分组时恢复
+  - 新增 `switchGroup(group)` 回调：`business` 分组直接 `navigate(businessPath)`（pseudo-tab 唯一入口）；其他分组切到该组上次访问的 tab，无记忆时回落到该组第一个 tab
+  - 桌面端 `tab-groups` 单行结构替换为 `tab-groups-2level` 上下两行：第一级 `tab-group-pills`（4 个分组 pill + 子 tab 数量徽标），第二级 `tab-sub-tabs`（当前分组子 tab，复用 `.tab-btn` 下划线风格）
+  - 键盘导航分两层：第一级 ←→ 在分组间切换，第二级 ←→ 在当前分组子 tab 间切换
+- `panel/frontend/src/styles.css`：移除旧 `.tab-groups` / `.tab-group-inline` / `.tab-group-label` / `.tab-group-divider` 样式，新增 `.tab-groups-2level` / `.tab-group-pills` / `.tab-group-pill` / `.tab-group-pill-count` / `.tab-sub-tabs` 样式（Apple 风格 pill + 下划线，主色填充激活态，子 tab 数量徽标）
+
+**行为说明：**
+- 初始进入：`activeGroup` 由 URL `?tab=` 反推（默认 `console` → `runtime`）
+- 点击分组 pill：切到该组上次访问的 tab（无记忆则切到该组第一个 tab）；点击「业务运营」pill 直接跳转 `/business` 二级页
+- 移动端（≤768px）保持原 `mobile-tab-scroller` 扁平结构不变
+
+---
 
 ## v4.32.4 (2026-07-29) — 部署链路化债（防止生产 `.env` 被开发配置覆盖 + 迁移幂等补强）
 

@@ -2,7 +2,7 @@
 type: plan
 title: 实例计费规则落地实施计划（VPS 式 v3）
 date: 2026-07-29
-status: draft
+status: deployed（v4.35.0 VPS 预付费计费上线，见 version.md）
 related: instance-billing-rules-plan.md
 tags: [billing, plan, implementation, vps-prepaid]
 ---

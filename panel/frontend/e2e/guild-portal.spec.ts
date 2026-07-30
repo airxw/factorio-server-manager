@@ -24,8 +24,8 @@ test.describe('v4.15.0 玩家门户新页面可达性', () => {
     await injectTokenAndGoto(page, ROLE_ACCOUNTS.user, '/guild');
 
     await expect(page).toHaveURL(/\/guild$/);
-    // GuildDock 快捷入口（绑定角色/游戏商城/CDK兑换/我的订单）
-    await expect(page.getByText('绑定角色').first()).toBeVisible({ timeout: 15_000 });
+    // GuildDock：游戏角色绑定分区（v4.17.0 起为独立分区，原"绑定角色"快捷入口已移除）+ CDK兑换
+    await expect(page.getByText('游戏角色绑定').first()).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText('CDK兑换').first()).toBeVisible({ timeout: 10_000 });
     // 不命中 404
     await expect(page.getByText('抱歉，您访问的页面不存在')).not.toBeVisible();
@@ -45,10 +45,11 @@ test.describe('v4.15.0 玩家门户新页面可达性', () => {
     await injectTokenAndGoto(page, ROLE_ACCOUNTS.user, '/guild/bind');
 
     await expect(page).toHaveURL(/\/guild\/bind$/);
+    // GuildBind 页头为「绑定管理」h1 + 游戏角色绑定/账户级绑定 双 tab（v4.17.0 向导分支结构）
     await expect(
-      page.getByRole('heading', { name: '绑定角色' }),
+      page.getByRole('heading', { name: '绑定管理' }),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(page.getByText('新增绑定')).toBeVisible();
+    await expect(page.getByRole('tab', { name: '游戏角色绑定' })).toBeVisible();
     await expect(page.getByText('抱歉，您访问的页面不存在')).not.toBeVisible();
   });
 
@@ -72,15 +73,16 @@ test.describe('v4.15.0 玩家门户新页面可达性', () => {
     await expect(page.getByText('抱歉，您访问的页面不存在')).not.toBeVisible();
   });
 
-  test('首页快捷入口「绑定角色」点击跳转 /guild/bind', async ({ page }) => {
+  test('首页「游戏角色绑定」分区管理入口点击跳转 /guild/bind', async ({ page }) => {
     await injectTokenAndGoto(page, ROLE_ACCOUNTS.user, '/guild');
 
-    const entry = page.getByText('绑定角色').first();
+    // GuildDock「游戏角色绑定」分区的「管理」按钮（无条件渲染，不依赖绑定空态）
+    const entry = page.getByRole('button', { name: '管理', exact: true }).first();
     await expect(entry).toBeVisible({ timeout: 15_000 });
     await entry.click();
     await expect(page).toHaveURL(/\/guild\/bind$/);
     await expect(
-      page.getByRole('heading', { name: '绑定角色' }),
+      page.getByRole('heading', { name: '绑定管理' }),
     ).toBeVisible({ timeout: 15_000 });
   });
 

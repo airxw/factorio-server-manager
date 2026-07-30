@@ -18,7 +18,7 @@ import {
 } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { LoginResponse, RegisterResponse, UserInfo, UserRole } from '@public/schema/panel-api-types';
-import { createApiClient, type PanelApiClient } from './client';
+import { createApiClient, PanelApiError, type PanelApiClient } from './client';
 import { notificationStore } from '../stores/notificationStore';
 
 export const TOKEN_KEY = 'panel_token';
@@ -137,27 +137,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    api
-      .me()
-      .then((res) => {
-        if (!cancelled) {
-          setUser(res.user);
-          // 4.6: 缓存 user 到 sessionStorage，刷新页面时先恢复
-          try {
-            sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(res.user));
-          } catch {
-            // ignore
+    // v4.34.0-W7: /auth/me 初始化加载对非 401 失败做有限重试（429 限流/网络抖动）。
+    // 此前任何错误都直接结束 initializing → ProtectedRoute 见 user=null 强制跳 /login，
+    // E2E 全量并发触发后端 50req/s 限流时复现（真实用户遇限流也会被误踢）。
+    // 401 由 createApiClient({ onUnauthorized }) 统一登出处理，不在此重试。
+    const ME_RETRY_DELAYS_MS = [400, 1200];
+    const fetchMe = (attempt: number): void => {
+      api
+        .me()
+        .then((res) => {
+          if (!cancelled) {
+            setUser(res.user);
+            // 4.6: 缓存 user 到 sessionStorage，刷新页面时先恢复
+            try {
+              sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(res.user));
+            } catch {
+              // ignore
+            }
+            setInitializing(false);
           }
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          const is401 = err instanceof PanelApiError && err.status === 401;
+          if (!is401 && attempt < ME_RETRY_DELAYS_MS.length) {
+            const delay = ME_RETRY_DELAYS_MS[attempt];
+            setTimeout(() => {
+              if (!cancelled) fetchMe(attempt + 1);
+            }, delay);
+            return;
+          }
+          // 一.5: 不再在此清理 token，401 由 createApiClient({ onUnauthorized }) 统一处理。
+          // 重试耗尽后结束 initializing；网络错误等情况保留 token 以便后续重试。
           setInitializing(false);
-        }
-      })
-      .catch(() => {
-        // 一.5: 不再在此清理 token，401 由 createApiClient({ onUnauthorized }) 统一处理。
-        // 此处仅结束 initializing 状态；网络错误等情况保留 token 以便后续重试。
-        if (!cancelled) {
-          setInitializing(false);
-        }
-      });
+        });
+    };
+    fetchMe(0);
     return () => {
       cancelled = true;
     };

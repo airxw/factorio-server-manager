@@ -2,7 +2,7 @@
 type: plan
 title: 部署节点开放给实例管理员方案（落地 v4.28.0 自带节点字段 + 未开源提示 + 弹窗拉宽）
 date: 2026-07-29
-status: draft
+status: deployed（v4.28.x 部署节点开放 instance_admin + 未开源提示 + 弹窗拉宽，见 version.md）
 related:
   - panel/frontend/src/pages/admin/Nodes.tsx
   - panel/frontend/src/components/Layout.tsx

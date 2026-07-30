@@ -312,12 +312,32 @@ export const PackWorldGenerationSchema = z.object({
 export type PackWorldGeneration = z.infer<typeof PackWorldGenerationSchema>;
 
 // 1.2 mods — Mod 文件管理配置（DB 记录由现有 mod_records 表承载）
+// v4.33.0: 新增 mechanism/file_extensions/mods_dir 字段支持多游戏 mod 机制自适应，全部 optional 向后兼容
 export const PackModsSchema = z.object({
   list_file: z.string().min(1),
   list_format: ConfigFormatSchema,
   dependency_check: z.boolean().default(false),
   download_enabled: z.boolean().default(false),
   download_source: z.string().optional(),
+  /**
+   * v4.33.0: Mod 启停机制。决定 listModFiles/toggleModFile 如何操作 mod。
+   * - jar-rename: .jar ↔ .jar.disabled 重命名（Minecraft Forge/Fabric/NeoForge）
+   * - list-file: 通过 list_file 中 enabled 字段控制（Factorio mod-list.json / Terraria enabled.json）
+   * - file-presence: 文件存在即启用，移除即禁用（Rust .cs / Valheim .dll / Palworld .pak）
+   * - workshop-id: 通过配置文件中 Workshop ID 列表控制（ARK / Zomboid）
+   * 缺省时按 game type 推断（minecraft→jar-rename / factorio→list-file / rust→file-presence 等）。
+   */
+  mechanism: z.enum(['jar-rename', 'list-file', 'file-presence', 'workshop-id']).optional(),
+  /**
+   * v4.33.0: Mod 文件后缀列表（含点号，如 ['.jar'] / ['.zip'] / ['.cs'] / ['.dll'] / ['.tmod']）。
+   * 用于 listModFiles 过滤与 isModFileName 校验。缺省时按 mechanism 或 game type 推断。
+   */
+  file_extensions: z.array(z.string().min(1)).optional(),
+  /**
+   * v4.33.0: Mod 文件所在目录（相对 instance_root，如 'mods' / 'oxide/plugins' / 'BepInEx/plugins'）。
+   * 缺省时从 list_file 的 dirname 推断。
+   */
+  mods_dir: z.string().optional(),
 });
 export type PackMods = z.infer<typeof PackModsSchema>;
 

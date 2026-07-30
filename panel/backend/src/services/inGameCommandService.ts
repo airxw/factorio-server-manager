@@ -8,7 +8,7 @@
 //   !help              → 返回可用命令清单
 //   !status            → 返回服务器状态（查 servers 表）
 //   !players           → 返回在线玩家列表（查 player_histories 表 left_at IS NULL）
-//   !uptime            → 返回服务器运行时长（查 servers.created_at，TODO: 待 Daemon 支持真实 uptime）
+//   !uptime            → 返回实例真实运行时长（v4.33.0 起调 Daemon，不可达时降级 servers.created_at 近似）
 //
 // 来源：模块10 Task 5 / 参考 factorio 项目 chatMonitor.ts handleAutoReply
 // ============================================================================
@@ -48,16 +48,22 @@ export interface InGameCommandServiceDeps {
     gamePlayerName: string,
     serverId: string,
   ) => Promise<{ success: boolean; message: string }>;
+  /**
+   * v4.33.0 W5: !uptime 查询 Daemon 真实运行时长（秒）。
+   * 实例不在 Daemon 摘要中时返回 null；节点不可达时由调用方捕获并降级。
+   */
+  readonly getInstanceUptime: (nodeId: string, serverId: string) => Promise<number | null>;
 }
 
 // ----- DB 行类型（仅本服务关心的列） -----
 
-/** servers 表行视图（status / created_at / pack_id） */
+/** servers 表行视图（status / created_at / pack_id / node_id） */
 interface ServerRow {
   id: string;
   pack_id: string;
   status: string;
   created_at: string;
+  node_id: string;
 }
 
 /** player_histories 表行视图（在线玩家查询） */
@@ -370,14 +376,16 @@ export class InGameCommandServiceImpl {
   }
 
   /**
-   * !uptime — 查 servers.created_at 计算运行时长。
-   * TODO: servers.created_at 是服务器记录创建时间，非实例实际启动时间。
-   *       待 Daemon 接口扩展 uptime 字段后，应改为调用 daemonClient 获取真实运行时长。
+   * !uptime — 返回实例真实运行时长。
+   *
+   * v4.33.0 W5: 优先调 daemonClient.getInstanceUptime 取 Daemon 真实 uptime
+   * （实例进程启动至今，daemon/src/instances/manager.ts listSummaries）；
+   * Daemon 不可达或实例不在摘要中时，降级用 servers.created_at 近似。
    */
   private async handleUptime(serverId: string): Promise<boolean> {
     try {
       const row = await this.db<ServerRow>('servers')
-        .select('status', 'created_at')
+        .select('status', 'created_at', 'node_id')
         .where({ id: serverId })
         .first();
       if (!row) {
@@ -388,9 +396,23 @@ export class InGameCommandServiceImpl {
         await this.reply(serverId, `服务器未运行（当前状态: ${row.status}）`);
         return true;
       }
-      // TODO: 此处用 created_at 近似（服务器记录创建时间），非真实实例启动时间
-      const createdAt = new Date(row.created_at).getTime();
-      const uptimeSeconds = Math.floor((Date.now() - createdAt) / 1000);
+
+      // 优先：Daemon 真实 uptime（实例进程启动至今）
+      let uptimeSeconds: number | null = null;
+      try {
+        uptimeSeconds = await this.deps.getInstanceUptime(row.node_id, serverId);
+      } catch (err) {
+        console.warn(
+          '[inGameCommandService] !uptime 查询 Daemon 失败，降级 created_at 近似:',
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+
+      // 降级：servers.created_at 近似（记录创建时间，非进程启动时间）
+      if (uptimeSeconds === null) {
+        uptimeSeconds = Math.floor((Date.now() - new Date(row.created_at).getTime()) / 1000);
+      }
+
       const hours = Math.floor(uptimeSeconds / 3600);
       const minutes = Math.floor((uptimeSeconds % 3600) / 60);
       await this.reply(serverId, `运行时长: ${hours}小时${minutes}分钟`);

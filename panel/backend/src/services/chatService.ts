@@ -11,6 +11,8 @@
 
 import type { Knex } from 'knex';
 import { ChatTriggerNotFoundError } from './errors.js';
+// v4.33.0: 日期键统一走公共 utils（W3 提炼批）
+import { utcDateKey } from '../utils/date.js';
 import type {
   ChatSettingsSummary,
   ChatTriggerResponseSummary,
@@ -370,7 +372,7 @@ export class ChatServiceImpl {
       server_id: vars.server_id,
       message: vars.message,
       timestamp: now.toISOString(),
-      date: now.toISOString().slice(0, 10),
+      date: utcDateKey(now),
       time: now.toTimeString().slice(0, 8),
     };
     return template.replace(/\{\{(\w+)\}\}/g, (match, key: string) =>

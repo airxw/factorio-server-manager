@@ -372,6 +372,7 @@ mods:
   dependency_check: false
   download_enabled: false
   download_source: 'https://steamcommunity.com/workshop/browse?appid=108600'
+  mechanism: workshop-id
 
 # ---- 启动前置引导（首次启动前向导，v4.x 新增）----
 startup_guide:

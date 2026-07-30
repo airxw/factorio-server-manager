@@ -261,6 +261,9 @@ mods:
   dependency_check: false              # UE4SS mod 无标准依赖声明
   download_enabled: false
   download_source: 'https://nexusmods.com/palworld/'
+  mechanism: file-presence
+  file_extensions: ['.pak']
+  mods_dir: 'Pal/Content/Paks/~mods'
 
 # ---- 启动前置引导（首次启动前向导，v4.x 新增）----
 startup_guide:

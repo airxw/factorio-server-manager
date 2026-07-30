@@ -13,7 +13,7 @@ import type { SettingSchemaItem, SettingGroup } from '../../api/modules/settings
 import { SensitiveInput, useToast } from '../../components/ui';
 import { getEffectiveRole, isAdminRole } from '../../utils/role';
 
-/** 分组显示配置（与后端 SettingGroup 同步，含 v3.9.0 新增的 mail/maintenance/disk/legal） */
+/** 分组显示配置（v4.33.0 起 SettingGroup 唯一真相源为 public/schema/settings.ts，含 system） */
 const GROUP_LABELS: Record<SettingGroup, string> = {
   site: '站点信息',
   registration: '注册管理',
@@ -25,6 +25,7 @@ const GROUP_LABELS: Record<SettingGroup, string> = {
   maintenance: '维护模式',
   disk: '磁盘监控',
   legal: '法律条款',
+  system: '系统运行',
 };
 
 /** 分组展示顺序（新分组追加在末尾） */
@@ -39,6 +40,7 @@ const GROUP_ORDER: SettingGroup[] = [
   'maintenance',
   'disk',
   'legal',
+  'system',
 ];
 
 /**
@@ -169,6 +171,7 @@ export default function Settings() {
       maintenance: [],
       disk: [],
       legal: [],
+      system: [],
     };
     for (const s of settings) {
       // safeGroup 兜底：后端未来新增 group 不在前端列表时归入 admin，避免 undefined.push 崩溃

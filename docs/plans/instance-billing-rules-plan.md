@@ -2,7 +2,7 @@
 type: plan
 title: 实例计费规则方案（VPS 式简化定稿）
 date: 2026-07-28
-status: draft
+status: deployed（v4.35.0 VPS 预付费计费上线，见 version.md）
 related: billing, wallet, settlement, admin_tiers
 tags: [billing, plan, vps-prepaid, simplified]
 ---

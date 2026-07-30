@@ -204,6 +204,8 @@ import type { StoreGmApi } from './modules/store-gm';
 import type { StorePlayerActionsApi } from './modules/store-player-actions';
 // v4.15.0: 玩家门户聚合 API（/api/my/*）
 import type { MyApi, MyOrdersStatusFilter } from './modules/my';
+// v3-billing: VPS 式预付费实例计费 API 切片
+import type { InstanceBillingApi } from './modules/instance-billing';
 export type { MyOrdersStatusFilter } from './modules/my';
 // 领域类型重新导出，保持 client.ts 公共 API 不变
 export type {
@@ -416,7 +418,7 @@ function snakeToCamel<T>(data: unknown): T {
  * 领域定义见 src/api/modules/{auth,servers,admin,shop}.ts
  * 实现集中在 createApiClient 工厂内，保持单一运行时入口。
  */
-export interface PanelApiClient extends AuthApi, ServersApi, AdminApi, ShopApi, SystemApi, SettingsApi, AssetApi, ShopConfigApi, StoreGmApi, StorePlayerActionsApi, MyApi {}
+export interface PanelApiClient extends AuthApi, ServersApi, AdminApi, ShopApi, SystemApi, SettingsApi, AssetApi, ShopConfigApi, StoreGmApi, StorePlayerActionsApi, MyApi, InstanceBillingApi {}
 
 export function createApiClient(opts: ApiClientOptions = {}): PanelApiClient {
   const token = opts.token ?? null;
@@ -2467,6 +2469,61 @@ export function createApiClient(opts: ApiClientOptions = {}): PanelApiClient {
       return request<import('./modules/store-player-actions').AdjustPlaytimeResponse>(
         `/store/players/${encodeURIComponent(userId)}/adjust-playtime`,
         { method: 'POST', body: JSON.stringify(req) },
+      );
+    },
+    // ---------- v3-billing: VPS 式预付费实例计费 API（InstanceBillingApi 实现） ----------
+    // 后端：panel/backend/src/api/routes/instance-billing.ts（挂载于 /api/admin/instance-billing）
+    // 门控：types 写操作仅 server_admin；settings/renew/renewals 按实例归属校验
+    listInstanceTypePricings() {
+      return request<import('./modules/instance-billing').ListInstanceTypePricingsResponse>(
+        '/admin/instance-billing/types',
+      );
+    },
+    upsertInstanceTypePricing(req) {
+      return request<import('./modules/instance-billing').UpsertInstanceTypePricingResponse>(
+        '/admin/instance-billing/types',
+        { method: 'POST', body: JSON.stringify(req) },
+      );
+    },
+    async archiveInstanceTypePricing(instanceType) {
+      await request<void>(
+        `/admin/instance-billing/types/${encodeURIComponent(instanceType)}`,
+        { method: 'DELETE' },
+      );
+    },
+    previewBillingAmount(instanceType, billingCycleMonths, customMonthlyPrice) {
+      const params = new URLSearchParams({
+        instance_type: instanceType,
+        billing_cycle_months: String(billingCycleMonths),
+      });
+      if (customMonthlyPrice !== undefined && customMonthlyPrice !== null) {
+        params.set('custom_monthly_price', String(customMonthlyPrice));
+      }
+      return request<import('./modules/instance-billing').PreviewBillingAmountResponse>(
+        `/admin/instance-billing/preview?${params.toString()}`,
+      );
+    },
+    getInstanceBillingSettings(instanceId) {
+      return request<import('./modules/instance-billing').GetInstanceBillingSettingsResponse>(
+        `/admin/instance-billing/settings/${encodeURIComponent(instanceId)}`,
+      );
+    },
+    updateInstanceBillingSettings(instanceId, req) {
+      return request<import('./modules/instance-billing').UpdateInstanceBillingSettingsResponse>(
+        `/admin/instance-billing/settings/${encodeURIComponent(instanceId)}`,
+        { method: 'PUT', body: JSON.stringify(req) },
+      );
+    },
+    renewInstance(instanceId, req) {
+      return request<import('./modules/instance-billing').RenewInstanceResponse>(
+        `/admin/instance-billing/renew/${encodeURIComponent(instanceId)}`,
+        { method: 'POST', body: JSON.stringify(req) },
+      );
+    },
+    listInstanceRenewals(instanceId, limit) {
+      const query = limit ? `?limit=${limit}` : '';
+      return request<import('./modules/instance-billing').ListInstanceRenewalsResponse>(
+        `/admin/instance-billing/${encodeURIComponent(instanceId)}/renewals${query}`,
       );
     },
   };

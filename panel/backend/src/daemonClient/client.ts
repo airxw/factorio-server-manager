@@ -205,10 +205,11 @@ export class DaemonHttpClient {
   /**
    * v4.3.0-H1 新增：切换 mod 启用状态（.jar ↔ .jar.disabled）。
    */
-  async toggleModFile(id: string, modName: string): Promise<ToggleModFileResponse> {
+  async toggleModFile(id: string, modName: string, opts?: { modsDir?: string }): Promise<ToggleModFileResponse> {
+    const query = opts?.modsDir ? `?dir=${encodeURIComponent(opts.modsDir)}` : '';
     return this.request<ToggleModFileResponse>(
       'POST',
-      `/api/instances/${encodeURIComponent(id)}/mods/files/${encodeURIComponent(modName)}/toggle`,
+      `/api/instances/${encodeURIComponent(id)}/mods/files/${encodeURIComponent(modName)}/toggle${query}`,
     );
   }
 
@@ -308,10 +309,15 @@ export class DaemonHttpClient {
    * @param id 实例 ID
    * @returns 扫描结果（含每个 jar 的 name/version/loader/environment/isClientSide）
    */
-  async scanMods(id: string): Promise<ScanModsResponse> {
+  async scanMods(id: string, opts?: { modsDir?: string; fileExtensions?: string[]; gameType?: string }): Promise<ScanModsResponse> {
+    const params = new URLSearchParams();
+    if (opts?.modsDir) params.set('dir', opts.modsDir);
+    if (opts?.fileExtensions?.length) params.set('ext', opts.fileExtensions.join(','));
+    if (opts?.gameType) params.set('game', opts.gameType);
+    const query = params.toString() ? `?${params.toString()}` : '';
     return this.request<ScanModsResponse>(
       'GET',
-      `/api/instances/${encodeURIComponent(id)}/mods/scan`,
+      `/api/instances/${encodeURIComponent(id)}/mods/scan${query}`,
     );
   }
 

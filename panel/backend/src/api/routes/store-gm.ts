@@ -28,6 +28,9 @@ import type { Knex } from 'knex';
 import { Role } from '../../core/auth/roles.js';
 import { requireRole } from '../../middleware/auth.js';
 import type { PanelErrorResponse } from '@public/schema/panel-api-types';
+// v4.33.0: 分页/日期统一走公共 utils（W3 提炼批）
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, parsePositiveInt } from '../../utils/pagination.js';
+import { utcDateKey } from '../../utils/date.js';
 
 /** DB 行类型 */
 interface ServerRow {
@@ -109,8 +112,9 @@ export function createStoreGmRouter(db: Knex, logger: Logger): Router {
     async (req: Request, res: Response, next: NextFunction) => {
       try {
         const instanceId = String(req.query.instance_id ?? '');
-        const page = Math.max(1, parseInt(String(req.query.page ?? '1'), 10) || 1);
-        const limit = Math.min(100, Math.max(1, parseInt(String(req.query.limit ?? '20'), 10) || 20));
+        // v4.33.0: 分页解析统一走公共 utils（W3 提炼批；本路由第二参数名为 limit）
+        const page = parsePositiveInt(req.query.page, 1);
+        const limit = Math.min(MAX_PAGE_SIZE, parsePositiveInt(req.query.limit, DEFAULT_PAGE_SIZE));
         const search = req.query.search ? String(req.query.search).trim() : '';
 
         if (!instanceId) {
@@ -307,7 +311,7 @@ export function createStoreGmRouter(db: Knex, logger: Logger): Router {
         const dateSet = new Set<string>();
         for (let i = 0; i < days; i++) {
           const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-          dateSet.add(d.toISOString().slice(0, 10));
+          dateSet.add(utcDateKey(d));
         }
         for (const date of dateSet) {
           if (!daily.find((d) => d.date === date)) {
@@ -397,7 +401,7 @@ export function createStoreGmRouter(db: Knex, logger: Logger): Router {
         const dateSet = new Set<string>();
         for (let i = 0; i < days; i++) {
           const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-          dateSet.add(d.toISOString().slice(0, 10));
+          dateSet.add(utcDateKey(d));
         }
         for (const date of dateSet) {
           if (!daily.find((d) => d.date === date)) {

@@ -383,6 +383,9 @@ mods:
   dependency_check: false              # uMod mod 无标准依赖声明
   download_enabled: false
   download_source: 'https://umod.org/plugins/'
+  mechanism: file-presence
+  file_extensions: ['.cs']
+  mods_dir: 'oxide/plugins'
 
 # ---- 启动前置引导（首次启动前向导，v4.x 新增）----
 startup_guide:

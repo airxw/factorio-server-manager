@@ -2,7 +2,7 @@
 type: plan
 title: /store 首页 KPI 卡片可点击跳转方案
 date: 2026-07-29
-status: draft
+status: deployed（KpiCard 可点击跳转已上线，见 version.md）
 related:
   - panel/frontend/src/pages/store/components/WorkbenchUI.tsx
   - panel/frontend/src/pages/store/StoreHome.tsx

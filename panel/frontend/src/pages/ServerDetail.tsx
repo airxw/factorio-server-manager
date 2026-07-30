@@ -16,7 +16,7 @@ import {
   type KeyboardEvent,
 } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { RefreshCw, AlertTriangle, Pencil } from 'lucide-react';
+import { RefreshCw, AlertTriangle, Pencil, Wallet } from 'lucide-react';
 import type { InstanceState } from '@public/schema/daemon-api-types';
 import type { PackSummary, ServerSummary } from '@public/schema/panel-api-types';
 import type { UITabObject } from '@public/schema/pack-schema';
@@ -156,6 +156,30 @@ function getExpiryDetailDisplay(
   return { text: `${dateStr} 到期` };
 }
 
+// v3-billing: 计费周期展示标签
+const BILLING_CYCLE_LABELS: Record<number, string> = {
+  1: '月付',
+  3: '季付',
+  6: '半年付',
+  12: '年付',
+};
+
+// v3-billing: 实例类型展示标签
+const INSTANCE_TYPE_LABELS: Record<string, string> = {
+  micro: '微型',
+  small: '小型',
+  medium: '中型',
+  large: '大型',
+  xlarge: '超大型',
+};
+
+// v3-billing: 豁免原因展示标签
+const EXEMPT_REASON_LABELS: Record<string, string> = {
+  owner_self: '腐竹自有实例',
+  self_hosted_node: '自带节点',
+  manual: '管理员豁免',
+};
+
 function useMediaQuery(query: string): boolean {
   const getMatches = () => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
@@ -256,6 +280,19 @@ export default function ServerDetail({
   const [expiryCustomDate, setExpiryCustomDate] = useState('');
   const updateExpiryMutation = useUpdateServerExpiry();
 
+  // v3-billing: 实例计费设置 + 续费记录 + 续费操作状态
+  const [billingSettings, setBillingSettings] = useState<
+    import('@public/interface_stub/shared-types').InstanceBillingSettings | null
+  >(null);
+  const [renewals, setRenewals] = useState<
+    import('@public/interface_stub/shared-types').InstanceRenewal[]
+  >([]);
+  const [renewCycle, setRenewCycle] = useState<
+    import('@public/interface_stub/shared-types').BillingCycleMonths
+  >(1);
+  const [renewing, setRenewing] = useState(false);
+  const [showRenewals, setShowRenewals] = useState(false);
+
   // Pack.ui_tabs：用于动态渲染实例详情子页 tab
   // v3.7.0: 后端 loader 已规范化为 UITabObject[] 对象数组
   const [uiTabs, setUiTabs] = useState<UITabObject[] | null>(null);
@@ -345,6 +382,63 @@ export default function ServerDetail({
     };
   }, [api, server]);
 
+  // v3-billing: 加载实例计费设置 + 续费记录（server 加载完成后触发）
+  // 计费设置用于展示实例类型/豁免/自动续扣；续费记录用于展示历史扣款
+  useEffect(() => {
+    if (!server) return;
+    let cancelled = false;
+    api
+      .getInstanceBillingSettings(server.id)
+      .then((res) => {
+        if (cancelled) return;
+        setBillingSettings(res.settings);
+        if (res.settings.last_billing_cycle_months) {
+          setRenewCycle(res.settings.last_billing_cycle_months);
+        }
+      })
+      .catch(() => {
+        // 计费设置加载失败不阻断详情页（可能未接入计费）
+        if (cancelled) setBillingSettings(null);
+      });
+    api
+      .listInstanceRenewals(server.id, 20)
+      .then((res) => {
+        if (cancelled) return;
+        setRenewals(res.renewals);
+      })
+      .catch(() => {
+        if (cancelled) setRenewals([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, server]);
+
+  // v3-billing: 手动续费
+  const handleRenew = useCallback(async () => {
+    if (!server || renewing) return;
+    setRenewing(true);
+    try {
+      const res = await api.renewInstance(server.id, { billing_cycle_months: renewCycle });
+      const result = res.renewal;
+      if (result.exempt || result.amount_paid === 0) {
+        toast.success('续费成功（免计费）');
+      } else {
+        toast.success(`续费成功，已扣费 ${result.amount_paid} 点券`);
+      }
+      // 刷新详情页（更新 expires_at）+ 计费记录
+      void refresh();
+      api
+        .listInstanceRenewals(server.id, 20)
+        .then((r) => setRenewals(r.renewals))
+        .catch(() => undefined);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '续费失败');
+    } finally {
+      setRenewing(false);
+    }
+  }, [api, server, renewing, renewCycle, toast, refresh]);
+
   // v3.7.0: 最终展示的 tab 列表（UITabObject[] 格式，含 group/order/require_state）
   // - 合并底座 tab（BASE_USER_TAB_OBJECTS）+ Pack.ui_tabs（去重，按 group+order 排序）
   // - B4: business group 的 tab 替换为 __business__ pseudo-tab（点击导航到 /business）
@@ -422,6 +516,27 @@ export default function ServerDetail({
     return groupOrder.filter((g) => map.has(g)).map((g) => ({ group: g, tabs: map.get(g)! }));
   }, [visibleTabs]);
 
+  // v4.32.5: 2 级菜单——当前激活分组由 activeTab 反推（activeTab 所在组即激活组）
+  const activeGroup = useMemo(() => {
+    const tab = visibleTabs.find((t) => String(t.tab) === activeTab);
+    return tab?.group ?? 'runtime';
+  }, [visibleTabs, activeTab]);
+
+  // v4.32.5: 当前激活分组的子 tab 列表
+  const activeGroupTabs = useMemo(
+    () => groupedTabs.find((g) => g.group === activeGroup)?.tabs ?? [],
+    [groupedTabs, activeGroup],
+  );
+
+  // v4.32.5: 记忆每个分组最后访问的 tab，切换分组时恢复（business pseudo-tab 不记忆）
+  const [lastTabByGroup, setLastTabByGroup] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!activeTab || activeTab === BUSINESS_TAB_KEY) return;
+    setLastTabByGroup((prev) =>
+      prev[activeGroup] === activeTab ? prev : { ...prev, [activeGroup]: activeTab },
+    );
+  }, [activeTab, activeGroup]);
+
   // v3.7.0: 兼容旧代码——保留 `tabs` 字符串数组（供 useSwipe / URL 校验等使用）
   const tabs: string[] = useMemo(() => visibleTabs.map((t) => t.tab), [visibleTabs]);
 
@@ -456,6 +571,31 @@ export default function ServerDetail({
       setSearchParams({ tab: key }, { replace: true });
     },
     [setSearchParams],
+  );
+
+  // v4.32.5: business 路径提前到 hooks 区计算——server 未加载时回落到 URL serverId
+  // （值等价：server 由 id 参数拉取，加载后 server.id === serverId）
+  const businessPath = businessPathForServer(server?.id ?? serverId);
+
+  // v4.32.5: 切换一级分组——business 直接导航到 /business（pseudo-tab 唯一入口），
+  // 其他分组切到该组上次访问的 tab，无记忆时回落到该组第一个 tab
+  // 注：必须在早退 return 之前的 hooks 区定义（React hooks 规则），且位于 switchTab 之后避免 TDZ
+  const switchGroup = useCallback(
+    (group: string) => {
+      if (group === 'business') {
+        navigate(businessPath);
+        return;
+      }
+      const groupTabs = groupedTabs.find((g) => g.group === group)?.tabs ?? [];
+      if (groupTabs.length === 0) return;
+      const lastTab = lastTabByGroup[group];
+      const targetTabObj =
+        lastTab && groupTabs.some((t) => String(t.tab) === lastTab)
+          ? (groupTabs.find((t) => String(t.tab) === lastTab) ?? groupTabs[0])
+          : groupTabs[0];
+      switchTab(String(targetTabObj.tab));
+    },
+    [groupedTabs, lastTabByGroup, switchTab, navigate, businessPath],
   );
 
   // 9.6: 移动端左右滑动切换 Tab（含越界 bounds check）
@@ -768,7 +908,6 @@ export default function ServerDetail({
   const canDelete = displayState === 'stopped' || displayState === 'error';
   // v4.29.8: error 状态下显示"重置状态"按钮（仅 admin，纯 DB 修复不调 daemon）
   const canResetState = displayState === 'error' && isAdminRole(effectiveRole);
-  const businessPath = businessPathForServer(server.id);
   const businessLabel = isStoreView ? '商城管理' : '业务运营';
   const packLabel = isStoreView ? '游戏模板' : 'Pack';
   const portLabel = isStoreView ? '服务端口' : '游戏端口';
@@ -1026,6 +1165,139 @@ export default function ServerDetail({
                 )}
               </span>
             </div>
+            {/* v3-billing: 实例计费信息行（实例类型 / 计费周期 / 自动续扣 / 豁免状态） */}
+            {billingSettings && (
+              <div className="info-row">
+                <span className="info-label">实例计费</span>
+                <span className="info-value">
+                  <Wallet size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
+                  <span className="mono">
+                    {INSTANCE_TYPE_LABELS[billingSettings.instance_type] ??
+                      billingSettings.instance_type}
+                  </span>
+                  {billingSettings.last_billing_cycle_months && (
+                    <span className="info-hint" style={{ marginLeft: 8 }}>
+                      ·{' '}
+                      {BILLING_CYCLE_LABELS[billingSettings.last_billing_cycle_months] ??
+                        `${billingSettings.last_billing_cycle_months}个月`}
+                    </span>
+                  )}
+                  <span className="info-hint" style={{ marginLeft: 8 }}>
+                    · {billingSettings.auto_renew_enabled ? '自动续扣' : '手动续费'}
+                  </span>
+                  {billingSettings.billing_exempt && (
+                    <span
+                      className="info-hint"
+                      style={{ marginLeft: 8, color: 'var(--color-success, #16a34a)' }}
+                    >
+                      · 免计费
+                      {billingSettings.exempt_reason &&
+                        `（${
+                          EXEMPT_REASON_LABELS[billingSettings.exempt_reason] ??
+                          billingSettings.exempt_reason
+                        }）`}
+                    </span>
+                  )}
+                </span>
+              </div>
+            )}
+            {/* v3-billing: 手动续费操作行（仅非豁免实例展示续费入口） */}
+            {billingSettings && !billingSettings.billing_exempt && (
+              <div className="info-row">
+                <span className="info-label">续费</span>
+                <span className="info-value">
+                  <select
+                    value={renewCycle}
+                    onChange={(e) =>
+                      setRenewCycle(
+                        Number(e.target.value) as import('@public/interface_stub/shared-types').BillingCycleMonths,
+                      )
+                    }
+                    className="select select-sm"
+                    style={{ marginRight: 8, padding: '2px 8px' }}
+                    disabled={renewing}
+                    aria-label="续费周期"
+                  >
+                    <option value={1}>月付</option>
+                    <option value={3}>季付</option>
+                    <option value={6}>半年付</option>
+                    <option value={12}>年付</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => void handleRenew()}
+                    disabled={renewing}
+                    style={{ marginRight: 8 }}
+                  >
+                    {renewing ? '续费中…' : '立即续费'}
+                  </button>
+                  {renewals.length > 0 && (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      onClick={() => setShowRenewals((v) => !v)}
+                      aria-expanded={showRenewals}
+                    >
+                      {showRenewals ? '收起记录' : `续费记录(${renewals.length})`}
+                    </button>
+                  )}
+                </span>
+              </div>
+            )}
+            {/* v3-billing: 续费记录列表（展开时显示最近 20 条） */}
+            {billingSettings && showRenewals && renewals.length > 0 && (
+              <div className="info-row" style={{ alignItems: 'flex-start' }}>
+                <span className="info-label">续费明细</span>
+                <span className="info-value" style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      maxHeight: 200,
+                      overflowY: 'auto',
+                      borderRadius: 8,
+                      border: '1px solid var(--color-border, #e2e8f0)',
+                      padding: '4px 0',
+                    }}
+                  >
+                    {renewals.map((r) => (
+                      <div
+                        key={r.id}
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 8,
+                          padding: '4px 12px',
+                          fontSize: 12,
+                          borderBottom: '1px solid var(--color-border-subtle, #f1f5f9)',
+                        }}
+                      >
+                        <span className="mono">
+                          {new Date(r.renewed_at).toLocaleString('zh-CN')}
+                        </span>
+                        <span className="info-hint">
+                          {r.renewal_type === 'manual'
+                            ? '手动'
+                            : r.renewal_type === 'auto'
+                              ? '自动'
+                              : '赠送'}
+                          {r.billing_cycle_months
+                            ? `· ${BILLING_CYCLE_LABELS[r.billing_cycle_months] ?? `${r.billing_cycle_months}个月`}`
+                            : ''}
+                        </span>
+                        <span className="mono">
+                          {r.amount_paid === 0
+                            ? '免计费'
+                            : `扣 ${r.amount_paid} 点券`}
+                        </span>
+                        {r.duration_days > 0 && (
+                          <span className="info-hint">+{r.duration_days}天</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </span>
+              </div>
+            )}
             {/* v3.6.1-B2: 磁盘占用行 + 刷新按钮 */}
             <div className="info-row">
               <span className="info-label">磁盘占用</span>
@@ -1124,59 +1396,97 @@ export default function ServerDetail({
           })}
         </div>
       ) : (
-        <div
-          className="tab-groups"
-          role="tablist"
-          aria-label="实例详情标签页"
-          onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
-            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
-            e.preventDefault();
-            const idx = tabs.indexOf(activeTab);
-            if (idx === -1) return;
-            const next =
-              e.key === 'ArrowRight'
-                ? (idx + 1) % tabs.length
-                : (idx - 1 + tabs.length) % tabs.length;
-            switchTab(tabs[next]);
-            const btn = document.getElementById(`tab-${tabs[next]}`);
-            btn?.focus();
-          }}
-        >
-          {groupedTabs.map(({ group, tabs: groupTabs }, groupIdx) => (
-            <div key={group} className="tab-group-inline">
-              <span className="tab-group-label" aria-hidden="true">
-                {GROUP_LABELS[group] ?? group}
-              </span>
-              {groupTabs.map((tabObj) => {
-                const tabKey = tabObj.tab;
-                const active = activeTab === tabKey;
-                const isBusinessPseudo = String(tabKey) === BUSINESS_TAB_KEY;
-                return (
-                  <button
-                    key={tabKey}
-                    id={`tab-${tabKey}`}
-                    role="tab"
-                    aria-selected={active}
-                    aria-controls={`tabpanel-${tabKey}`}
-                    tabIndex={active ? 0 : -1}
-                    className={`tab-btn${active ? ' active' : ''}`}
-                    onClick={() => {
-                      if (isBusinessPseudo) {
-                        navigate(businessPath);
-                        return;
-                      }
-                      switchTab(tabKey);
-                    }}
-                  >
-                    {getTabLabel(String(tabKey))}
-                  </button>
-                );
-              })}
-              {groupIdx < groupedTabs.length - 1 && (
-                <span className="tab-group-divider" aria-hidden="true" />
-              )}
-            </div>
-          ))}
+        <div className="tab-groups-2level">
+          {/* 第一级：分组 pill */}
+          <div
+            className="tab-group-pills"
+            role="tablist"
+            aria-label="实例详情分组"
+            onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+              e.preventDefault();
+              const idx = groupedTabs.findIndex((g) => g.group === activeGroup);
+              if (idx === -1) return;
+              const next =
+                e.key === 'ArrowRight'
+                  ? (idx + 1) % groupedTabs.length
+                  : (idx - 1 + groupedTabs.length) % groupedTabs.length;
+              switchGroup(groupedTabs[next].group);
+              const pill = document.getElementById(`tab-group-pill-${groupedTabs[next].group}`);
+              pill?.focus();
+            }}
+          >
+            {groupedTabs.map(({ group, tabs: groupTabs }) => {
+              const active = activeGroup === group;
+              return (
+                <button
+                  key={group}
+                  id={`tab-group-pill-${group}`}
+                  role="tab"
+                  aria-selected={active}
+                  tabIndex={active ? 0 : -1}
+                  className={`tab-group-pill${active ? ' active' : ''}`}
+                  onClick={() => switchGroup(group)}
+                >
+                  {GROUP_LABELS[group] ?? group}
+                  <span className="tab-group-pill-count" aria-hidden="true">
+                    {groupTabs.length}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {/* 第二级：当前分组子 tab */}
+          <div
+            className="tab-sub-tabs"
+            role="tablist"
+            aria-label={`${GROUP_LABELS[activeGroup] ?? activeGroup}标签页`}
+            onKeyDown={(e: KeyboardEvent<HTMLDivElement>) => {
+              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+              e.preventDefault();
+              const subTabs = activeGroupTabs.map((t) => String(t.tab));
+              const idx = subTabs.indexOf(activeTab);
+              if (idx === -1) return;
+              const next =
+                e.key === 'ArrowRight'
+                  ? (idx + 1) % subTabs.length
+                  : (idx - 1 + subTabs.length) % subTabs.length;
+              const nextTab = subTabs[next];
+              if (nextTab === BUSINESS_TAB_KEY) {
+                navigate(businessPath);
+                return;
+              }
+              switchTab(nextTab);
+              const btn = document.getElementById(`tab-${nextTab}`);
+              btn?.focus();
+            }}
+          >
+            {activeGroupTabs.map((tabObj) => {
+              const tabKey = String(tabObj.tab);
+              const active = activeTab === tabKey;
+              const isBusinessPseudo = tabKey === BUSINESS_TAB_KEY;
+              return (
+                <button
+                  key={tabKey}
+                  id={`tab-${tabKey}`}
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls={`tabpanel-${tabKey}`}
+                  tabIndex={active ? 0 : -1}
+                  className={`tab-btn${active ? ' active' : ''}`}
+                  onClick={() => {
+                    if (isBusinessPseudo) {
+                      navigate(businessPath);
+                      return;
+                    }
+                    switchTab(tabKey);
+                  }}
+                >
+                  {getTabLabel(tabKey)}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
@@ -1216,7 +1526,7 @@ export default function ServerDetail({
 
         <TabPanel tabKey="mods" activeTab={activeTab} activated={activatedTabs.has('mods')}>
             <LazyTabContent>
-              <Mods serverId={server.id} />
+              <Mods serverId={server.id} gameType={server.game_type} />
             </LazyTabContent>
         </TabPanel>
 

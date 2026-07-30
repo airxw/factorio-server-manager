@@ -2,7 +2,7 @@
 type: plan
 title: 用户批量管理与分析工具方案
 date: 2026-07-26
-status: pending
+status: deployed（批量操作 /batch 已上线，见 version.md）
 related:
   - panel/frontend/src/pages/admin/Users.tsx
   - panel/frontend/src/api/modules/admin.ts

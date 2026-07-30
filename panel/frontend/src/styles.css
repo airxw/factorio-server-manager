@@ -5072,47 +5072,81 @@ a.server-card-name:focus-visible {
   display: none;
 }
 
-/* B2: Tab 横向分组条（原垂直折叠卡片优化为横向 inline，释放控制台垂直空间） */
-.tab-groups {
+/* B7: Tab 2 级菜单（v4.32.5：第一级分组 pill + 第二级子 tab，替换原单行 inline 分组条） */
+.tab-groups-2level {
   display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 10px;
+  flex-direction: column;
+  gap: 0;
   margin-bottom: 12px;
-  padding: 6px 0;
   border-bottom: 1px solid var(--color-border);
 }
 
-.tab-group-inline {
+/* 第一级：分组 pill */
+.tab-group-pills {
   display: flex;
-  align-items: center;
-  gap: 4px;
   flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 0 4px;
 }
 
-.tab-group-label {
-  font-size: 11px;
+.tab-group-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--color-text-muted);
-  letter-spacing: 0.02em;
-  padding: 2px 6px;
-  background: var(--color-bg-hover, rgba(0, 0, 0, 0.04));
-  border-radius: 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  cursor: pointer;
   white-space: nowrap;
-  flex-shrink: 0;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
 }
 
-.tab-group-divider {
-  display: block;
-  width: 1px;
-  height: 18px;
-  background: rgba(0, 0, 0, 0.15);
-  flex-shrink: 0;
-  align-self: center;
+.tab-group-pill:hover {
+  background: var(--color-bg-hover, rgba(0, 0, 0, 0.04));
+  color: var(--color-text);
 }
 
-.tab-group-inline .tab-btn {
+.tab-group-pill.active {
+  background: var(--color-primary, #2563eb);
+  color: #fff;
+}
+
+.tab-group-pill:focus-visible {
+  outline: 2px solid var(--color-primary, #2563eb);
+  outline-offset: 2px;
+}
+
+.tab-group-pill-count {
+  font-size: 11px;
+  font-weight: 400;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  line-height: 1.4;
+}
+
+.tab-group-pill.active .tab-group-pill-count {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* 第二级：当前分组子 tab（复用 .tab-btn 下划线风格） */
+.tab-sub-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 4px 0 6px;
+}
+
+.tab-sub-tabs .tab-btn {
   padding: 6px 10px;
   font-size: 13px;
 }

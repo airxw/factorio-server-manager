@@ -344,24 +344,26 @@ async function walkDir(
 }
 
 /**
- * 切换 mod 启用状态：.jar ↔ .jar.disabled（v4.3.0-H1 新增）。
+ * 切换 mod 启用状态：通用 .disabled 后缀切换（v4.33.0 多游戏支持）。
  * @param workdir 实例工作目录
- * @param modName mod 文件名（如 example.jar 或 example.jar.disabled）
+ * @param modName mod 文件名（如 example.jar 或 example.cs.disabled）
+ * @param opts.modsDir mod 文件所在子目录（默认 'mods'，向后兼容）
  * @returns 新状态
  * @throws {FilePathInvalidError} 路径非法
  * @throws {FileNotFoundError} 文件不存在
- * @throws {Error} 文件名不符合 .jar / .jar.disabled 规则
  */
 export async function toggleModFile(
   workdir: string,
   modName: string,
+  opts?: { modsDir?: string },
 ): Promise<{ name: string; new_state: 'enabled' | 'disabled' }> {
   // 校验 modName 必须为纯文件名（无路径）
   if (modName.includes('/') || modName.includes('\\') || modName.includes('..')) {
     throw new FilePathInvalidError(`modName 不能包含路径分隔符或 ..: ${modName}`);
   }
-  // 路径必须在 mods/ 子目录下
-  const modsRel = `mods/${modName}`;
+  // v4.33.0: modsDir 参数化（默认 'mods' 向后兼容）
+  const modsDir = opts?.modsDir ?? 'mods';
+  const modsRel = `${modsDir}/${modName}`;
   const absPath = safeResolve(workdir, modsRel);
 
   let stat;
@@ -380,12 +382,9 @@ export async function toggleModFile(
     throw new FilePathInvalidError(`mod 路径不是文件: ${modName}`);
   }
 
-  // 判定当前状态与目标路径
+  // v4.33.0: 通用 .disabled 后缀切换（不再限定 .jar）
   const isDisabled = modName.endsWith('.disabled');
   const enabledName = isDisabled ? modName.slice(0, -'.disabled'.length) : modName;
-  if (!enabledName.endsWith('.jar')) {
-    throw new Error(`mod 文件名必须以 .jar 或 .jar.disabled 结尾: ${modName}`);
-  }
   const disabledName = `${enabledName}.disabled`;
 
   const fromPath = absPath;

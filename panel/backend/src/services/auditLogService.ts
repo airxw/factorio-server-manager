@@ -12,6 +12,7 @@
 // ============================================================================
 
 import type { Knex } from 'knex';
+import { clampPagination } from '../utils/pagination.js';
 import type {
   AuditLogSummary,
   ListAuditLogsQuery,
@@ -172,9 +173,8 @@ export class AuditLogServiceImpl {
     page: number;
     page_size: number;
   }> {
-    const page = Math.max(1, opts.page ?? 1);
-    const pageSize = Math.min(100, Math.max(1, opts.page_size ?? 20));
-    const offset = (page - 1) * pageSize;
+    // v4.33.0: 分页归一化统一走公共 utils（W3 提炼批）
+    const { page, pageSize, offset } = clampPagination(opts.page, opts.page_size);
 
     let qb = this.db<AuditLogRow>('audit_logs').where('user_id', userId);
     if (opts.action) {

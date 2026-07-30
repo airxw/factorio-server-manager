@@ -9,6 +9,17 @@ GSP 是一款面向下一代游戏私服生态的 **B2B2C 商业化 SaaS 操作�
 - **普通用户（玩家）**：体验纯粹的“玩家自助充值门户”，账号绑定、充值消费、自动下发特权与道具一气呵成。
 
 ## 🚀 当前版本
+**v4.34.0** - Mod 管理多游戏自适应（修复 Mod 系统仅支持 Minecraft 的问题）(2026-07-30)
+- Mod 系统从 Minecraft 专用扩展为支持 9 款游戏的自适应架构
+- 契约扩展 `PackModsSchema` 新增 `mechanism` / `file_extensions` / `mods_dir` 字段（向后兼容）
+- Daemon 扫描器支持多游戏元数据格式（Factorio `info.json` 等），文件扩展名与目录可配置
+- 前端 UI 按 `game_type` 自适应显隐元数据列与客户端 Mod 警告
+
+**v4.33.0** - Factorio Pack 修复（配置文件路径错位 + 字段对齐 2.0 + 自动建图 + 路径渲染）(2026-07-30)
+- Factorio pack.yaml server-settings schema 对齐 2.0（28 字段），bootstrap.ts 修复路径错位 + 新增 map-gen/map-settings 生成
+- manager.ts save_path 默认值追加 .zip 扩展名，bootstrap 首次启动自动建图
+- configFileService listConfigFiles 返回渲染后的 path，npm run packs:validate 9 个 Pack 全部通过
+
 **v4.32.4** - 部署链路化债（防止生产 `.env` 被开发配置覆盖 + 迁移幂等补强）(2026-07-29)
 - `deploy.sh` 不再把开发目录中的 `panel/backend/.env` / `daemon/.env` 覆盖到 `/opt`
 - `20260823000000_add_link_key_expires_at_to_nodes.ts` 增加幂等保护，切回旧数据库路径时不再因重复加列崩溃
@@ -618,7 +629,7 @@ A: 检查：
 
 ## 版本
 
-- **当前版本**：4.32.4
+- **当前版本**：4.34.0
 - **基线**：Panel-Daemon 主从集群架构 + 全量业务功能迁移 + 前后端分离架构
 - **多游戏支持**：内置 12 款游戏 Pack，配置驱动、零硬编码
 - **项目主页**：未登录用户访问根路径会跳转到 `/home` 项目介绍主页（深色科技风单页着陆页），已登录用户直接进入实例列表

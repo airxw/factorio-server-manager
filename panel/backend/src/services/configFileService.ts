@@ -59,15 +59,19 @@ export class ConfigFileServiceImpl {
 
   /**
    * 列出 Pack 声明的所有 config_files 元信息。
+   *
+   * v4.33.0：path 返回渲染后的相对路径（如 `config/server-settings.json`），
+   *          而非原始模板 `{{config_dir}}/server-settings.json`，让前端能展示真实文件位置。
    */
   async listConfigFiles(serverId: string): Promise<ConfigFileMeta[]> {
     const pack = await this.resolveServerPack(serverId);
     if (!pack.config_files || pack.config_files.length === 0) {
       return [];
     }
+    const { instanceRoot, vars } = this.buildPathVars(serverId, pack);
     return pack.config_files.map((f) => ({
       name: f.name,
-      path: f.path,
+      path: toRelPath(renderTemplate(f.path, vars), instanceRoot),
       format: f.format,
       read_only: f.read_only,
     }));
@@ -203,12 +207,11 @@ export class ConfigFileServiceImpl {
     return { configFile };
   }
 
-  /** 渲染 config_files[].path 模板，转换为相对 instanceRoot 的路径 */
-  private async resolveConfigRelPath(
+  /** 构建路径渲染变量（listConfigFiles 与 resolveConfigRelPath 共用） */
+  private buildPathVars(
     serverId: string,
     pack: GamePack,
-    configFile: PackConfigFile,
-  ): Promise<string> {
+  ): { instanceRoot: string; vars: Readonly<Record<string, string>> } {
     const instancesDir = process.env.INSTANCES_DIR ?? './instances';
     const instanceRoot = `${instancesDir}/${serverId}`;
     const configDir = `${instanceRoot}/config`;
@@ -217,6 +220,16 @@ export class ConfigFileServiceImpl {
       instance_root: instanceRoot,
       binary: pack.startup.binary,
     };
+    return { instanceRoot, vars };
+  }
+
+  /** 渲染 config_files[].path 模板，转换为相对 instanceRoot 的路径 */
+  private async resolveConfigRelPath(
+    serverId: string,
+    pack: GamePack,
+    configFile: PackConfigFile,
+  ): Promise<string> {
+    const { instanceRoot, vars } = this.buildPathVars(serverId, pack);
     const absPath = renderTemplate(configFile.path, vars);
     return toRelPath(absPath, instanceRoot);
   }

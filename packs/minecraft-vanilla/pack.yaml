@@ -400,6 +400,9 @@ mods:
   dependency_check: true                 # Forge/Fabric 有强依赖关系，必须检查
   download_enabled: false                 # P0 不开放自动下载（涉及 CurseForge/Modrinth API key）
   download_source: 'https://api.modrinth.com/v2/'
+  mechanism: jar-rename
+  file_extensions: ['.jar']
+  mods_dir: 'mods'
 
 # ---- 启动前置引导（首次启动前向导，v4.x 新增）----
 startup_guide:

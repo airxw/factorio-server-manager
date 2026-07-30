@@ -2,7 +2,7 @@
 type: plan
 title: 玩家角色绑定从 game_type 全局语义迁移至 instance 实例级语义
 date: 2026-07-27
-status: pending
+status: deployed（v4.27.0 已迁移，见 version.md）
 related: binding-unification-multi-role-plan
 tags: [binding, player-binding, instance-scope, contract-change, s0601]
 ---

@@ -15,12 +15,18 @@ import {
   Info,
   Package,
   Tag,
+  Wallet,
 } from 'lucide-react';
 import type { CreateServerRequest } from '@public/schema/panel-api-types';
 import type { PackSummary } from '@public/schema/panel-api-types';
 import type { GameVersionSummary } from '@public/schema/panel-api-types';
 import type { MyQuotaResponse } from '@public/schema/panel-api-types';
 import type { NodeInfo } from '../api/client';
+import type {
+  InstanceTypePricing,
+  BillingCycleMonths,
+} from '@public/interface_stub/shared-types';
+import type { BillingAmountPreview } from '../api/modules/instance-billing';
 import { useAuth } from '../api/auth';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useDraftAutosave } from '../hooks/useDraftAutosave';
@@ -42,6 +48,29 @@ import {
 } from './store/components/WorkbenchUI';
 
 type CreateServerField = 'name';
+
+/** v3-billing: 创建实例请求体扩展（后端 servers.ts 已支持 instance_type/billing_cycle_months） */
+type CreateServerRequestWithBilling = CreateServerRequest & {
+  instance_type?: 'micro' | 'small' | 'medium' | 'large' | 'xlarge';
+  billing_cycle_months?: 1 | 3 | 6 | 12;
+};
+
+/** v3-billing: 创建实例响应体扩展（后端附加 billing 字段） */
+type CreateServerResponseWithBilling = {
+  server: import('@public/schema/panel-api-types').ServerSummary;
+  billing?: {
+    amount_paid: number;
+    exempt: boolean;
+    new_expires_at: string;
+  };
+};
+
+const CYCLE_OPTIONS: ReadonlyArray<{ value: BillingCycleMonths; label: string }> = [
+  { value: 1, label: '月付' },
+  { value: 3, label: '季付' },
+  { value: 6, label: '半年付' },
+  { value: 12, label: '年付' },
+];
 
 export default function CreateServer() {
   const { api, user } = useAuth();
@@ -69,6 +98,16 @@ export default function CreateServer() {
   const [fieldErrors, setFieldErrors] = useState<FieldErrors<CreateServerField>>({});
   // v4.6.0-E3: 配额预检（仅非 server_admin 角色加载）
   const [quota, setQuota] = useState<MyQuotaResponse | null>(null);
+
+  // v3-billing: 实例类型定价 + 计费周期选择 + 价格预览
+  const [typePricings, setTypePricings] = useState<InstanceTypePricing[]>([]);
+  const [selectedInstanceType, setSelectedInstanceType] = useState<
+    'micro' | 'small' | 'medium' | 'large' | 'xlarge'
+  >('small');
+  const [billingCycleMonths, setBillingCycleMonths] = useState<BillingCycleMonths>(1);
+  const [pricePreview, setPricePreview] = useState<BillingAmountPreview | null>(null);
+  const [loadingTypes, setLoadingTypes] = useState(true);
+  const [loadingPreview, setLoadingPreview] = useState(false);
 
   // 7.5: 表单草稿自动保存——草稿恢复提示未决时暂停自动保存，避免空表单覆盖草稿
   const [draftPromptResolved, setDraftPromptResolved] = useState(false);
@@ -185,6 +224,54 @@ export default function CreateServer() {
     };
   }, [api, isServerAdmin]);
 
+  // v3-billing: 加载实例类型定价（任意已登录用户可读）
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingTypes(true);
+    api
+      .listInstanceTypePricings()
+      .then((res) => {
+        if (cancelled) return;
+        setTypePricings(res.types);
+        // 默认选中 small（若不存在则选第一个）
+        const hasSmall = res.types.some((t) => t.instance_type === 'small');
+        if (!hasSmall && res.types.length > 0) {
+          setSelectedInstanceType(res.types[0].instance_type);
+        }
+      })
+      .catch(() => {
+        // 定价加载失败不阻塞创建（后端会用默认 small 定价）
+        if (!cancelled) setTypePricings([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingTypes(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api]);
+
+  // v3-billing: 实时价格预览（实例类型或周期变化时刷新）
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingPreview(true);
+    api
+      .previewBillingAmount(selectedInstanceType, billingCycleMonths)
+      .then((res) => {
+        if (!cancelled) setPricePreview(res.preview);
+      })
+      .catch(() => {
+        // 预览失败不阻塞创建（后端会重新计算）
+        if (!cancelled) setPricePreview(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPreview(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, selectedInstanceType, billingCycleMonths]);
+
   const validateField = (field: CreateServerField, value: string): string | null => {
     if (field === 'name') return validateInstanceName(value);
     return null;
@@ -233,19 +320,31 @@ export default function CreateServer() {
       }
 
       // v1.1.0: 端口由系统自动分配，前端不再传 port/rcon_port
-      const req: CreateServerRequest = {
+      // v3-billing: 附带 instance_type + billing_cycle_months，后端预付费扣款
+      const req: CreateServerRequestWithBilling = {
         name: name.trim(),
         pack_id: packId,
         node_id: nodeId,
         version_id: versionId || undefined,
+        instance_type: selectedInstanceType,
+        billing_cycle_months: billingCycleMonths,
       };
 
       setSubmitting(true);
       try {
-        const res = await api.createServer(req);
+        const res = (await api.createServer(req)) as CreateServerResponseWithBilling;
         setSuccess(true);
-        // 6.5: 成功 Toast 反馈
-        toast.success('实例创建成功');
+        // v3-billing: 展示计费结果（扣款金额/豁免/到期时间）
+        if (res.billing) {
+          if (res.billing.exempt || res.billing.amount_paid === 0) {
+            toast.success('实例创建成功（免计费）');
+          } else {
+            toast.success(`实例创建成功，已扣费 ${res.billing.amount_paid} 点券`);
+          }
+        } else {
+          // 6.5: 成功 Toast 反馈（未接入计费的兜底）
+          toast.success('实例创建成功');
+        }
         // 7.5: 提交成功后清除草稿
         clearDraft();
         // 一.7: 延迟跳转，让用户看到成功提示；定时器由 redirectTimerRef 管理，卸载时清理
@@ -261,7 +360,20 @@ export default function CreateServer() {
         setSubmitting(false);
       }
     },
-    [submitting, name, packId, nodeId, api, navigate, clearDraft, toast, isServerAdmin, quota],
+    [
+      submitting,
+      name,
+      packId,
+      nodeId,
+      api,
+      navigate,
+      clearDraft,
+      toast,
+      isServerAdmin,
+      quota,
+      selectedInstanceType,
+      billingCycleMonths,
+    ],
   );
 
   const INPUT_CLASS =
@@ -476,6 +588,141 @@ export default function CreateServer() {
                 )}
                 <p className={HINT_CLASS}>选择实例使用的游戏版本，默认最新。</p>
               </div>
+            )}
+          </div>
+        </WorkbenchSection>
+
+        {/* v3-billing: 实例计费配置（类型选择 + 周期选择 + 实时价格预览） */}
+        <WorkbenchSection
+          title="实例计费"
+          description="选择实例类型与计费周期。创建实例时将预付费扣全额，到期后自动续扣。"
+          icon={Wallet}
+        >
+          <div className="space-y-5">
+            {loadingTypes ? (
+              <p className={HINT_CLASS}>加载实例类型定价中…</p>
+            ) : typePricings.length === 0 ? (
+              <WorkbenchNote tone="blue" icon={Info}>
+                暂无类型定价配置，将使用系统默认 small 类型计费。
+              </WorkbenchNote>
+            ) : (
+              <>
+                <div>
+                  <label className={LABEL_CLASS}>实例类型</label>
+                  <p className={`mb-3 ${HINT_CLASS}`}>
+                    不同类型对应不同的资源配额与月费，请按实际需求选择。
+                  </p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {typePricings.map((t) => {
+                      const isSelected = selectedInstanceType === t.instance_type;
+                      return (
+                        <button
+                          key={t.instance_type}
+                          type="button"
+                          onClick={() => setSelectedInstanceType(t.instance_type)}
+                          className={`rounded-[14px] border p-4 text-left transition ${
+                            isSelected
+                              ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-semibold text-slate-700">
+                              {t.display_name}
+                            </span>
+                            {isSelected && (
+                              <CheckCircle2 size={16} className="text-blue-500" />
+                            )}
+                          </div>
+                          <div className="mt-1 text-lg font-bold text-slate-800">
+                            ¥{t.monthly_price}
+                            <span className="ml-1 text-xs font-normal text-slate-400">
+                              /月
+                            </span>
+                          </div>
+                          <div className="mt-2 space-y-0.5 text-xs text-slate-500">
+                            {t.recommended_slots != null && (
+                              <div>推荐 {t.recommended_slots} 人</div>
+                            )}
+                            {t.cpu_limit && <div>CPU {t.cpu_limit} 核</div>}
+                            {t.memory_limit_mb != null && (
+                              <div>内存 {t.memory_limit_mb} MB</div>
+                            )}
+                            {t.disk_limit_gb != null && (
+                              <div>磁盘 {t.disk_limit_gb} GB</div>
+                            )}
+                          </div>
+                          {t.description && (
+                            <p className="mt-2 text-xs leading-5 text-slate-400">
+                              {t.description}
+                            </p>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className={LABEL_CLASS}>计费周期</label>
+                  <p className={`mb-3 ${HINT_CLASS}`}>
+                    选择更长周期可享受折扣优惠，到期后自动按相同周期续扣。
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {CYCLE_OPTIONS.map((opt) => {
+                      const isSelected = billingCycleMonths === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setBillingCycleMonths(opt.value)}
+                          className={`rounded-[12px] border px-4 py-2 text-sm font-medium transition ${
+                            isSelected
+                              ? 'border-blue-400 bg-blue-50 text-blue-600 ring-2 ring-blue-200'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* v3-billing: 价格预览 */}
+                <div className="rounded-[14px] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                      应付金额
+                    </span>
+                    {loadingPreview ? (
+                      <span className="text-xs text-slate-400">计算中…</span>
+                    ) : pricePreview ? (
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-slate-800">
+                          {pricePreview.amount}
+                          <span className="ml-1 text-sm font-normal text-slate-400">
+                            点券
+                          </span>
+                        </div>
+                        <div className="mt-0.5 text-xs text-slate-400">
+                          {pricePreview.monthly_price_effective} ×{' '}
+                          {pricePreview.billing_cycle_months} 月
+                          {pricePreview.cycle_discount_applied < 1 && (
+                            <span className="ml-1 text-emerald-600">
+                              （{(pricePreview.cycle_discount_applied * 10).toFixed(1)}折）
+                            </span>
+                          )}
+                          {' · '}
+                          有效期 {pricePreview.duration_days} 天
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400">无法预览</span>
+                    )}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </WorkbenchSection>

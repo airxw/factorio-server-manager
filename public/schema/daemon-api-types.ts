@@ -16,6 +16,12 @@ export interface InstanceSummary {
   status: InstanceState;
   port: number;
   rcon_port: number;
+  /**
+   * v4.33.0 契约补齐：实例运行时长（秒）。Daemon B8 起已在
+   * GET /api/instances 实际返回（daemon/src/instances/manager.ts listSummaries），
+   * 未运行态返回 0。此前契约漏声明，本版本补齐（向后兼容的纯新增字段）。
+   */
+  uptime: number;
 }
 
 // ----- GET /health（无需 token） -----
@@ -194,8 +200,8 @@ export interface ScanJavasResult {
 //       避免误装到服务端导致启动失败。
 // ============================================================================
 
-/** Mod 加载器类型 */
-export type ModLoader = 'fabric' | 'forge' | 'neoforge' | 'unknown';
+/** Mod 加载器/平台类型（v4.33.0 扩展多游戏支持） */
+export type ModLoader = 'fabric' | 'forge' | 'neoforge' | 'factorio' | 'umod' | 'bepinex' | 'tmodloader' | 'steam-workshop' | 'unknown';
 
 /** Mod 运行环境 */
 export type ModEnvironment = 'client' | 'server' | 'both';
@@ -206,13 +212,13 @@ export interface ModMetadata {
   name: string;
   /** Mod 版本 */
   version: string;
-  /** 加载器：fabric / forge / neoforge / unknown */
+  /** 加载器/平台：fabric/forge/neoforge(MC) / factorio / umod(Rust) / bepinex(Valheim) / tmodloader(Terraria) / steam-workshop(ARK/Zomboid) / unknown */
   loader: ModLoader;
   /** 运行环境：client（仅客户端）/ server（仅服务端）/ both（双端） */
   environment: ModEnvironment;
   /** 是否为客户端 mod（environment === 'client' 或命中黑名单） */
   isClientSide: boolean;
-  /** jar 源文件名 */
+  /** mod 源文件名 */
   sourceFile: string;
 }
 

@@ -252,6 +252,249 @@ export async function createAssetTables(db: Knex): Promise<void> {
 }
 
 /**
+ * 在已初始化的测试 DB 上创建经济系统相关表。
+ * 与生产迁移保持列定义一致，来源：
+ * - user_wallets / cdk_codes / cdk_code_items / shop_orders / shop_order_items /
+ *   system_config / vip_permissions：baseline 20260808000000_baseline_v4_post_demo.ts
+ * - global_balances / instance_points / user_integrals / user_vip_status /
+ *   instance_pricing / wallet_transactions / withdraw_codes：2026072700000{1..8}
+ * - cdk_codes 扩展列（type/amount/vip_duration/creator_user_id/refunded_at/refund_tx_id）：
+ *   20260727000006_extend_cdk_keys.ts
+ * 另：createTestDb 中的 shop_items 缺 price 列（生产基线含），此处补齐。
+ * 供 wallet/balance/withdraw/points/integral/pricing/vip/cdk/shop 服务测试使用。
+ */
+export async function createEconomyTables(db: Knex): Promise<void> {
+  // ----- shop_items 补 price 列（生产基线含 price，createTestDb 版本缺） -----
+  if (!(await db.schema.hasColumn('shop_items', 'price'))) {
+    await db.schema.alterTable('shop_items', (table) => {
+      table.integer('price').notNullable().defaultTo(0);
+    });
+  }
+
+  // ----- user_wallets（实例点券钱包，UNIQUE(user_id, server_id)） -----
+  if (!(await db.schema.hasTable('user_wallets'))) {
+    await db.schema.createTable('user_wallets', (table) => {
+      table.increments('id').primary();
+      table.string('user_id').notNullable();
+      table.string('server_id').notNullable();
+      table.integer('balance').notNullable().defaultTo(0);
+      table.integer('total_earned').notNullable().defaultTo(0);
+      table.integer('total_spent').notNullable().defaultTo(0);
+      table.text('last_daily_claim_at').nullable();
+      table.text('last_daily_claim_date').nullable();
+      table.text('created_at').notNullable();
+      table.text('updated_at').notNullable();
+      table.unique(['user_id', 'server_id'], { indexName: 'idx_user_wallets_user_server' });
+    });
+  }
+
+  // ----- wallet_transactions（统一流水；order_id 部分唯一索引为幂等键） -----
+  if (!(await db.schema.hasTable('wallet_transactions'))) {
+    await db.schema.createTable('wallet_transactions', (table) => {
+      table.increments('id').primary();
+      table.string('user_id').notNullable();
+      table.string('server_id').nullable();
+      table.string('currency_type').notNullable();
+      table.string('type').notNullable();
+      table.integer('amount').notNullable();
+      table.integer('balance_after').notNullable();
+      table.integer('linked_tx_id').nullable();
+      table.string('order_id').nullable();
+      table.integer('cdk_id').nullable();
+      table.integer('withdraw_code_id').nullable();
+      table.text('description').nullable();
+      table.string('operator_user_id').nullable();
+      table.string('trace_id').notNullable();
+      table.text('created_at').notNullable();
+    });
+    await db.raw(
+      'CREATE UNIQUE INDEX IF NOT EXISTS `idx_wallet_tx_order_id` ON `wallet_transactions` (`order_id`) WHERE `order_id` IS NOT NULL',
+    );
+  }
+
+  // ----- global_balances（全局余额，user_id PK） -----
+  if (!(await db.schema.hasTable('global_balances'))) {
+    await db.schema.createTable('global_balances', (table) => {
+      table.string('user_id').primary();
+      table.integer('balance').notNullable().defaultTo(0);
+      table.integer('total_earned').notNullable().defaultTo(0);
+      table.integer('total_spent').notNullable().defaultTo(0);
+      table.integer('frozen_balance').notNullable().defaultTo(0);
+      table.integer('total_withdrawn').notNullable().defaultTo(0);
+      table.text('last_income_at').nullable();
+      table.text('created_at').notNullable();
+      table.text('updated_at').notNullable();
+    });
+  }
+
+  // ----- instance_points（实例点券，PK(user_id, server_id)） -----
+  if (!(await db.schema.hasTable('instance_points'))) {
+    await db.schema.createTable('instance_points', (table) => {
+      table.string('user_id').notNullable();
+      table.string('server_id').notNullable();
+      table.integer('balance').notNullable().defaultTo(0);
+      table.integer('total_earned').notNullable().defaultTo(0);
+      table.integer('total_spent').notNullable().defaultTo(0);
+      table.text('created_at').notNullable();
+      table.text('updated_at').notNullable();
+      table.primary(['user_id', 'server_id']);
+    });
+  }
+
+  // ----- user_integrals（成长积分，PK(user_id, server_id)） -----
+  if (!(await db.schema.hasTable('user_integrals'))) {
+    await db.schema.createTable('user_integrals', (table) => {
+      table.string('user_id').notNullable();
+      table.string('server_id').notNullable();
+      table.integer('total_integral').notNullable().defaultTo(0);
+      table.integer('current_integral').notNullable().defaultTo(0);
+      table.text('last_decay_at').nullable();
+      table.text('created_at').notNullable();
+      table.text('updated_at').notNullable();
+      table.primary(['user_id', 'server_id']);
+    });
+  }
+
+  // ----- user_vip_status（VIP 状态，PK(user_id, server_id)） -----
+  if (!(await db.schema.hasTable('user_vip_status'))) {
+    await db.schema.createTable('user_vip_status', (table) => {
+      table.string('user_id').notNullable();
+      table.string('server_id').notNullable();
+      table.string('vip_type').nullable();
+      table.text('vip_expires_at').nullable();
+      table.text('purchased_at').nullable();
+      table.text('created_at').notNullable();
+      table.text('updated_at').notNullable();
+      table.primary(['user_id', 'server_id']);
+    });
+  }
+
+  // ----- instance_pricing（实例定价，server_id PK） -----
+  if (!(await db.schema.hasTable('instance_pricing'))) {
+    await db.schema.createTable('instance_pricing', (table) => {
+      table.string('server_id').primary();
+      table.integer('vip_monthly_price').nullable();
+      table.integer('vip_lifetime_price').nullable();
+      table.float('points_exchange_ratio').notNullable().defaultTo(1.0);
+      table.float('integral_ratio').notNullable().defaultTo(1.0);
+      table.integer('daily_consumption_limit').nullable();
+      table.text('created_at').notNullable();
+      table.text('updated_at').notNullable();
+    });
+  }
+
+  // ----- withdraw_codes（提现码，code UNIQUE） -----
+  if (!(await db.schema.hasTable('withdraw_codes'))) {
+    await db.schema.createTable('withdraw_codes', (table) => {
+      table.increments('id').primary();
+      table.string('code').notNullable().unique();
+      table.string('user_id').notNullable();
+      table.integer('amount').notNullable();
+      table.integer('actual_amount').notNullable();
+      table.float('ratio').notNullable();
+      table.string('status').notNullable().defaultTo('pending');
+      table.string('operator_user_id').nullable();
+      table.text('approved_at').nullable();
+      table.text('expires_at').notNullable();
+      table.text('created_at').notNullable();
+    });
+  }
+
+  // ----- system_config（平台配置，key PK） -----
+  if (!(await db.schema.hasTable('system_config'))) {
+    await db.schema.createTable('system_config', (table) => {
+      table.string('key').primary();
+      table.string('value').notNullable();
+      table.string('description').nullable();
+      table.text('updated_at').notNullable();
+    });
+  }
+
+  // ----- vip_permissions（VIP 权益模板，vip_level UNIQUE） -----
+  if (!(await db.schema.hasTable('vip_permissions'))) {
+    await db.schema.createTable('vip_permissions', (table) => {
+      table.increments('id').primary();
+      table.integer('vip_level').notNullable().unique();
+      table.string('display_name').notNullable();
+      table.text('permissions').defaultTo('[]');
+      table.string('max_quality').notNullable().defaultTo('normal');
+      table.integer('daily_limit').nullable();
+      table.integer('daily_reward_amount').notNullable().defaultTo(0);
+    });
+  }
+
+  // ----- cdk_codes（基线 + v5 经济扩展列，code UNIQUE） -----
+  if (!(await db.schema.hasTable('cdk_codes'))) {
+    await db.schema.createTable('cdk_codes', (table) => {
+      table.increments('id').primary();
+      table.string('server_id').notNullable();
+      table.string('code').notNullable().unique();
+      table.string('item_name').notNullable();
+      table.integer('count').notNullable();
+      table.string('quality').notNullable().defaultTo('normal');
+      table.string('status').notNullable().defaultTo('unused');
+      table.string('claimed_player').nullable();
+      table.text('claimed_at').nullable();
+      table.text('claiming_at').nullable();
+      table.text('expires_at').notNullable();
+      table.string('created_by').notNullable();
+      table.text('created_at').notNullable();
+      table.string('gift_name').nullable();
+      table.string('gift_description').nullable();
+      // v5 经济系统扩展列（migration 20260727000006）
+      table.string('type').notNullable().defaultTo('item');
+      table.integer('amount').nullable();
+      table.string('vip_duration').nullable();
+      table.string('creator_user_id').nullable();
+      table.text('refunded_at').nullable();
+      table.integer('refund_tx_id').nullable();
+    });
+  }
+
+  // ----- cdk_code_items（礼包子表） -----
+  if (!(await db.schema.hasTable('cdk_code_items'))) {
+    await db.schema.createTable('cdk_code_items', (table) => {
+      table.increments('id').primary();
+      table.integer('cdk_code_id').notNullable();
+      table.string('item_name').notNullable();
+      table.integer('count').notNullable();
+      table.string('quality').notNullable().defaultTo('normal');
+      table.integer('sort_order').notNullable().defaultTo(0);
+    });
+  }
+
+  // ----- shop_orders（商店订单，claim_code UNIQUE） -----
+  if (!(await db.schema.hasTable('shop_orders'))) {
+    await db.schema.createTable('shop_orders', (table) => {
+      table.increments('id').primary();
+      table.string('server_id').notNullable();
+      table.string('user_id').notNullable();
+      table.string('status').notNullable().defaultTo('pending');
+      table.string('claim_code').notNullable().unique();
+      table.integer('items_count').notNullable();
+      table.integer('total_price').notNullable().defaultTo(0);
+      table.text('claimed_at').nullable();
+      table.text('claiming_at').nullable();
+      table.text('expires_at').notNullable();
+      table.string('claimed_player').nullable();
+      table.text('created_at').notNullable();
+    });
+  }
+
+  // ----- shop_order_items（订单明细，含 price 快照） -----
+  if (!(await db.schema.hasTable('shop_order_items'))) {
+    await db.schema.createTable('shop_order_items', (table) => {
+      table.increments('id').primary();
+      table.integer('order_id').notNullable();
+      table.string('item_name').notNullable();
+      table.integer('count').notNullable();
+      table.string('quality').notNullable().defaultTo('normal');
+      table.integer('price').notNullable().defaultTo(0);
+    });
+  }
+}
+
+/**
  * 销毁测试数据库实例，释放 :memory: 连接。
  */
 export async function destroyTestDb(db: Knex): Promise<void> {

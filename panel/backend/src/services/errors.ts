@@ -604,3 +604,64 @@ export class FileOperationError extends AppError {
     this.code = code;
   }
 }
+
+// ----- v3-billing 实例计费域（VPS 式预付费）-----
+// 与 shared-types.d.ts 中 v3-billing-D 错误类声明对齐（运行时实现）。
+// 来源：docs/plans/instance-billing-rules-plan.md §8 + instance-billing-service.d.ts
+
+/** 实例类型定价不存在或已归档（INSTANCE_TYPE_PRICING_NOT_FOUND） */
+export class InstanceTypePricingNotFoundError extends AppError {
+  readonly code = 'INSTANCE_TYPE_PRICING_NOT_FOUND';
+  readonly httpStatus = 404;
+  constructor(message = '实例类型定价不存在或已归档') {
+    super(message);
+  }
+}
+
+/** 实例计费设置不存在（INSTANCE_BILLING_SETTINGS_NOT_FOUND） */
+export class InstanceBillingSettingsNotFoundError extends AppError {
+  readonly code = 'INSTANCE_BILLING_SETTINGS_NOT_FOUND';
+  readonly httpStatus = 404;
+  constructor(message = '实例计费设置不存在') {
+    super(message);
+  }
+}
+
+/** 实例已过期且未续费，禁止启动（INSTANCE_EXPIRED_NOT_RENEWED） */
+export class InstanceExpiredError extends AppError {
+  readonly code = 'INSTANCE_EXPIRED_NOT_RENEWED';
+  readonly httpStatus = 409;
+  constructor(message = '实例已过期，需续费后才能启动') {
+    super(message);
+  }
+}
+
+/** 计费豁免冲突（BILLING_EXEMPT_CONFLICT） */
+export class BillingExemptError extends AppError {
+  readonly code = 'BILLING_EXEMPT_CONFLICT';
+  readonly httpStatus = 409;
+  constructor(message = '计费豁免冲突') {
+    super(message);
+  }
+}
+
+/** 计费周期非法（INVALID_BILLING_CYCLE） */
+export class InvalidBillingCycleError extends AppError {
+  readonly code = 'INVALID_BILLING_CYCLE';
+  readonly httpStatus = 400;
+  constructor(message = '计费周期非法，必须为 1/3/6/12') {
+    super(message);
+  }
+}
+
+/** 腐竹全局余额不足（GLOBAL_BALANCE_INSUFFICIENT，HTTP 402）
+ * 区别于 InsufficientBalanceError(400, 玩家 user_wallets) 与
+ * AdminWalletInsufficientBalanceError(402, 腐竹 admin_wallets)。
+ * VPS 计费扣 global_balances 表（通过 user_id 隔离的腐竹全局账户）。 */
+export class GlobalBalanceInsufficientError extends AppError {
+  readonly code = 'GLOBAL_BALANCE_INSUFFICIENT';
+  readonly httpStatus = 402;
+  constructor(message = '腐竹全局余额不足') {
+    super(message);
+  }
+}

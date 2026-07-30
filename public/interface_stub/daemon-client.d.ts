@@ -66,6 +66,15 @@ export interface DaemonClient {
   getInstanceState(nodeId: string, serverId: string): Promise<InstanceState>;
 
   /**
+   * v4.33.0 新增：查询实例真实运行时长（秒）。
+   *
+   * 实现：GET /api/instances（listSummaries 含 uptime 字段），按 serverId 匹配摘要。
+   * @returns 运行时长（秒）；实例不在 Daemon 摘要中（未注册/已清理）时返回 null
+   * @throws {DaemonUnreachableError} 节点不可达
+   */
+  getInstanceUptime(nodeId: string, serverId: string): Promise<number | null>;
+
+  /**
    * 下发命令（WS sendCommand 下行）。
    * @param requestId 请求追踪 ID，用于关联响应
    * @returns {success, error?} error 在 success=false 时给出失败原因
@@ -143,8 +152,9 @@ export interface DaemonClient {
   ): Promise<ListFilesResponse>;
 
   /**
-   * v4.3.0-H1 新增：切换 mod 启用状态（.jar ↔ .jar.disabled）。
-   * @param modName 纯文件名（无路径，必须以 .jar 或 .jar.disabled 结尾）
+   * v4.3.0-H1 新增 / v4.33.0 多游戏扩展：切换 mod 启用状态（通用 .disabled 后缀切换）。
+   * @param modName 纯文件名（无路径）
+   * @param opts.modsDir mod 文件所在子目录（默认 'mods'）
    * @returns 新状态
    * @throws {DaemonUnreachableError} 节点不可达
    * @throws {InstanceNotFoundError} serverId 在节点上不存在
@@ -153,6 +163,7 @@ export interface DaemonClient {
     nodeId: string,
     serverId: string,
     modName: string,
+    opts?: { modsDir?: string },
   ): Promise<ToggleModFileResponse>;
 
   /**
@@ -168,18 +179,25 @@ export interface DaemonClient {
   scanJavas(nodeId: string): Promise<ScanJavasResult>;
 
   /**
-   * L4 新增 → L2 提升到 public/：扫描实例 mods 目录所有 jar 的元数据。
+   * L2 提升到 public/ / v4.33.0 多游戏扩展：扫描实例 mods 目录所有 mod 的元数据。
    *
    * 用于识别客户端 mod（environment === 'client' 或命中黑名单），避免误装到服务端
    * 导致启动失败。扫描在 Daemon 端完成（GET /api/instances/:id/mods/scan）。
    *
    * @param nodeId 目标节点 ID
    * @param serverId 目标服务器 ID
-   * @returns mod 元数据数组（mods 目录不存在时返回空数组）
+   * @param opts.modsDir mod 文件所在子目录（默认 'mods'）
+   * @param opts.fileExtensions 文件后缀过滤（如 ['.jar'] / ['.zip'] / ['.cs']）
+   * @param opts.gameType 游戏类型，用于选择元数据解析策略
+   * @returns mod 元数据数组（目录不存在时返回空数组）
    * @throws {DaemonUnreachableError} 节点不可达
    * @throws {InstanceNotFoundError} serverId 在节点上不存在
    */
-  scanMods(nodeId: string, serverId: string): Promise<ModMetadata[]>;
+  scanMods(
+    nodeId: string,
+    serverId: string,
+    opts?: { modsDir?: string; fileExtensions?: string[]; gameType?: string },
+  ): Promise<ModMetadata[]>;
 
   /**
    * L2: 使指定节点的 HTTP 客户端缓存失效。

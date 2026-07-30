@@ -33,6 +33,8 @@ import {
   INTEGRAL_DAILY_DECAY,
   VIP_SUBSCRIPTION_SCAN,
   WALLET_ANOMALY_SCAN,
+  INSTANCE_AUTO_RENEWAL,
+  INSTANCE_BILLING_ALERT,
   type SchedulerTaskType,
 } from './services/scheduler.js';
 import {
@@ -81,6 +83,7 @@ export function initScheduler(deps: SchedulerDeps): void {
     integralService,
     vipService,
     withdrawService,
+    instanceBillingService,
   } = services;
 
   // S7-1: scheduler executor 注册
@@ -810,6 +813,62 @@ export function initScheduler(deps: SchedulerDeps): void {
           );
         });
     }
+
+    // v3-billing: INSTANCE_AUTO_RENEWAL — 每日 03:00 自动续扣扫描
+    // 扫描临近到期实例（expires_at <= now + lookahead_days），按上次周期自动扣款续费
+    if ((task.type as string) === INSTANCE_AUTO_RENEWAL) {
+      void (async () => {
+        try {
+          const result = await instanceBillingService.scanAndAutoRenew();
+          logger.info(
+            { scanned: result.scanned, renewed: result.renewed, failed: result.failed, exempt: result.exempt },
+            'INSTANCE_AUTO_RENEWAL: 自动续扣扫描完成',
+          );
+        } catch (err) {
+          logger.error(
+            { err: err instanceof Error ? err.message : String(err) },
+            'INSTANCE_AUTO_RENEWAL 执行失败',
+          );
+        }
+      })();
+    }
+
+    // v3-billing: INSTANCE_BILLING_ALERT — 每日 09:00 欠费告警扫描
+    // 查询自动续扣失败的实例（expiry_status=active 且 expires_at < now），通知腐竹
+    if ((task.type as string) === INSTANCE_BILLING_ALERT) {
+      void (async () => {
+        try {
+          // 扫描已过期但 expiry_status 仍为 active 的实例（自动续扣失败的兜底）
+          const expiredInstances = await db<{ id: string; name: string; owner_user_id: string; expires_at: string }>('servers')
+            .select('id', 'name', 'owner_user_id', 'expires_at')
+            .where('expiry_status', 'active')
+            .whereNotNull('expires_at')
+            .where('expires_at', '<', new Date().toISOString());
+
+          for (const inst of expiredInstances) {
+            // 发送站内信通知腐竹
+            void notificationService
+              .create({
+                userId: inst.owner_user_id,
+                title: '实例已过期',
+                content: `您的实例「${inst.name}」已于 ${inst.expires_at} 过期，自动续扣失败。请及时续费或充值，否则实例将在宽限期结束后被清理。`,
+                type: 'warning',
+                relatedServerId: inst.id,
+              })
+              .catch(() => undefined);
+          }
+          logger.info(
+            { alertCount: expiredInstances.length },
+            'INSTANCE_BILLING_ALERT: 欠费告警扫描完成',
+          );
+        } catch (err) {
+          logger.error(
+            { err: err instanceof Error ? err.message : String(err) },
+            'INSTANCE_BILLING_ALERT 执行失败',
+          );
+        }
+      })();
+    }
   });
 
   // ===== 定时任务注册 =====
@@ -941,6 +1000,22 @@ export function initScheduler(deps: SchedulerDeps): void {
   scheduler.schedule({
     type: WALLET_ANOMALY_SCAN as SchedulerTaskType,
     next_run_at: new Date(Date.now() + 170_000).toISOString(),
+    interval_ms: 24 * 60 * 60 * 1000,
+    payload: {},
+  });
+  // v3-billing: 实例自动续扣扫描（每日，首次 180s 后启动，之后每 24h）
+  // executor 调用 instanceBillingService.scanAndAutoRenew() 扫描临近到期实例
+  scheduler.schedule({
+    type: INSTANCE_AUTO_RENEWAL as SchedulerTaskType,
+    next_run_at: new Date(Date.now() + 180_000).toISOString(),
+    interval_ms: 24 * 60 * 60 * 1000,
+    payload: {},
+  });
+  // v3-billing: 欠费告警扫描（每日，首次 190s 后启动，之后每 24h）
+  // 扫描已过期但 expiry_status 仍为 active 的实例，通知腐竹续费
+  scheduler.schedule({
+    type: INSTANCE_BILLING_ALERT as SchedulerTaskType,
+    next_run_at: new Date(Date.now() + 190_000).toISOString(),
     interval_ms: 24 * 60 * 60 * 1000,
     payload: {},
   });

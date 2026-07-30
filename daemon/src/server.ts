@@ -818,14 +818,15 @@ export function createDaemonServer(
   });
 
   // POST /api/instances/:id/mods/files/:name/toggle — 切换 mod 启用状态
-  // 路径参数 :name 必须为纯文件名（.jar 或 .jar.disabled）
+  // v4.33.0: 支持 ?dir=<modsDir> 指定 mod 目录（默认 mods）
   app.post('/api/instances/:id/mods/files/:name/toggle', authMiddleware, async (req: Request, res: Response) => {
     const id = req.params.id;
     const workdir = resolveInstanceWorkdir(manager, id);
     const modName = req.params.name;
+    const modsDir = (req.query.dir as string) || 'mods';
 
     try {
-      const result = await fileManagerToggleMod(workdir, modName);
+      const result = await fileManagerToggleMod(workdir, modName, { modsDir });
       res.json(result);
     } catch (err) {
       if (err instanceof FilePathInvalidError) {
@@ -846,16 +847,22 @@ export function createDaemonServer(
     }
   });
 
-  // L4 GET /api/instances/:id/mods/scan — 扫描实例 mods 目录所有 jar 的元数据
+  // L4 GET /api/instances/:id/mods/scan — 扫描实例 mods 目录所有 mod 的元数据
+  // v4.33.0: 支持 ?dir=<modsDir>&ext=<.jar,.zip>&game=<gameType> 多游戏参数
   // 鉴权：authMiddleware（仅 Panel 可调用）
-  // 用途：识别客户端 mod，避免误装到服务端导致启动失败
   app.get('/api/instances/:id/mods/scan', authMiddleware, async (req: Request, res: Response) => {
     const id = req.params.id;
     const workdir = resolveInstanceWorkdir(manager, id);
-    const modsDir = path.join(workdir, 'mods');
+    const dir = (req.query.dir as string) || 'mods';
+    const gameType = (req.query.game as string) || undefined;
+    let fileExtensions: string[] | undefined;
+    if (typeof req.query.ext === 'string') {
+      fileExtensions = req.query.ext.split(',').map((e) => e.trim()).filter(Boolean);
+    }
+    const modsDir = path.join(workdir, dir);
 
     try {
-      const mods: ModMetadata[] = await scanModsDir(modsDir);
+      const mods: ModMetadata[] = await scanModsDir(modsDir, { fileExtensions, gameType });
       res.json({ mods });
     } catch (err) {
       logger.error({ err: (err as Error).message }, 'scan mods failed');

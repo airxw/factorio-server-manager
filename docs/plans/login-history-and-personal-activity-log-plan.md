@@ -2,7 +2,7 @@
 type: plan
 title: 登录日志与个人活动日志方案
 date: 2026-07-29
-status: draft
+status: deployed（SecurityCenter 登录历史/活动日志已上线，见 version.md）
 related: auth, audit, user-center, security
 tags: [login-history, audit, security, plan, personal-activity]
 target_version: 4.31.0

@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test';
 import { ROLE_ACCOUNTS } from './helpers';
 
+// 默认实例与 seedDemoData 固定 UUID 对齐（manager 拥有的 Rust 演示服）；
+// 历史硬编码 73baf630-... 已不在当前 DB，环境不同可用 E2E_STORE_INSTANCE_ID 覆盖。
 const STORE_INSTANCE_ID =
-  process.env.E2E_STORE_INSTANCE_ID || '73baf630-6b56-4f1d-acee-9d5050980c9f';
+  process.env.E2E_STORE_INSTANCE_ID || ROLE_ACCOUNTS.instance_admin.demoInstanceId;
 
 async function gotoWithGatewayRetry(
   page: import('@playwright/test').Page,

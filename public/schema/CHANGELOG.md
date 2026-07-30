@@ -1,5 +1,35 @@
 # 契约变更记录 (Changelog)
 
+## [v4.33.0] - 2026-07-29 - 技术债治理：契约漂移统一（s0601）
+
+> **变更类型**: MAJOR ×1（VerifyBindingViaWebhookRequest 删字段）+ MINOR ×3（新增类型/契约文件，向后兼容）
+> **决策来源**: `docs/plans/tech-debt-remediation-plan.md`（W2 契约批，人类 2026-07-29 整体授权）
+> **扫描依据**: `.trae/documents/tech-debt-scan-20260729.md` M2/M3/M4/L5
+
+### 一、BREAKING：VerifyBindingViaWebhookRequest 移除冗余 game_type 字段
+
+- `VerifyBindingViaWebhookRequest` 删除 `game_type: string` 字段，保留 `server_id / player_name / verify_code`。
+- **理由**：v4.27.0 起玩家绑定已迁移为实例级语义（`CreatePlayerBindingRequest.game_type → server_id`），本接口同时携带 server_id 与 game_type 属冗余漂移；且该接口当前无运行时消费方（`handleVerifyCommand` 仅存在于 interface_stub 与 pre_generated_mock，无路由实现），变更无线上影响。
+- **影响面**：`public/pre_generated_mock/webhook-receiver.ts` 注释已同步；无其他消费方（全仓 grep 验证）。
+
+### 二、MINOR：提现审批 / 清理预览类型上推（唯一真相源）
+
+- 新增 `PendingWithdrawItem`（待审批提现条目，snake_case 线格式，以后端 `userCenter.ts` 为准）。
+- 新增 `ListPendingWithdrawsResponse`（`GET /api/admin/withdraw/pending` 分页包裹，`items` 字段）。
+- **移除** 陈旧类型 `ListPendingWithdrawalsResponse`（`withdrawals` 包装，与实际线格式不符且零消费方，全仓 grep 验证仅定义处 1 命中）。
+- 新增 `CleanupAllPreviewResponse`（`POST /api/admin/maintenance/cleanup-all/preview` 响应）。
+- **影响面**：前端 `modules/admin.ts` 本地定义已删除，改为从本契约导入并再导出（页面 import 路径不变）。
+
+### 三、MINOR：新建 public/schema/settings.ts 统一设置契约
+
+- 新文件 `public/schema/settings.ts`：`SettingType` / `SettingGroup` / `SettingDefinition` / `SettingSchemaItem`。
+- **理由**：此前后端 `settingSchemaService.ts` 与前端 `api/modules/settings.ts` 双处定义且已漂移（前端 SettingGroup 缺 `'system'`）。
+- **影响面**：后端 `settingSchemaService.ts` 与前端 `modules/settings.ts` 均改为从本契约导入并再导出（既有 import 路径兼容，无消费方改动）。
+
+### 四、Mock 补全
+
+- 新增 `public/pre_generated_mock/preflight.ts`：Setup Wizard 预检（8 项检查 × 4 场景 + 密码策略）稳定 Mock，补齐 rules-3 §四 零等待支点。
+
 ## [v4.32.2] - 2026-07-29 - 数据量监控告警（B2.8）
 
 > **变更类型**: MINOR（新增 1 个 `/api/admin/maintenance/data-volume` 接口 + 3 个 TS 类型，全部向后兼容，无破坏性变更）

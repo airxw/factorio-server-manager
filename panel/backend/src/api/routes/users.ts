@@ -45,6 +45,8 @@ import type {
   UserStatsResponse,
 } from '@public/schema/panel-api-types';
 import type { AuditLogServiceImpl } from '../../services/auditLogService.js';
+// v4.33.0: 分页解析统一走公共 utils（W3 提炼批）
+import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, parsePositiveInt } from '../../utils/pagination.js';
 
 // ----- DB 行类型 -----
 interface UserRow {
@@ -52,7 +54,11 @@ interface UserRow {
   email: string;
   username: string;
   password_hash: string;
-  /** @deprecated v4.17.0 过渡期保留，等同 active_role；v4.18.0 删除 */
+  /**
+   * @deprecated 等同 active_role，仅为向后兼容保留。
+   * v4.33.0 修订：原"v4.18.0 删除"承诺作废——users/roles 相关路由与
+   * 旧数据兼容路径仍真实消费本列，字段长期保留；新代码应优先读取 active_role。
+   */
   role: string;
   status: string;
   display_name: string | null;
@@ -204,8 +210,9 @@ export function createUsersRouter(): Router {
       let page = 1;
       let pageSize = 20;
       if (hasPage) {
-        page = Math.max(1, parseInt(String(pageRaw), 10) || 1);
-        pageSize = Math.min(100, Math.max(1, parseInt(String(pageSizeRaw), 10) || 20));
+        // v4.33.0: 分页解析统一走公共 utils（W3 提炼批）
+        page = parsePositiveInt(pageRaw, 1);
+        pageSize = Math.min(MAX_PAGE_SIZE, parsePositiveInt(pageSizeRaw, DEFAULT_PAGE_SIZE));
       }
 
       // ---------- 构造基础查询（过滤 + 排序） ----------

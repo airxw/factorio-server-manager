@@ -69,6 +69,11 @@ export const INTEGRAL_DAILY_DECAY = 'INTEGRAL_DAILY_DECAY' as const;
 export const VIP_SUBSCRIPTION_SCAN = 'VIP_SUBSCRIPTION_SCAN' as const;
 // WALLET_ANOMALY_SCAN: 经济异常流水告警扫描（每日，方案 §8.3：单日大额流入/负余额/CDK 批次异常兑换率）
 export const WALLET_ANOMALY_SCAN = 'WALLET_ANOMALY_SCAN' as const;
+// v3-billing: VPS 式预付费实例计费调度任务
+// INSTANCE_AUTO_RENEWAL: 每日 03:00 自动续扣扫描（临近到期实例预扣款）
+export const INSTANCE_AUTO_RENEWAL = 'INSTANCE_AUTO_RENEWAL' as const;
+// INSTANCE_BILLING_ALERT: 每日 09:00 欠费告警扫描（自动续扣失败实例通知腐竹）
+export const INSTANCE_BILLING_ALERT = 'INSTANCE_BILLING_ALERT' as const;
 
 export type { SchedulerTaskType } from '@public/interface_stub/shared-types';
 

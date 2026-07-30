@@ -2,7 +2,7 @@
 type: plan
 title: "/admin 前端梳理审计修复方案"
 date: 2026-07-26
-status: draft
+status: deployed（B1-B9 已执行，见 version.md）
 related:
   - docs/frontend/pages/admin-*.md
   - docs/frontend/flows/flow-admin-*.md

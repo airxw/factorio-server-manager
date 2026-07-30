@@ -33,6 +33,8 @@ export function mockDaemonClient(): MockedClient<DaemonClient> {
     startInstance: vi.fn(),
     stopInstance: vi.fn(),
     getInstanceState: vi.fn(),
+    // v4.33.0: 契约新增——实例真实 uptime 查询
+    getInstanceUptime: vi.fn(),
     sendCommand: vi.fn(),
     subscribeEvents: vi.fn(),
     execCommand: vi.fn(),

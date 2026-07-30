@@ -2,7 +2,7 @@
 type: plan
 title: 实例启停交互与启动前置引导方案
 date: 2026-07-29
-status: draft
+status: deployed（v4.29.0 上线，见 version.md）
 related: instance, startup_guide, action_bar, pack_schema, port_allocation
 tags: [plan, instance, startup-guide, action-bar, pack-extension]
 ---

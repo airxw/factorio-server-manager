@@ -645,6 +645,24 @@ export interface CleanupResponse {
   results: CleanupResultEntry[];
 }
 
+/**
+ * POST /api/admin/maintenance/cleanup-all/preview 响应体
+ *
+ * v4.33.0：由前端 modules/admin.ts 本地定义上推为唯一真相源（s0601）。
+ */
+export interface CleanupAllPreviewResponse {
+  /** 各表行数预览（size_bytes 在 SQLite 下恒为 null） */
+  tables: Array<{
+    name: 'audit_logs' | 'user_notifications' | 'item_sync_log' | 'chat_logs';
+    rows: number;
+    size_bytes: number | null;
+  }>;
+  /** 总行数（四张表合计） */
+  total_rows: number;
+  /** DB 文件总大小（字节），失败为 null */
+  total_size_bytes: number | null;
+}
+
 /** PUT /api/admin/maintenance/retention 请求体 */
 export interface RetentionUpdateRequest {
   table_name: MaintenanceTableName;
@@ -3607,8 +3625,8 @@ export interface ReceiveWebhookEventResponse {
 
 /** POST /api/webhooks/verify-command（专用：处理游戏内 !verify 命令） */
 export interface VerifyBindingViaWebhookRequest {
+  /** 实例 ID（v4.27.0 起玩家绑定为实例级语义；v4.33.0 移除冗余 game_type 字段） */
   server_id: string;
-  game_type: string;
   player_name: string;
   verify_code: string;
 }
@@ -4232,9 +4250,29 @@ export interface ListWithdrawHistoryResponse {
   page_size: number;
 }
 
-/** GET /api/admin/withdraw/pending — 管理端待审批列表 */
-export interface ListPendingWithdrawalsResponse {
-  withdrawals: Array<WithdrawCode & { username?: string }>;
+/**
+ * 待审批提现条目（WithdrawCode 精简视图 + 申请用户信息）
+ *
+ * v4.33.0：由前端 modules/admin.ts 本地定义上推为唯一真相源（s0601）。
+ * 字段以后端 panel/backend/src/api/routes/userCenter.ts 为准（snake_case 线格式）。
+ */
+export interface PendingWithdrawItem {
+  id: number;
+  code: string;
+  user_id: string;
+  amount: number;
+  actual_amount: number;
+  ratio: number;
+  status: string;
+  expires_at: string;
+  created_at: string;
+  user_username: string | null;
+  user_email: string | null;
+}
+
+/** GET /api/admin/withdraw/pending — 管理端待审批列表（分页包裹） */
+export interface ListPendingWithdrawsResponse {
+  items: PendingWithdrawItem[];
   total: number;
   page: number;
   page_size: number;

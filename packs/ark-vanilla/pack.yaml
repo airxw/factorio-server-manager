@@ -357,6 +357,7 @@ mods:
   dependency_check: true                # ARK mod 有依赖关系
   download_enabled: false               # 涉及 Steam Workshop API
   download_source: 'https://steamcommunity.com/app/346110/workshop/'
+  mechanism: workshop-id
 
 # ---- 启动前置引导（首次启动前向导，v4.x 新增）----
 startup_guide:

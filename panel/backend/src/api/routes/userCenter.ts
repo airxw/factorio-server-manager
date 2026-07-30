@@ -66,6 +66,8 @@ import type {
   WithdrawServiceImpl,
 } from '../../services/withdrawService.js';
 import type { AuditLogServiceImpl } from '../../services/auditLogService.js';
+// v4.33.0: 分页解析统一走公共 utils（W3 提炼批）
+import { parsePagination } from '../../utils/pagination.js';
 
 // ---------------------------------------------------------------------------
 // 依赖注入
@@ -1191,21 +1193,6 @@ function parseTxFilters(query: Request['query']): {
         ? query.server_id.trim()
         : null,
   };
-}
-
-/** 分页参数归一化（page >= 1，1 <= pageSize <= 100，默认 20） */
-function parsePagination(query: Request['query']): {
-  page: number;
-  pageSize: number;
-  offset: number;
-} {
-  const rawPage = typeof query.page === 'string' ? Number.parseInt(query.page, 10) : NaN;
-  const rawPageSize =
-    typeof query.page_size === 'string' ? Number.parseInt(query.page_size, 10) : NaN;
-  const page = Number.isInteger(rawPage) && rawPage >= 1 ? rawPage : 1;
-  const pageSize =
-    Number.isInteger(rawPageSize) && rawPageSize >= 1 ? Math.min(rawPageSize, 100) : 20;
-  return { page, pageSize, offset: (page - 1) * pageSize };
 }
 
 /** 发送 CSV 响应（BOM 头防 Excel 乱码 + Content-Disposition attachment） */

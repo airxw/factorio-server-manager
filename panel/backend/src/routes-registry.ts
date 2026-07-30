@@ -120,6 +120,8 @@ import { createStoreGmRouter } from './api/routes/store-gm.js';
 import { createStorePlayerActionsRouter } from './api/routes/store-player-actions.js';
 // v4.13.0: Daemon 上报玩家会话端点（步骤18b 防假闭合写入链路）
 import { createDaemonReportRouter } from './api/routes/daemon-report.js';
+// v3-billing: VPS 式预付费实例计费路由（类型定价/计费设置/续费/预览/记录）
+import { createInstanceBillingRouter } from './api/routes/instance-billing.js';
 
 import type {
   LoginRequest,
@@ -384,6 +386,8 @@ export function registerRoutes(deps: RouteDeps): RouteResult {
   app.locals.tunnelService = tunnelService;
   app.locals.assetService = assetService;
   app.locals.instanceShopConfigService = instanceShopConfigService;
+  // v3-billing: 注入实例计费服务（供 servers.ts 创建实例时调用 chargeInstanceCreation）
+  app.locals.instanceBillingService = services.instanceBillingService;
 
   // ===== 内联路由 =====
 
@@ -1194,6 +1198,18 @@ export function registerRoutes(deps: RouteDeps): RouteResult {
   //   被错误拦截（assets 路由挂在下方 app.use('/api', ..., createAssetsRouter)）。
   //   修复：requireAdmin 移入 cleanup.ts 各路由内部，挂载层仅保留 authenticateToken。
   app.use('/api/admin', authenticateToken(JWT_SECRET), createCleanupRouter(db, safeRemoveService));
+
+  // v3-billing: 实例计费路由（类型定价/计费设置/续费/预览/记录）
+  //   权限在路由内部逐端点校验：types 写操作仅 server_admin，settings/renew/renewals 按实例归属校验
+  app.use(
+    '/api/admin/instance-billing',
+    authenticateToken(JWT_SECRET),
+    createInstanceBillingRouter({
+      instanceBillingService: services.instanceBillingService,
+      db,
+      logger,
+    }),
+  );
   app.use('/api/demo', authenticateToken(JWT_SECRET), createDemoRouter(db, registry, logger));
   app.use(
     '/api/admin/maintenance',

@@ -352,6 +352,9 @@ mods:
   dependency_check: false
   download_enabled: false
   download_source: 'https://valheim.thunderstore.io/'
+  mechanism: file-presence
+  file_extensions: ['.dll']
+  mods_dir: 'BepInEx/plugins'
 
 # ---- 启动前置引导（首次启动前向导，v4.x 新增）----
 startup_guide:

@@ -13,7 +13,9 @@ pack:
   version: '1.0'
 
 startup:
-  binary: './bin/x64/factorio'
+  # v4.34.1: 修正 binary 路径——factorio-official tar.xz 解压到 bin/ 后产生 bin/factorio/ 子目录
+  # 实际二进制位于 bin/factorio/bin/x64/factorio（非 SteamCMD 布局的 bin/x64/factorio）
+  binary: './bin/factorio/bin/x64/factorio'
   args:
     - '--start-server'
     - '{{save_path}}'
@@ -96,6 +98,7 @@ resources:
 # ============================================================================
 
 # ---- 地图生成（mapGenerator.ts 参考）----
+# v4.34.1: schema 对齐 Factorio 2.0 官方格式（旧 schema 为 1.1 格式，字段名不兼容）
 world_generation:
   create_command: '{{binary}} --create {{save_path}} --map-gen-settings {{config_dir}}/map-gen-settings.json --map-settings {{config_dir}}/map-settings.json'
   settings_files:
@@ -103,28 +106,37 @@ world_generation:
       path: '{{config_dir}}/map-gen-settings.json'
       format: json
       schema:
-        terrain_segmentation:
-          type: string
-          description: 地形分割
-        water:
-          type: string
-          description: 水量
         starting_area:
-          type: string
-          description: 起始区域大小
+          type: integer
+          description: 起始区域大小倍率（1=标准，0=无起始区）
+          default: 1
         peaceful_mode:
           type: boolean
-          description: 和平模式
+          description: 和平模式（虫群不主动攻击）
+          default: false
+        seed:
+          type: integer
+          description: 世界种子（null=随机）
+          default: null
+        autoplace_controls:
+          type: object
+          description: 资源/地形生成控制（frequency/size/richness 各 1=标准）
     - name: map-settings
       path: '{{config_dir}}/map-settings.json'
       format: json
       schema:
+        difficulty_settings:
+          type: object
+          description: 难度设置（technology_price_multiplier 等）
         pollution:
           type: object
           description: 污染设置
         enemy_evolution:
           type: object
           description: 敌人进化设置
+        enemy_expansion:
+          type: object
+          description: 敌人扩张设置
 
 # ---- Mod 管理 ----
 mods:
@@ -133,6 +145,9 @@ mods:
   dependency_check: true
   download_enabled: true
   download_source: 'https://mods.factorio.com/api/mods/{{mod_name}}'
+  mechanism: list-file
+  file_extensions: ['.zip']
+  mods_dir: 'mods'
 
 # ---- 存档管理 ----
 saves:
@@ -142,50 +157,186 @@ saves:
   activate_command: '--start-server {{save_path}}'
 
 # ---- 多配置文件 ----
+# v4.33.0: server-settings schema 按 Factorio 2.0 官方 server-settings.example.json 完整对齐
+#   来源: https://github.com/wube/factorio-data/blob/master/server-settings.example.json
+#   修复历史 bug:
+#     1) 旧 schema 仅 11 字段，缺失 17+ Factorio 2.0 必需字段
+#     2) 旧 bootstrap 错误嵌套 credentials:{username,password,token}，官方为顶层字段
+#     3) 旧 bootstrap 用 allowed_commands + 枚举 'admins'，官方字段名 allow_commands + 枚举 'admins-only'
+#     4) autosave_interval 单位是分钟（非秒）
 config_files:
   - name: server-settings
     path: '{{config_dir}}/server-settings.json'
     format: json
     group: server
     schema:
+      # === 服务器身份 ===
       name:
         type: string
         description: 服务器名称
+        default: ''
+        requires_restart: true
       description:
         type: string
         description: 服务器描述
+        default: ''
+        requires_restart: true
+      tags:
+        type: array
+        description: 服务器标签（用于服务器浏览器筛选）
+        default: []
+        items:
+          type: string
+        requires_restart: true
       max_players:
         type: integer
-        description: 最大玩家数（0=不限）
+        description: 最大玩家数（0=不限，管理员仍可加入满员服务器）
+        default: 0
+        min: 0
+        requires_restart: true
+      # === 可见性 ===
       visibility:
         type: object
         description: 可见性设置
+        # v4.35.2: 默认 public=false（Factorio 2.0 强制 public=true 时 require_user_verification=true，
+        #   需 Factorio 账号 + username/token）。用户需要公网可见时须手动改 public=true + 填认证。
+        default: { public: false, lan: true }
         properties:
           public:
             type: boolean
+            description: '公网可见（发布到 Factorio 官方匹配服务器，需同时设置 require_user_verification=true + username/token）'
           lan:
             type: boolean
+            description: 局域网可见
+        requires_restart: true
+      # === 认证（Factorio 2.0 顶层字段，非 credentials 对象）===
+      username:
+        type: string
+        description: Factorio 账号用户名（公网可见时必填）
+        default: ''
+        sensitive: true
+        requires_restart: true
+      password:
+        type: string
+        description: Factorio 账号密码（与 token 二选一）
+        default: ''
+        sensitive: true
+        requires_restart: true
+      token:
+        type: string
+        description: Factorio 认证令牌（可替代 password，更安全）
+        default: ''
+        sensitive: true
+        requires_restart: true
       game_password:
         type: string
-        description: 游戏密码
+        description: 游戏加入密码（空=无密码）
+        default: ''
+        sensitive: true
+        requires_restart: true
       require_user_verification:
         type: boolean
-        description: 要求用户验证
+        description: 要求玩家拥有 Factorio 正版账号验证（强烈建议 true）
+        default: true
+        requires_restart: true
+      # === 自动保存 ===
       autosave_interval:
         type: integer
-        description: 自动保存间隔（秒）
+        description: 自动保存间隔（分钟，默认 10）
+        default: 10
+        min: 0
       autosave_slots:
         type: integer
-        description: 自动保存槽位数
+        description: 自动保存槽位数（循环覆盖）
+        default: 5
+        min: 1
+      autosave_only_on_server:
+        type: boolean
+        description: 自动保存仅在服务端（不同步到客户端）
+        default: true
+        requires_restart: true
+      non_blocking_saving:
+        type: boolean
+        description: 非阻塞保存（实验性，仅 UNIX，fork 进程后台保存）
+        default: false
+        requires_restart: true
+      # === 玩家管理 ===
       afk_autokick_interval:
         type: integer
-        description: AFK 踢出间隔（分钟）
+        description: AFK 踢出间隔（分钟，0=禁用）
+        default: 0
+        min: 0
       auto_pause:
         type: boolean
-        description: 自动暂停
+        description: 无人时自动暂停游戏
+        default: true
+      auto_pause_when_players_connect:
+        type: boolean
+        description: 玩家连接过程中暂停游戏（减少初始加载卡顿）
+        default: false
       only_admins_can_pause_the_game:
         type: boolean
-        description: 仅管理员可暂停
+        description: 仅管理员可暂停游戏
+        default: true
+      ignore_player_limit_for_returning_players:
+        type: boolean
+        description: 曾经加入过的玩家绕过 max_players 限制
+        default: false
+        requires_restart: true
+      # === 命令权限 ===
+      allow_commands:
+        type: string
+        description: 控制台命令权限（true=所有人可执行含 Lua，false=全禁用，admins-only=仅管理员）
+        default: 'admins-only'
+        enum_values: ['true', 'false', 'admins-only']
+        requires_restart: true
+      # === 网络调优 ===
+      max_upload_in_kilobytes_per_second:
+        type: integer
+        description: 上传带宽上限（KB/s，0=不限）
+        default: 0
+        min: 0
+        requires_restart: true
+      max_upload_slots:
+        type: integer
+        description: 同时下载地图的玩家槽位数（0=不限）
+        default: 5
+        min: 0
+        requires_restart: true
+      minimum_latency_in_ticks:
+        type: integer
+        description: 最小延迟（tick，1 tick=16ms，0=无最小限制）
+        default: 0
+        min: 0
+        requires_restart: true
+      max_heartbeats_per_second:
+        type: integer
+        description: 网络心跳上限（6-240，默认 60）
+        default: 60
+        min: 6
+        max: 240
+        requires_restart: true
+      # === 高级网络分段（通常无需调整）===
+      minimum_segment_size:
+        type: integer
+        description: 网络消息最小分段大小
+        default: 25
+        requires_restart: true
+      minimum_segment_size_peer_count:
+        type: integer
+        description: 触发最小分段的玩家数阈值
+        default: 20
+        requires_restart: true
+      maximum_segment_size:
+        type: integer
+        description: 网络消息最大分段大小
+        default: 100
+        requires_restart: true
+      maximum_segment_size_peer_count:
+        type: integer
+        description: 触发最大分段的玩家数阈值
+        default: 10
+        requires_restart: true
     read_only: false
 
 # ---- 游戏更新 ----

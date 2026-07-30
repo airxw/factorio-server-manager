@@ -147,8 +147,8 @@ const ADMIN_GROUPS: SidebarLinkGroup[] = [
       { to: '/admin/nodes', label: '节点管理', icon: Server },
       // v4.31.0: 实例管理入口（管理员视角，跨用户查看全部实例）
       { to: '/admin/servers', label: '实例管理', icon: Box },
-      // v4.32.x: 版本管理入口（server_admin 侧边栏可见，链接到 /store/versions）
-      { to: '/store/versions', label: '版本管理', icon: Package },
+      // v4.32.x: 版本管理入口（admin 基座内，避免穿台到 /store）
+      { to: '/admin/versions', label: '版本管理', icon: Package },
     ],
   },
   {
@@ -322,6 +322,8 @@ const PATH_ACTIVE_MAP: Record<string, string> = {
   '/admin/nodes': '/admin/nodes',
   // v4.31.0: 实例管理入口
   '/admin/servers': '/admin/servers',
+  // v4.32.x: 版本管理激活态（admin 基座）
+  '/admin/versions': '/admin/versions',
   // v4.14.2: admin/store 基座内 profile + notifications 激活态
   '/admin/profile': '/admin/profile',
   '/admin/profile/verify': '/admin/profile',

@@ -40,6 +40,8 @@
 
 import { randomUUID } from 'node:crypto';
 import type { Knex } from 'knex';
+// v4.33.0: 日期键统一走公共 utils（W3 提炼批）
+import { utcDateKey } from '../utils/date.js';
 import {
   PlayerBindingNotFoundError,
   PlayerBindingAlreadyExistsError,
@@ -642,7 +644,7 @@ export class PlayerServiceImpl {
       ip_address: vars.ip_address ?? '',
       online_count: String(onlineCount),
       timestamp: now.toISOString(),
-      date: now.toISOString().slice(0, 10),
+      date: utcDateKey(now),
       time: now.toTimeString().slice(0, 8),
     };
 
@@ -669,7 +671,7 @@ export class PlayerServiceImpl {
     gamePlayerName: string,
     claimType: GiftClaimType,
   ): Promise<boolean> {
-    const todayPrefix = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const todayPrefix = utcDateKey(); // YYYY-MM-DD
     const row = await this.db<GiftClaimRow>('gift_claims')
       .where({
         server_id: serverId,

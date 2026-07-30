@@ -419,6 +419,8 @@ export default function App() {
               <Route path="maintenance" element={<Maintenance />} />
               {/* v4.6.0-E3: 配额管理（仅 server_admin） */}
               <Route path="quotas" element={<Quotas />} />
+              {/* v4.32.x: 版本管理（server_admin+，admin 基座内，避免穿台到 /store） */}
+              <Route path="versions" element={<VersionsPage />} />
               {/* v4.7.0-G2: 全平台总览（仅 server_admin） */}
               <Route path="platform" element={<PlatformDashboard />} />
               {/* I1-I4: 优化升级方案第四项管理页面 */}

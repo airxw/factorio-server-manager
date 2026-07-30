@@ -28,8 +28,8 @@ import type { Entry } from 'yauzl';
 // 类型定义
 // ---------------------------------------------------------------------------
 
-/** Mod 加载器类型 */
-export type ModLoader = 'fabric' | 'forge' | 'neoforge' | 'unknown';
+/** Mod 加载器/平台类型（v4.33.0 扩展多游戏支持，与 daemon-api-types 对齐） */
+export type ModLoader = 'fabric' | 'forge' | 'neoforge' | 'factorio' | 'umod' | 'bepinex' | 'tmodloader' | 'steam-workshop' | 'unknown';
 
 /** Mod 运行环境 */
 export type ModEnvironment = 'client' | 'server' | 'both';
@@ -276,38 +276,98 @@ function isClientMod(environment: ModEnvironment, name: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// v4.33.0: 多游戏 mod 元数据支持
+// ---------------------------------------------------------------------------
+
+/** 游戏类型 → 默认 loader/平台 映射（MC 由元数据决定具体 loader，其余按游戏推断） */
+function gameTypeToLoader(gameType?: string): ModLoader {
+  switch (gameType) {
+    case 'factorio': return 'factorio';
+    case 'rust': return 'umod';
+    case 'valheim': return 'bepinex';
+    case 'terraria':
+    case 'terraria-tshock': return 'tmodloader';
+    case 'ark':
+    case 'zomboid': return 'steam-workshop';
+    default: return 'unknown';
+  }
+}
+
+/** Factorio mod info.json 结构（仅取关心的字段） */
+interface FactorioInfoJson {
+  name?: string;
+  version?: string;
+  factorio_version?: string;
+  title?: string;
+}
+
+/**
+ * v4.33.0: 从 Factorio mod zip 中读取 info.json 元数据。
+ * zip 内顶层目录为 <modname>_<version>/，info.json 位于其下。
+ */
+async function scanFactorioInfo(zipPath: string, sourceFile: string): Promise<ModMetadata | null> {
+  let zipfile: yauzl.ZipFile;
+  try {
+    zipfile = await openZip(zipPath);
+  } catch {
+    return null;
+  }
+  try {
+    const infoContent = await new Promise<string | null>((resolve, reject) => {
+      let found: string | null = null;
+      zipfile.on('entry', (entry: Entry) => {
+        if (entry.fileName.endsWith('/info.json') && !found) {
+          readEntryContent(zipfile, entry)
+            .then((content) => { found = content; zipfile.readEntry(); })
+            .catch(() => { zipfile.readEntry(); });
+          return;
+        }
+        zipfile.readEntry();
+      });
+      zipfile.on('end', () => resolve(found));
+      zipfile.on('error', reject);
+      zipfile.readEntry();
+    });
+    if (!infoContent) return null;
+    let data: FactorioInfoJson;
+    try {
+      data = JSON.parse(infoContent) as FactorioInfoJson;
+    } catch {
+      return null;
+    }
+    const name = (data.title ?? data.name ?? sourceFile).trim();
+    const version = (data.version ?? 'unknown').trim();
+    return {
+      name,
+      version,
+      loader: 'factorio',
+      environment: 'both',
+      isClientSide: false,
+      sourceFile,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 核心扫描函数
 // ---------------------------------------------------------------------------
 
 /**
- * 扫描单个 jar 文件的 mod 元数据。
+ * 扫描 Minecraft .jar 文件的 mod 元数据（原 scanModMetadata 的 MC 逻辑）。
  *
  * 依次尝试读取：fabric.mod.json → META-INF/neoforge.mods.toml → META-INF/mods.toml → mcmod.info
- * 命中第一个有效元数据即返回（Fabric 优先，与实际加载顺序无关，仅取识别结果）。
- *
- * @param jarPath jar 文件绝对路径
- * @returns ModMetadata；文件不存在 / 非 zip / 无有效元数据时返回 null
+ * 命中第一个有效元数据即返回。
  */
-export async function scanModMetadata(jarPath: string): Promise<ModMetadata | null> {
-  // 文件存在性检查
-  try {
-    const stat = await fs.promises.stat(jarPath);
-    if (!stat.isFile()) return null;
-  } catch {
-    return null;
-  }
-
-  const sourceFile = path.basename(jarPath);
-
+async function scanJarMetadata(jarPath: string, sourceFile: string): Promise<ModMetadata | null> {
   let zipfile: yauzl.ZipFile;
   try {
     zipfile = await openZip(jarPath);
   } catch {
-    // 非 zip 文件 / 损坏的 jar
     return null;
   }
 
-  // 收集目标元数据文件内容
   const targets = new Set<string>([
     FABRIC_MOD_JSON,
     FORGE_MODS_TOML,
@@ -319,7 +379,6 @@ export async function scanModMetadata(jarPath: string): Promise<ModMetadata | nu
   try {
     await new Promise<void>((resolve, reject) => {
       zipfile.on('entry', (entry: Entry) => {
-        // 仅读取目标元数据文件，跳过目录与其他条目
         if (targets.has(entry.fileName)) {
           readEntryContent(zipfile, entry)
             .then((content) => {
@@ -327,7 +386,6 @@ export async function scanModMetadata(jarPath: string): Promise<ModMetadata | nu
               zipfile.readEntry();
             })
             .catch((err) => {
-              // 单条目读取失败不阻断整体扫描
               void err;
               zipfile.readEntry();
             });
@@ -343,33 +401,27 @@ export async function scanModMetadata(jarPath: string): Promise<ModMetadata | nu
     // 读取过程中出错，使用已收集的内容继续尝试解析
   }
 
-  // 按优先级尝试解析
-  // 1. Fabric
   const fabricContent = contents.get(FABRIC_MOD_JSON);
   if (fabricContent) {
     const meta = parseFabricModJson(fabricContent, sourceFile);
     if (meta) return meta;
   }
-  // 2. NeoForge
   const neoforgeContent = contents.get(NEOFORGE_MODS_TOML);
   if (neoforgeContent) {
     const meta = parseModsToml(neoforgeContent, sourceFile, 'neoforge');
     if (meta) return meta;
   }
-  // 3. Forge
   const forgeContent = contents.get(FORGE_MODS_TOML);
   if (forgeContent) {
     const meta = parseModsToml(forgeContent, sourceFile, 'forge');
     if (meta) return meta;
   }
-  // 4. 旧版 Forge mcmod.info
   const mcmodContent = contents.get(LEGACY_MCMOD_INFO);
   if (mcmodContent) {
     const meta = parseMcmodInfo(mcmodContent, sourceFile);
     if (meta) return meta;
   }
 
-  // 无任何已知元数据文件 — 返回 unknown
   return {
     name: sourceFile,
     version: 'unknown',
@@ -381,15 +433,68 @@ export async function scanModMetadata(jarPath: string): Promise<ModMetadata | nu
 }
 
 /**
- * 扫描 mods 目录下所有 .jar 文件的 mod 元数据。
+ * 扫描单个 mod 文件的元数据（v4.33.0 多游戏支持）。
  *
- * 仅扫描 .jar 文件（.jar.disabled 不扫描，因禁用的 mod 不参与加载）。
- * 单个 jar 扫描失败不影响其他文件，结果按文件名排序。
+ * 按文件后缀和游戏类型分发：
+ *   - .jar（Minecraft）：scanJarMetadata 解析 fabric.mod.json / mods.toml 等
+ *   - .zip（Factorio）：读取 zip 内 info.json
+ *   - .cs/.dll/.pak/.tmod 等：无标准元数据，返回基础信息（loader 按游戏类型推断）
+ *
+ * @param filePath mod 文件绝对路径
+ * @param opts.gameType 游戏类型（可选，用于推断 loader 和选择解析策略）
+ * @returns ModMetadata；文件不存在时返回 null
+ */
+export async function scanModMetadata(
+  filePath: string,
+  opts?: { gameType?: string },
+): Promise<ModMetadata | null> {
+  try {
+    const stat = await fs.promises.stat(filePath);
+    if (!stat.isFile()) return null;
+  } catch {
+    return null;
+  }
+
+  const sourceFile = path.basename(filePath);
+  const ext = path.extname(sourceFile).toLowerCase();
+  const gameType = opts?.gameType;
+
+  // Minecraft .jar → MC 元数据解析
+  if (ext === '.jar' && (!gameType || gameType === 'minecraft')) {
+    const meta = await scanJarMetadata(filePath, sourceFile);
+    if (meta) return meta;
+  }
+
+  // Factorio .zip → info.json 解析
+  if (ext === '.zip' && (!gameType || gameType === 'factorio')) {
+    const meta = await scanFactorioInfo(filePath, sourceFile);
+    if (meta) return meta;
+  }
+
+  // 其他格式 → 基础信息（loader 按游戏类型推断）
+  const baseName = sourceFile.replace(/\.[^.]+$/, '');
+  return {
+    name: baseName,
+    version: 'unknown',
+    loader: gameTypeToLoader(gameType),
+    environment: 'both',
+    isClientSide: false,
+    sourceFile,
+  };
+}
+
+/**
+ * 扫描 mods 目录下所有 mod 文件的元数据（v4.33.0 多游戏支持）。
  *
  * @param modsDir mods 目录绝对路径
+ * @param opts.fileExtensions 文件后缀过滤（如 ['.jar'] / ['.zip'] / ['.cs']），默认 ['.jar']
+ * @param opts.gameType 游戏类型，用于选择元数据解析策略
  * @returns ModMetadata 数组；目录不存在时返回空数组
  */
-export async function scanModsDir(modsDir: string): Promise<ModMetadata[]> {
+export async function scanModsDir(
+  modsDir: string,
+  opts?: { fileExtensions?: string[]; gameType?: string },
+): Promise<ModMetadata[]> {
   let names: string[];
   try {
     names = await fs.promises.readdir(modsDir);
@@ -397,12 +502,18 @@ export async function scanModsDir(modsDir: string): Promise<ModMetadata[]> {
     return [];
   }
 
-  const jarFiles = names.filter((n) => n.toLowerCase().endsWith('.jar'));
+  const extensions = opts?.fileExtensions ?? ['.jar'];
+  const gameType = opts?.gameType;
+
+  const modFiles = names.filter((n) => {
+    const lower = n.toLowerCase();
+    return extensions.some((ext) => lower.endsWith(ext));
+  });
   const results: ModMetadata[] = [];
 
-  for (const name of jarFiles) {
+  for (const name of modFiles) {
     const fullPath = path.join(modsDir, name);
-    const meta = await scanModMetadata(fullPath);
+    const meta = await scanModMetadata(fullPath, { gameType });
     if (meta) {
       results.push(meta);
     }

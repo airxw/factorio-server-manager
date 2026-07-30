@@ -33,17 +33,17 @@ test.describe('登录流程与角色跳转', () => {
     await page.goto('/admin');
 
     await expect(page).toHaveURL(/\/login$/);
-    // v4.15.x: 登录页按 from=/admin 显示上下文标题（服主控制台）
-    await expect(page.getByRole('heading', { name: '登录服主控制台' })).toBeVisible();
-    await expect(page.getByText('服主专属 · 运营管理后台')).toBeVisible();
+    // 当前登录页为统一标题（v4.15.x 的 from= 上下文标题已不在代码中，spec 对齐实际行为）
+    await expect(page.getByRole('heading', { name: '登录 GameServer Panel' })).toBeVisible();
+    await expect(page.getByText('登录后选择您的身份，开始使用')).toBeVisible();
   });
 
   test('server_admin 登录后跳转到 /admin（Platform Dashboard）', async ({ page }) => {
     await page.goto('/login');
 
-    // Login.tsx 使用 input[type="email"] placeholder="you@example.com"
-    const emailInput = page.locator('input[type="email"]');
-    const pwdInput = page.locator('input[type="password"]');
+    // 登录页输入框：邮箱或用户名（text）+ 密码（type=password 无显式 label 关联，用 role+name 定位）
+    const emailInput = page.getByRole('textbox', { name: '邮箱或用户名' });
+    const pwdInput = page.getByRole('textbox', { name: '密码' });
     await emailInput.fill(ROLE_ACCOUNTS.server_admin.email);
     await pwdInput.fill(ROLE_ACCOUNTS.server_admin.password);
 
@@ -60,8 +60,8 @@ test.describe('登录流程与角色跳转', () => {
   test('instance_admin 登录后跳转到 /store（GM Workbench）', async ({ page }) => {
     await page.goto('/login');
 
-    const emailInput = page.locator('input[type="email"]');
-    const pwdInput = page.locator('input[type="password"]');
+    const emailInput = page.getByRole('textbox', { name: '邮箱或用户名' });
+    const pwdInput = page.getByRole('textbox', { name: '密码' });
     await emailInput.fill(ROLE_ACCOUNTS.instance_admin.email);
     await pwdInput.fill(ROLE_ACCOUNTS.instance_admin.password);
 
@@ -78,8 +78,8 @@ test.describe('登录流程与角色跳转', () => {
   test('user 登录后跳转到 /guild（Player Portal）', async ({ page }) => {
     await page.goto('/login');
 
-    const emailInput = page.locator('input[type="email"]');
-    const pwdInput = page.locator('input[type="password"]');
+    const emailInput = page.getByRole('textbox', { name: '邮箱或用户名' });
+    const pwdInput = page.getByRole('textbox', { name: '密码' });
     await emailInput.fill(ROLE_ACCOUNTS.user.email);
     await pwdInput.fill(ROLE_ACCOUNTS.user.password);
 
@@ -94,8 +94,8 @@ test.describe('登录流程与角色跳转', () => {
   test('错误密码显示错误信息且不跳转', async ({ page }) => {
     await page.goto('/login');
 
-    const emailInput = page.locator('input[type="email"]');
-    const pwdInput = page.locator('input[type="password"]');
+    const emailInput = page.getByRole('textbox', { name: '邮箱或用户名' });
+    const pwdInput = page.getByRole('textbox', { name: '密码' });
     await emailInput.fill(ROLE_ACCOUNTS.server_admin.email);
     await pwdInput.fill('wrong-password');
 

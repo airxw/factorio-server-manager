@@ -46,6 +46,11 @@ import type {
   GetApiKeyResponse,
   ListApiKeysResponse,
   RevokeApiKeyResponse,
+  // v4.33.0: B7 类型契约漂移治理——提现审批与清理预览类型已上推 public 契约（s0601）
+  // 注：PendingWithdrawItem / ListPendingWithdrawsResponse / CleanupAllPreviewResponse
+  //     已在下方 re-export 直接 from public 契约，此处无需重复 import
+  ListPendingWithdrawsResponse,
+  CleanupAllPreviewResponse,
 } from '@public/schema/panel-api-types';
 
 // I3: API Key 领域类型重新导出，供页面直接 import 自 modules/admin
@@ -58,59 +63,18 @@ export type {
   RevokeApiKeyResponse,
 } from '@public/schema/panel-api-types';
 
+// v4.33.0: 提现审批 / 清理预览类型重新导出（唯一真相源为 public/schema/panel-api-types.ts）
+export type {
+  PendingWithdrawItem,
+  ListPendingWithdrawsResponse,
+  CleanupAllPreviewResponse,
+} from '@public/schema/panel-api-types';
+
 /** POST /api/packs/reload 响应体（camelCase，已从后端 snake_case 转换） */
 export interface ReloadPacksResult {
   loaded: string[];
   failed: Array<{ pack: string; error: string }>;
   total: number;
-}
-
-/**
- * POST /api/admin/maintenance/cleanup-all/preview 响应体
- *
- * 本地类型定义（前端临时）：B2 批次破坏性操作 dry-run 集成需要。
- * 待 B7 类型契约漂移治理走 s0601 流程时统一升级到 public/schema/panel-api-types.ts。
- */
-export interface CleanupAllPreviewResponse {
-  /** 各表行数预览（size_bytes 在 SQLite 下恒为 null） */
-  tables: Array<{
-    name: 'audit_logs' | 'user_notifications' | 'item_sync_log' | 'chat_logs';
-    rows: number;
-    size_bytes: number | null;
-  }>;
-  /** 总行数（四张表合计） */
-  total_rows: number;
-  /** DB 文件总大小（字节），失败为 null */
-  total_size_bytes: number | null;
-}
-
-/**
- * 待审批提现条目（WithdrawCodeRow + 申请用户信息）
- *
- * 本地类型定义（前端临时）：B2.1 提现审批 API 客户端化需要。
- * 待 B7 类型契约漂移治理走 s0601 流程时统一升级到 public/schema/panel-api-types.ts。
- * 字段以后端 panel/backend/src/api/routes/userCenter.ts 为准（snake_case 线格式）。
- */
-export interface PendingWithdrawItem {
-  id: number;
-  code: string;
-  user_id: string;
-  amount: number;
-  actual_amount: number;
-  ratio: number;
-  status: string;
-  expires_at: string;
-  created_at: string;
-  user_username: string | null;
-  user_email: string | null;
-}
-
-/** GET /api/admin/withdraw/pending 响应体（分页包裹） */
-export interface ListPendingWithdrawsResponse {
-  items: PendingWithdrawItem[];
-  total: number;
-  page: number;
-  page_size: number;
 }
 
 /**

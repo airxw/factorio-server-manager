@@ -461,15 +461,18 @@ export class ModServiceImpl {
       throw new Error('daemonClient 未注入，无法列出 mod 文件');
     }
     const { nodeId } = await this.resolveServerPack(serverId);
+    // v4.33.0: 从 pack 配置读取 mods_dir 和 file_extensions
+    const packMods = await this.tryGetPackMods(serverId);
+    const modsDir = packMods?.mods_dir ?? 'mods';
+    const extensions = packMods?.file_extensions ?? ['.jar'];
     const resp: ListFilesResponse = await this.daemonClient.listFiles(
       nodeId,
       serverId,
-      'mods',
+      modsDir,
       false,
     );
-    // 过滤出 mod 文件（.jar / .jar.disabled），并解析启用状态
     return resp.entries
-      .filter((e) => e.type === 'file' && isModFileName(e.name))
+      .filter((e) => e.type === 'file' && matchesExtensions(e.name, extensions))
       .map((e) => ({
         name: e.name,
         state: (e.name.endsWith('.disabled') ? 'disabled' : 'enabled') as 'enabled' | 'disabled',
@@ -496,14 +499,20 @@ export class ModServiceImpl {
     if (!this.daemonClient) {
       throw new Error('daemonClient 未注入，无法切换 mod 文件状态');
     }
-    // 校验文件名合法性（防路径穿越 + 格式校验）
-    if (!isModFileName(modName)) {
-      throw new Error(
-        `mod 文件名必须以 .jar 或 .jar.disabled 结尾: ${modName}`,
-      );
-    }
     const { nodeId } = await this.resolveServerPack(serverId);
-    return await this.daemonClient.toggleModFile(nodeId, serverId, modName);
+    // v4.33.0: 从 pack 配置读取 mods_dir / file_extensions / mechanism
+    const packMods = await this.tryGetPackMods(serverId);
+    const modsDir = packMods?.mods_dir ?? 'mods';
+    const extensions = packMods?.file_extensions ?? ['.jar'];
+    const mechanism = packMods?.mechanism ?? 'jar-rename';
+    // list-file 和 workshop-id 机制不支持文件系统切换
+    if (mechanism === 'list-file' || mechanism === 'workshop-id') {
+      throw new Error(`当前游戏 mod 机制为 ${mechanism}，不支持文件系统切换，请使用 Mod 记录管理`);
+    }
+    if (!matchesExtensions(modName, extensions)) {
+      throw new Error(`mod 文件名后缀不在允许列表 ${JSON.stringify(extensions)} 中: ${modName}`);
+    }
+    return await this.daemonClient.toggleModFile(nodeId, serverId, modName, { modsDir });
   }
 
   // -------------------------------------------------------------------------
@@ -527,8 +536,16 @@ export class ModServiceImpl {
       throw new Error('daemonClient 未注入，无法扫描 mod 元数据');
     }
     const { nodeId } = await this.resolveServerPack(serverId);
-    // L2: scanMods 已加入 public DaemonClient 契约，无需本地扩展接口
-    return await this.daemonClient.scanMods(nodeId, serverId);
+    // v4.33.0: 从 pack 配置读取 mods_dir / file_extensions / gameType
+    const packMods = await this.tryGetPackMods(serverId);
+    const gameType = await this.resolveGameType(serverId);
+    const modsDir = packMods?.mods_dir ?? 'mods';
+    const fileExtensions = packMods?.file_extensions ?? ['.jar'];
+    return await this.daemonClient.scanMods(nodeId, serverId, {
+      modsDir,
+      fileExtensions,
+      gameType: gameType ?? undefined,
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -904,15 +921,20 @@ function isSqliteUniqueViolation(err: unknown): boolean {
 }
 
 /**
- * v4.3.0-H1: 判断文件名是否为合法 mod 文件。
- * 合法格式：以 .jar 或 .jar.disabled 结尾，且不含路径分隔符。
+ * v4.33.0: 判断文件名是否匹配指定后缀列表（含 .disabled 变体）。
+ * @param name 文件名
+ * @param extensions 允许的后缀列表（如 ['.jar'] / ['.cs'] / ['.zip']）
  */
-function isModFileName(name: string): boolean {
+function matchesExtensions(name: string, extensions: string[]): boolean {
   if (typeof name !== 'string' || name.length === 0) return false;
   if (name.includes('/') || name.includes('\\') || name.includes('\0') || name.includes('..')) {
     return false;
   }
-  return name.endsWith('.jar') || name.endsWith('.jar.disabled');
+  const lower = name.toLowerCase();
+  return extensions.some((ext) => {
+    const e = ext.toLowerCase();
+    return lower.endsWith(e) || lower.endsWith(e + '.disabled');
+  });
 }
 
 /** 简单模板渲染：{{var}} → vars[var]，未声明的变量保持原样 */

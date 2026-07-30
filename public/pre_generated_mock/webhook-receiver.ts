@@ -233,7 +233,7 @@ export class MockWebhookReceiver {
    * 专用接口：处理游戏内 !verify 命令（player.verify_command 事件）
    *
    * 真实实现：
-   *   1. 根据 (server_id, game_type, player_name) 查找 pending 绑定
+   *   1. 根据 (server_id, player_name) 查找 pending 绑定（v4.33.0 起不再含 game_type）
    *   2. 校验 verify_code 是否匹配
    *   3. 消费验证码：pending → verified
    *   4. 返回验证结果

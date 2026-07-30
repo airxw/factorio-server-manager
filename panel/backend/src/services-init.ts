@@ -79,6 +79,8 @@ import { createPasswordService } from '../../../modules/模块3_用户安全/pas
 import { AssetService } from './modules/asset_service/asset_service.js';
 // v4.13.0: 实例店铺外观配置服务
 import { InstanceShopConfigService } from './modules/asset_service/instance_shop_config_service.js';
+// v3-billing: VPS 式预付费实例计费服务（chargeInstanceCreation/chargeInstanceRenewal/autoRenewInstance）
+import { createInstanceBillingService, type InstanceBillingServiceImpl } from './services/instanceBillingService.js';
 
 export interface ServiceContainer {
   // P1
@@ -145,6 +147,8 @@ export interface ServiceContainer {
   instanceShopConfigService: InstanceShopConfigService;
   // v4.11.0: IExecutionEngine 的 Panel 侧实现（daemon 沙箱发货入口）
   executionEngineClient: IExecutionEngine;
+  // v3-billing: VPS 式预付费实例计费服务（创建/续费扣款 + 自动续扣扫描）
+  instanceBillingService: InstanceBillingServiceImpl;
 }
 
 export interface InitServicesConfig {
@@ -218,6 +222,9 @@ export async function initServices(
       }
       return userService.registerFromGame(email, username, password, gamePlayerName, serverId);
     },
+    // v4.33.0 W5: !uptime 接 Daemon 真实 uptime（实例摘要 uptime 字段）
+    getInstanceUptime: (nodeId, serverId) =>
+      daemonClientService.getInstanceUptime(nodeId, serverId),
   });
 
   // ----- P4 服务 -----
@@ -310,6 +317,14 @@ export async function initServices(
   // 供未来 UGC 资产发货链路调用：玩家购买 → 读取 execution_logic → 调用 executeLogic。
   const executionEngineClient = createExecutionEngineClient(db, daemonClientService);
 
+  // v3-billing: VPS 式预付费实例计费服务（依赖 balanceService + systemConfigService + logger）
+  const instanceBillingService = createInstanceBillingService(
+    db,
+    balanceService,
+    systemConfigService,
+    logger,
+  );
+
   logger.info('P1 服务已初始化（userService/vipService/systemConfigService/itemSyncService/daemonClient/commandDispatcher/scheduler）');
 
   return {
@@ -366,5 +381,6 @@ export async function initServices(
     assetService,
     instanceShopConfigService,
     executionEngineClient,
+    instanceBillingService,
   };
 }

@@ -21,6 +21,8 @@ import { Router, type Response } from 'express';
 import type { Logger } from 'pino';
 import type { LoginHistoryServiceImpl } from '../../services/loginHistoryService.js';
 import type { AuditLogServiceImpl } from '../../services/auditLogService.js';
+// v4.33.0: 分页解析统一走公共 utils（W3 提炼批，替换文件内局部 parsePositiveInt）
+import { parsePositiveInt } from '../../utils/pagination.js';
 import type {
   LoginHistoryListResponse,
   MyActivityListResponse,
@@ -185,18 +187,7 @@ export function createMeSecurityRouter(logger: Logger): Router {
 // 辅助函数
 // ===========================================================================
 
-/** 解析正整数查询参数，失败回退默认值 */
-function parsePositiveInt(value: unknown, defaultValue: number): number {
-  if (typeof value === 'string') {
-    const n = Number(value);
-    if (Number.isFinite(n) && n > 0) {
-      return Math.floor(n);
-    }
-  } else if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-    return Math.floor(value);
-  }
-  return defaultValue;
-}
+// v4.33.0: 局部 parsePositiveInt 已删除，统一使用 ../../utils/pagination.js 的公共实现
 
 /** 统一错误处理 */
 function handleSecurityError(res: Response, err: unknown, logger: Logger, endpoint: string): void {

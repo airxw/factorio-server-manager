@@ -154,6 +154,23 @@ export class DaemonClientImpl implements DaemonClient {
     }
   }
 
+  /**
+   * v4.33.0: 查询实例真实运行时长（秒）——GET /api/instances 摘要中的 uptime 字段。
+   * 实例不在 Daemon 摘要中（未注册/已清理）时返回 null；节点不可达抛 DaemonUnreachableError。
+   */
+  async getInstanceUptime(nodeId: string, serverId: string): Promise<number | null> {
+    const client = await this.getHttpClient(nodeId);
+    try {
+      const resp = await client.listInstances();
+      const summary = resp.instances.find((i) => i.id === serverId);
+      if (!summary) return null;
+      // 契约 v4.33.0 起必含 uptime；防御旧 Daemon 未升级时字段缺失
+      return typeof summary.uptime === 'number' ? summary.uptime : null;
+    } catch (err) {
+      throw this.wrapDaemonError(err);
+    }
+  }
+
   async sendCommand(
     nodeId: string,
     serverId: string,
@@ -297,10 +314,11 @@ export class DaemonClientImpl implements DaemonClient {
     nodeId: string,
     serverId: string,
     modName: string,
+    opts?: { modsDir?: string },
   ): Promise<ToggleModFileResponse> {
     const client = await this.getHttpClient(nodeId);
     try {
-      return await client.toggleModFile(serverId, modName);
+      return await client.toggleModFile(serverId, modName, opts);
     } catch (err) {
       throw this.wrapDaemonError(err);
     }
@@ -332,10 +350,10 @@ export class DaemonClientImpl implements DaemonClient {
    * @throws {DaemonUnreachableError} 节点不可达
    * @throws {InstanceNotFoundError} serverId 在节点上不存在
    */
-  async scanMods(nodeId: string, serverId: string): Promise<ModMetadata[]> {
+  async scanMods(nodeId: string, serverId: string, opts?: { modsDir?: string; fileExtensions?: string[]; gameType?: string }): Promise<ModMetadata[]> {
     const client = await this.getHttpClient(nodeId);
     try {
-      const resp = await client.scanMods(serverId);
+      const resp = await client.scanMods(serverId, opts);
       return resp.mods;
     } catch (err) {
       throw this.wrapDaemonError(err);

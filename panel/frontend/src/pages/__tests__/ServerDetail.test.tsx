@@ -14,6 +14,9 @@ const apiMock = {
   resetServerState: vi.fn(),
   getServerDiskUsage: vi.fn(),
   cleanupSubdir: vi.fn(),
+  // v3-billing: ServerDetail 挂载后加载计费设置 + 续费记录
+  getInstanceBillingSettings: vi.fn(),
+  listInstanceRenewals: vi.fn(),
 };
 
 let mockUser: Partial<UserInfo> | null = null;
@@ -163,6 +166,22 @@ describe('ServerDetail store mode', () => {
       usage: { total_bytes: 2048, updated_at: '2026-07-28T11:00:00.000Z' },
     });
     apiMock.cleanupSubdir.mockResolvedValue({ freed_bytes: 1024 });
+    // v3-billing: 默认无豁免/自动续扣开启/无续费记录
+    apiMock.getInstanceBillingSettings.mockResolvedValue({
+      settings: {
+        id: 'ibs-1',
+        instance_id: 'server-1',
+        instance_type: 'small',
+        custom_monthly_price: null,
+        billing_exempt: false,
+        exempt_reason: null,
+        auto_renew_enabled: true,
+        last_billing_cycle_months: null,
+        created_at: '2026-07-01T00:00:00.000Z',
+        updated_at: '2026-07-01T00:00:00.000Z',
+      },
+    });
+    apiMock.listInstanceRenewals.mockResolvedValue({ renewals: [] });
   });
 
   it('在 store 嵌入态中隐藏旧返回按钮并展示产品化信息标签', async () => {

@@ -8,6 +8,12 @@
 
 import type { Knex } from 'knex';
 import type { PackRegistry } from '../core/packs/registry.js';
+// v4.33.0 W4: itemAttributeResolver 孤岛治理——special_attributes 自适应接入 give-item 渲染链
+import {
+  hasSpecialAttributes,
+  resolveGiveCommandVars,
+  stripHiddenPlaceholders,
+} from '../core/packs/itemAttributeResolver.js';
 import type { CommandDispatcher } from '@public/interface_stub/command-dispatcher';
 import type { CommandPriority } from '@public/interface_stub/shared-types';
 import type { OnlinePlayer } from '@public/schema/panel-api-types';
@@ -18,6 +24,8 @@ import { InstanceNotFoundError } from './errors.js';
 interface ServerRow {
   id: string;
   pack_id: string;
+  /** 实例当前游戏版本（special_attributes 版本约束判定用；未知时为 null） */
+  current_version: string | null;
 }
 
 interface PlayerHistoryRow {
@@ -112,6 +120,11 @@ export class PlayerManagementServiceImpl {
    *   1. pack.commands.give_item
    *   2. pack.business.players.give_command
    *   3. DEFAULT_TEMPLATES.give_item
+   *
+   * v4.33.0 W4: special_attributes 自适应（itemAttributeResolver 真实接入）——
+   *   版本不匹配时按 fallback_behavior 处理：disable → 拒绝发放；
+   *   default → 用 default_value 填充 vars；hide → 渲染前剥离占位符。
+   *   实例版本未知（current_version 为 null）时保持旧行为，不做自适应。
    */
   async giveItem(
     serverId: string,
@@ -119,13 +132,40 @@ export class PlayerManagementServiceImpl {
     item: string,
     count: number,
   ): Promise<{ success: boolean; command: string; error?: string }> {
+    // special_attributes 自适应预处理（仅当 Pack 声明且实例版本已知）
+    const server = await this.db<ServerRow>('servers')
+      .select('id', 'pack_id', 'current_version')
+      .where({ id: serverId })
+      .first();
+    if (!server) {
+      throw new InstanceNotFoundError(`实例不存在: ${serverId}`);
+    }
+
+    let extraVars: Record<string, string> = {};
+    let placeholdersToRemove: string[] = [];
+    const pack = this.registry.get(server.pack_id);
+    if (pack && server.current_version && hasSpecialAttributes(pack)) {
+      const resolution = resolveGiveCommandVars(pack, server.current_version, {});
+      if (!resolution.dispatchable) {
+        return {
+          success: false,
+          command: '',
+          error:
+            '该物品在当前实例版本下不可发放（special_attributes fallback=disable）',
+        };
+      }
+      extraVars = resolution.vars;
+      placeholdersToRemove = resolution.placeholders_to_remove;
+    }
+
     return this.executePlayerCommand(serverId, 'give_item', {
       player: playerName,
       item,
       count: String(count),
+      ...extraVars,
     }, 'normal', [
       'business.players.give_command',
-    ]);
+    ], placeholdersToRemove);
   }
 
   /**
@@ -211,8 +251,9 @@ export class PlayerManagementServiceImpl {
    * 统一的玩家命令执行逻辑：
    *   1. 查询 server.pack_id
    *   2. 从 pack.commands / business / DEFAULT_TEMPLATES 获取模板
-   *   3. commandDispatcher.renderCommand 渲染
-   *   4. commandDispatcher.enqueue 入队
+   *   3. （可选）按 special_attributes hide 降级剥离占位符（v4.33.0 W4）
+   *   4. commandDispatcher.renderCommand 渲染
+   *   5. commandDispatcher.enqueue 入队
    */
   private async executePlayerCommand(
     serverId: string,
@@ -220,6 +261,7 @@ export class PlayerManagementServiceImpl {
     vars: Record<string, string>,
     priority: CommandPriority,
     businessFallbacks?: string[],
+    placeholdersToRemove?: string[],
   ): Promise<{ success: boolean; command: string; error?: string }> {
     // 1. 查询 server
     const server = await this.db<ServerRow>('servers')
@@ -231,9 +273,15 @@ export class PlayerManagementServiceImpl {
     }
 
     // 2. 获取命令模板
-    const template = this.resolveTemplate(server.pack_id, commandKey, businessFallbacks);
+    let template = this.resolveTemplate(server.pack_id, commandKey, businessFallbacks);
 
-    // 3. 渲染命令
+    // 3. v4.33.0 W4: special_attributes fallback=hide 的占位符渲染前剥离
+    //    （renderCommand 对残留占位符会报错，必须先 strip）
+    if (placeholdersToRemove && placeholdersToRemove.length > 0) {
+      template = stripHiddenPlaceholders(template, placeholdersToRemove);
+    }
+
+    // 4. 渲染命令
     let command: string;
     try {
       command = this.commandDispatcher.renderCommand(template, vars);

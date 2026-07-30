@@ -284,7 +284,9 @@ export class InstanceManager {
       server_hostname: instance.name,
       server_identity: instance.id,
       // 存档与配置目录（options.savePath 覆盖默认路径，用于带存档重启）
-      save_path: options?.savePath ?? `${instance.workdir}/saves/world`,
+      // v4.33.0：默认 save_path 追加 Pack.saves.extension（Factorio=.zip），否则
+      //          --start-server 找不到无扩展名的存档文件导致启动失败
+      save_path: options?.savePath ?? `${instance.workdir}/saves/world${pack.saves?.extension ?? ''}`,
       config_dir: `${instance.workdir}/config`,
       // 通用参数
       max_players: '20',
@@ -316,7 +318,7 @@ export class InstanceManager {
     };
 
     // A10: 启动前置环境检查（二进制是否存在/有执行权限）
-    this.checkBinaryEnvironment(startConfig.binary);
+    this.checkBinaryEnvironment(startConfig.binary, startConfig.workingDir);
 
     // 4. spawn 进程（A1: 传入 error 回调，spawn 失败时转为实例状态 error 而非进程崩溃）
     const { process: child, pid } = this.processDriver.start(startConfig, (err) => {
@@ -394,15 +396,29 @@ export class InstanceManager {
   /**
    * A10: 检查二进制文件是否存在且有执行权限。
    * - 绝对路径：直接检查文件是否存在 + X_OK
+   * - 相对路径（含 / ）：基于 workingDir 解析后检查 + X_OK
    * - 命令名（如 java）：在 PATH 中查找
    * 检查失败抛出明确错误，阻止 spawn 触发 ENOENT 崩溃。
+   *
+   * v4.34.1: 新增相对路径处理——pack.startup.binary 常为 './bin/...' 形式，
+   *          旧逻辑将其当命令名在 PATH 中搜索必然失败。
    */
-  private checkBinaryEnvironment(binary: string): void {
+  private checkBinaryEnvironment(binary: string, workingDir?: string): void {
     if (path.isAbsolute(binary)) {
       try {
         fs.accessSync(binary, fs.constants.X_OK);
       } catch {
         throw new Error(`二进制文件不存在或无执行权限: ${binary}`);
+      }
+      return;
+    }
+    // 相对路径（含路径分隔符）：基于 workingDir 解析
+    if (binary.includes('/') && workingDir) {
+      const resolved = path.resolve(workingDir, binary);
+      try {
+        fs.accessSync(resolved, fs.constants.X_OK);
+      } catch {
+        throw new Error(`二进制文件不存在或无执行权限: ${resolved}`);
       }
       return;
     }

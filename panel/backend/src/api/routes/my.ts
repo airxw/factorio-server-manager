@@ -16,6 +16,8 @@
 import { Router, type Response } from 'express';
 import type { Knex } from 'knex';
 import type { Logger } from 'pino';
+// v4.33.0: 日期键统一走公共 utils（W3 提炼批）
+import { utcDateKey } from '../../utils/date.js';
 import type {
   GetMyOverviewResponse,
   ListMyOrdersResponse,
@@ -165,7 +167,7 @@ export function createMyRouter(db: Knex, logger: Logger): Router {
         return;
       }
 
-      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const today = utcDateKey(); // YYYY-MM-DD
 
       // 绑定统计（v4.17.0: 旧表 player_bindings 已合并到统一 bindings 表，
       // v4.27.0: binding_type='player', scope_type='instance' 表示实例级玩家绑定）

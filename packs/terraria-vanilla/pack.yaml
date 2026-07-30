@@ -325,6 +325,9 @@ mods:
   dependency_check: false
   download_enabled: false
   download_source: 'https://forums.terraria.org/index.php?forums%2Fworkshop.205/'
+  mechanism: list-file
+  file_extensions: ['.tmod']
+  mods_dir: 'Mods'
 
 # ---- 启动前置引导（首次启动前向导，v4.x 新增）----
 startup_guide:

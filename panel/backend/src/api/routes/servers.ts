@@ -230,7 +230,12 @@ export function createServersRouter(
         return;
       }
 
-      const body = req.body as Partial<CreateServerRequest>;
+      const body = req.body as Partial<CreateServerRequest> & {
+        /** v3-billing: 实例类型（micro/small/medium/large/xlarge），默认 small */
+        instance_type?: 'micro' | 'small' | 'medium' | 'large' | 'xlarge';
+        /** v3-billing: 计费周期（1/3/6/12 月），默认 1 */
+        billing_cycle_months?: 1 | 3 | 6 | 12;
+      };
       if (!body.name || !body.pack_id) {
         const errBody: PanelErrorResponse = {
           error: { code: 'PANEL_VALIDATION_ERROR', message: '缺少 name 或 pack_id' },
@@ -238,6 +243,13 @@ export function createServersRouter(
         res.status(400).json(errBody);
         return;
       }
+
+      // v3-billing: 读取计费参数（默认 small × 1月）
+      const billingInstanceType = body.instance_type ?? 'small';
+      const billingCycleMonths = body.billing_cycle_months ?? 1;
+      const instanceBillingService = req.app.locals.instanceBillingService as
+        | import('../../services/instanceBillingService.js').InstanceBillingServiceImpl
+        | undefined;
 
       // 校验 pack 存在
       const pack = registry.get(body.pack_id);
@@ -433,6 +445,69 @@ export function createServersRouter(
         logger.warn({ err: itemErr instanceof Error ? itemErr.message : String(itemErr), serverId: id }, '初始化商城物品失败（不阻断实例创建）');
       }
 
+      // v3-billing: 创建实例后接入预付费计费
+      // 流程：设置 instance_type → chargeInstanceCreation（扣款 + 写 expires_at + 写续费记录）
+      // 失败回滚：计费失败时删除已创建的实例行，返回错误（避免孤儿实例）
+      let billingResult: {
+        amount_paid: number;
+        exempt: boolean;
+        new_expires_at: string;
+      } | null = null;
+      if (instanceBillingService) {
+        try {
+          // 1. 确保计费设置存在（首次访问自动创建，默认 instance_type='small'）
+          await instanceBillingService.getOrCreateBillingSettings(id);
+          // 2. 若请求的 instance_type 非默认，更新计费设置
+          if (billingInstanceType !== 'small') {
+            await instanceBillingService.updateBillingSettings(
+              id,
+              { instance_type: billingInstanceType },
+              userId,
+            );
+          }
+          // 3. 预付费扣款（豁免实例 amount=0，非豁免扣腐竹余额→加管理员余额）
+          const chargeResult = await instanceBillingService.chargeInstanceCreation(
+            id,
+            userId,
+            billingCycleMonths,
+          );
+          billingResult = {
+            amount_paid: chargeResult.amount_paid,
+            exempt: chargeResult.exempt,
+            new_expires_at: chargeResult.new_expires_at,
+          };
+        } catch (billingErr) {
+          // 计费失败 → 回滚：删除已创建的实例行（避免孤儿实例）
+          logger.error(
+            { err: billingErr instanceof Error ? billingErr.message : String(billingErr), serverId: id },
+            'v3-billing: 创建实例计费失败，回滚删除实例',
+          );
+          try {
+            await db<ServerRow>('servers').where({ id }).delete();
+          } catch (delErr) {
+            logger.error(
+              { err: delErr instanceof Error ? delErr.message : String(delErr), serverId: id },
+              'v3-billing: 计费失败后删除实例行失败（需人工清理孤儿实例）',
+            );
+          }
+          // 返回计费错误（余额不足=402，类型不存在=404 等）
+          const code =
+            billingErr && typeof billingErr === 'object' && 'code' in billingErr
+              ? (billingErr as { code?: string }).code
+              : 'PANEL_INTERNAL_ERROR';
+          const message =
+            billingErr instanceof Error ? billingErr.message : '实例计费失败';
+          const httpStatus =
+            billingErr && typeof billingErr === 'object' && 'httpStatus' in billingErr
+              ? (billingErr as { httpStatus?: number }).httpStatus ?? 500
+              : 500;
+          res.status(httpStatus).json({
+            error: { code, message: `实例创建失败（计费）: ${message}` },
+          });
+          return;
+        }
+      }
+
       const row = await db<ServerRowWithOwner>('servers')
         .select('servers.*', 'users.username as owner_username', 'nodes.name as node_name')
         .leftJoin('users', 'servers.owner_user_id', 'users.id')
@@ -448,6 +523,12 @@ export function createServersRouter(
       }
 
       const response: CreateServerResponse = { server: toSummary(row) };
+      // v3-billing: 返回计费结果（扣款金额/豁免标记/过期时间），前端据此展示付费信息
+      if (billingResult) {
+        (response as CreateServerResponse & {
+          billing?: { amount_paid: number; exempt: boolean; new_expires_at: string };
+        }).billing = billingResult;
+      }
       res.status(201).json(response);
     } catch (err) {
       handleInternal(res, err, logger);

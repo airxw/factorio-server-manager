@@ -3,37 +3,16 @@
 // 替代纯 KV 编辑器的 /api/system-config，提供 schema + 当前值 + 校验
 // ============================================================================
 
-/** 设置值类型 */
-export type SettingType = 'boolean' | 'number' | 'string' | 'json' | 'enum';
+// v4.33.0: SettingType/SettingGroup/SettingSchemaItem 唯一真相源为 public/schema/settings.ts（s0601），
+// 此处再导出保持既有 import 路径兼容（Settings.tsx 等页面从 modules/settings 导入）
+import type {
+  SettingType,
+  SettingGroup,
+  SettingDefinition,
+  SettingSchemaItem,
+} from '@public/schema/settings';
 
-/** 设置分组（与后端 settingSchemaService.SettingGroup 保持同步） */
-export type SettingGroup =
-  | 'site' // 站点信息
-  | 'registration' // 注册管理
-  | 'games' // 游戏配置
-  | 'vip' // VIP 体系
-  | 'admin' // 管理员配置
-  | 'backup' // 备份策略（实例 + DB）
-  | 'mail' // SMTP 邮件配置
-  | 'maintenance' // 维护模式
-  | 'disk' // 磁盘监控
-  | 'legal'; // 用户协议 / 隐私政策
-
-/** 单个设置项的 Schema + 当前值 */
-export interface SettingSchemaItem {
-  key: string;
-  label: string;
-  type: SettingType;
-  group: SettingGroup;
-  defaultValue: string;
-  description: string;
-  enumValues?: string[];
-  min?: number;
-  max?: number;
-  order: number;
-  sensitive?: boolean;
-  currentValue: string | null;
-}
+export type { SettingType, SettingGroup, SettingDefinition, SettingSchemaItem };
 
 /** GET /api/settings/schema 响应体 */
 export interface ListSettingsSchemaResponse {
