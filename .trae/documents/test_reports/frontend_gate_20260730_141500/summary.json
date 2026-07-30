@@ -1,0 +1,105 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "当前不可判定",
+  "timestamp": "2026-07-30T14:15:00+08:00",
+  "evidence_path": ".trae/documents/test_reports/frontend_gate_20260730_141500/",
+  "spec": ".trae/specs/force-player-binding-for-vip/spec.md",
+  "summary": "强制游戏角色绑定才能获得 VIP — 前端三重闸。Test1（单测）全部通过，Test3（Mock 回归）通过并发现 1 个 vip_level 契约偏离已修复。Test2（内置浏览器）因环境不满足（无认证凭据 + 后端改动未部署）标记为当前不可判定，用户裁决跳过并部署后补做。",
+  "tests": {
+    "test1_unit": {
+      "status": "PASS",
+      "frontend_vitest": "316/316 passed (28 files)",
+      "backend_vitest": "705/705 passed (40 files)",
+      "daemon_vitest": "20/20 passed (4 files)",
+      "frontend_tsc": "exit 0",
+      "backend_tsc": "exit 0",
+      "daemon_tsc": "exit 0",
+      "vite_build": "success (6.91s)",
+      "localhost_violation_check": "no matches found"
+    },
+    "test2_browser": {
+      "status": "当前不可判定",
+      "reason": "环境不满足：dev 数据库空（无用户），生产数据库不可读（gameserver 用户所有），后端改动未部署到生产",
+      "user_decision": "跳过 Test2 记录未闭合，部署后补做",
+      "deferred_scenes": [
+        "GuildDock 首页合并展示",
+        "GuildBind 单向导（无 SegmentedControl）",
+        "ServerDetail 账户级解绑入口",
+        "bindInstance API vip_level=0",
+        "verifyBindingByCode vip_level=1 + RCON 广播",
+        "迁移脚本 revoke 仅账户绑定记录"
+      ],
+      "rerun_entry": "部署后在 https://gsp.ecsrz.com:3001 补做内置浏览器核对"
+    },
+    "test3_mock_regression": {
+      "status": "PASS",
+      "method": "代码审查 + 契约对比",
+      "issues_found": 1,
+      "issues_fixed": 1,
+      "details": [
+        {
+          "endpoint": "POST /api/player-bindings/:id/verify",
+          "issue": "Mock 返回 vip_level=0（验证后），应为 1",
+          "fix": "Mock 改为 vip_level=1（与 verifyBindingByCode 实现对齐）",
+          "severity": "high"
+        }
+      ],
+      "uncovered_endpoints": [
+        {
+          "endpoint": "POST /api/instances/:serverId/bindings",
+          "reason": "无 MSW handler",
+          "alternative_coverage": "vi.fn() 直接 mock（单测覆盖）"
+        },
+        {
+          "endpoint": "GET /api/profile/bindings",
+          "reason": "无 MSW handler",
+          "alternative_coverage": "vi.fn().mockResolvedValue([])（单测覆盖）"
+        }
+      ]
+    }
+  },
+  "critical_fixes_during_gate": [
+    {
+      "fix": "bindInstance vip_level 从 1 改为 0（spec 决策 1 偏离修正）",
+      "file": "panel/backend/src/services/instanceBindingService.ts",
+      "severity": "critical",
+      "description": "原实现使用 DEFAULT_BOUND_VIP_LEVEL(=1) 设置账户级绑定 vip_level，与 spec 决策 1（vip_level=0）矛盾。已修正为 vip_level=0。"
+    },
+    {
+      "fix": "迁移脚本 20260902000000_revoke_account_only_bindings.ts 补建",
+      "file": "panel/backend/src/db/migrations/20260902000000_revoke_account_only_bindings.ts",
+      "severity": "high",
+      "description": "spec 决策 2 要求的迁移脚本不存在。已新建（时间戳调整为晚于最新迁移 20260901000001）+ 8 个单测。"
+    },
+    {
+      "fix": "verify 端点 Mock vip_level 从 0 改为 1",
+      "file": "panel/frontend/src/mocks/handlers.ts",
+      "severity": "high",
+      "description": "Mock 返回 vip_level=0（验证后），与后端 verifyBindingByCode 实现矛盾。已修正为 vip_level=1。"
+    },
+    {
+      "fix": "instanceBindingService.test.ts 断言从 vip_level=1 改为 0",
+      "file": "panel/backend/src/services/instanceBindingService.test.ts",
+      "severity": "high",
+      "description": "测试断言与 spec 决策 1 不一致。已修正为 vip_level=0。"
+    },
+    {
+      "fix": "ServerDetail.test.tsx listMyBindings mock 修复",
+      "file": "panel/frontend/src/pages/__tests__/ServerDetail.test.tsx",
+      "severity": "medium",
+      "description": "vi.clearAllMocks() 清空了 mockResolvedValue，导致 TypeError。在 beforeEach 中重新建立。"
+    },
+    {
+      "fix": "GuildServers.test.tsx 测试期望修正",
+      "file": "panel/frontend/src/pages/guild/__tests__/GuildServers.test.tsx",
+      "severity": "medium",
+      "description": "getByText 匹配多元素 + 点击目标错误（卡片名 vs 进入管理按钮）。已修正为精确匹配 + 按钮点击。"
+    }
+  ],
+  "next_actions": [
+    "S6 合流交付：版本号升级（中版本号+1）+ deploy.sh update 部署到生产",
+    "部署后补做 Test2 内置浏览器核对（https://gsp.ecsrz.com:3001）",
+    "更新 current-note.md + version.md + README.md"
+  ],
+  "rerun_entry": "部署后重跑 Test2：内置浏览器访问 https://gsp.ecsrz.com:3001/guild/servers + /guild/bind + /admin/servers/:id"
+}

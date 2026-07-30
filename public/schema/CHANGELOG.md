@@ -1,5 +1,39 @@
 # 契约变更记录 (Changelog)
 
+## [v4.38.0] - 2026-07-30 - 强制游戏角色绑定才能获得 VIP（契约描述澄清）
+
+> **变更类型**: PATCH（仅字段描述修正，不改字段定义 type/minimum/maximum/default）
+> **决策来源**: `.trae/specs/force-player-binding-for-vip/spec.md` 决策 1（人类 NotifyUser 审批 Spec 三件套授权）
+> **依赖**: 无（PATCH 级别仅记录，不阻断下游）
+> **s0601 流程**: 已走（变更影响面识别 + 依赖模块通知）
+
+### 一、PATCH：bindings-schema.json `vip_level` 字段描述澄清
+
+- **字段**: `vip_level`
+- **旧描述**: `VIP 等级 0-5（仅 binding_type='account' 有意义；binding_type='player' 恒为 0）`
+- **新描述**: `VIP 等级 0-5。仅 verify 角色后才有意义（vip_level 由 verifyBindingByCode 赋予）；bindInstance 创建时为 0。binding_type='player' 恒为 0`
+- **变更原因**: VIP 语义修正——原描述暗示"账户级绑定即有意义"，但实际 VIP 仅由 `verifyBindingByCode` 路径赋予（玩家角色验证成功后回填到 account 绑定）。`bindInstance` 创建的账户级绑定 `vip_level` 恒为 0（决策 1），不再像旧版那样默认 `vip_level=1`。
+- **字段定义不变**: `type: integer` / `minimum: 0` / `maximum: 5` / `default: 0` 全部保持原样。
+- **影响面**:
+  - 无破坏性变更（仅文档修正，运行时行为已在 Task 1/2 通过代码 + 迁移脚本实现）
+  - 下游消费方（voteService / shopService / walletService / getUserVipLevel）的查询逻辑不变，仅是数据来源语义澄清
+  - Mock 与测试套件无需同步（description 不影响 zod/ajv 校验）
+
+### 二、不修改 ws-events.ts
+
+- `player.binding_verified` 是 Panel 进程内 EventEmitter 事件（仅供 Panel 内部审计/日志订阅），**不进 `public/schema/ws-events.ts` 跨进程契约**。
+- 理由：避免混淆 DaemonToPanelEvent / PanelToDaemonCommand / PanelToFrontendEvent 三类既有契约。eventBus.ts 是 Panel 进程内 EventEmitter，daemon 作为独立进程无法订阅。
+
+### 三、闭合判据
+
+- [x] s0601 流程已走（变更影响面识别 + 依赖模块通知）
+- [x] bindings-schema.json `vip_level` 字段 description 已更新
+- [x] 字段定义不变（type/minimum/maximum/default 保持原样）
+- [x] CHANGELOG 更新
+- [x] ws-events.ts 未被修改（grep 验证 `player.binding_verified` 不在 public/ 任何文件中）
+
+---
+
 ## [v4.36.0] - 2026-07-30 - 好友推荐契约（D8 同实例玩家推荐）
 
 > **变更类型**: MINOR（新增 2 个 TS 类型，向后兼容，无破坏性变更）

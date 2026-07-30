@@ -165,6 +165,23 @@ export interface ServerSummary {
   expiry_status: 'permanent' | 'active' | 'grace' | 'expired' | 'cleaned';
   /** v4.31.0: 部署节点名称（JOIN nodes 表，孤儿节点为 null） */
   node_name: string | null;
+  /**
+   * v4.38.0: 平台级公开标记（servers.is_public）。
+   * true=公开实例（市场可见，可直接绑定）；false=私有实例（仅 owner/管理员可见，他人需申请绑定）
+   */
+  is_public: boolean;
+  /**
+   * v4.38.0: 绑定申请通道开关（servers.binding_requests_enabled）。
+   * 仅私有实例有意义：true=接受他人申请；false=拒绝他人申请。
+   * 公开实例此字段无实际效果（公开实例可直接绑定，无需申请）。
+   */
+  binding_requests_enabled: boolean;
+  /**
+   * v4.38.1: 绑定申请自动审批开关（servers.auto_approve_binding_requests）。
+   * 仅在 binding_requests_enabled=true 时有意义：true=申请即自动通过；false=需服主手动审批。
+   * 公开实例此字段无实际效果。
+   */
+  auto_approve_binding_requests: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -589,6 +606,14 @@ export const PanelErrorCode = {
   NODE_COMMS_KEY_INVALID: 'NODE_COMMS_KEY_INVALID',
   NODE_MASTER_NOT_DELETABLE: 'NODE_MASTER_NOT_DELETABLE',
   NODE_LINK_KEY_EXPIRED: 'NODE_LINK_KEY_EXPIRED',
+  // v4.38.0 新增错误码（绑定申请审批）
+  BINDING_REQUEST_OWNER_NOT_NEEDED: 'BINDING_REQUEST_OWNER_NOT_NEEDED',
+  BINDING_REQUEST_PUBLIC_INSTANCE: 'BINDING_REQUEST_PUBLIC_INSTANCE',
+  BINDING_REQUEST_DISABLED: 'BINDING_REQUEST_DISABLED',
+  BINDING_REQUEST_ALREADY_BOUND: 'BINDING_REQUEST_ALREADY_BOUND',
+  BINDING_REQUEST_ALREADY_PENDING: 'BINDING_REQUEST_ALREADY_PENDING',
+  BINDING_REQUEST_NOT_FOUND: 'BINDING_REQUEST_NOT_FOUND',
+  BINDING_REQUEST_NOT_PENDING: 'BINDING_REQUEST_NOT_PENDING',
 } as const;
 
 export type PanelErrorCodeType = typeof PanelErrorCode[keyof typeof PanelErrorCode];
@@ -1158,6 +1183,12 @@ export interface ShopOrderSummary {
   id: number;
   server_id: string;
   user_id: string;
+  /**
+   * 买家用户名（LEFT JOIN users.username 得到）。
+   * v4.36.1 新增可选字段：列表/详情接口均返回；用户被删除时为 null。
+   * MINOR 变更，不阻断依赖模块。
+   */
+  buyer_username?: string | null;
   status: 'pending' | 'claiming' | 'claimed' | 'expired';
   claim_code: string;
   items_count: number;
@@ -1211,12 +1242,27 @@ export interface ClaimShopOrderResponse {
 
 // ----- CDK 兑换码（乐观锁 unused→claiming→claimed/expired） -----
 // v2: 支持礼包（gift）包含多个物品，通过 cdk_code_items 子表存储
+// v4.37.0: 支持可重复使用 CDK（max_uses：1=一次性/N=多次/0=无限），
+//          多次用 CDK 的每次兑换记录于 cdk_redemptions 子表
 
 export interface CdkCodeItem {
   item_name: string;
   count: number;
   quality: 'normal' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   sort_order?: number;
+}
+
+/**
+ * CDK 兑换记录（多次用 CDK 的每次兑换行）。
+ * 一次性 CDK（max_uses=1）不写入此表，仍用 cdk_codes.claimed_player/claimed_at。
+ */
+export interface CdkRedemptionRecord {
+  id: number;
+  cdk_code_id: number;
+  /** 兑换的玩家名 */
+  player_name: string;
+  /** 兑换时间 */
+  redeemed_at: string;
 }
 
 export interface CdkCodeSummary {
@@ -1235,6 +1281,20 @@ export interface CdkCodeSummary {
   quality: 'normal' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   /** 礼包物品列表（来自 cdk_code_items 子表）。空数组表示单物品礼包（降级使用 item_name/count/quality） */
   items: CdkCodeItem[];
+  /**
+   * 最大使用次数（v4.37.0）：
+   * - 1 = 一次性（默认，向后兼容；兑换走 unused→claiming→claimed）
+   * - N (>1) = 可被 N 个不同玩家兑换（use_count 达 N 后 status='claimed'）
+   * - 0 = 无限次（直到过期，status 始终 'unused'）
+   */
+  max_uses: number;
+  /** 已使用次数（v4.37.0）。一次性 CDK 兑换后为 1；多次用 CDK 随每次兑换递增 */
+  use_count: number;
+  /**
+   * 兑换记录列表（v4.37.0，仅多次用 CDK 填充，一次性 CDK 为空数组）。
+   * 列表接口（listCodes）默认不填充以减少负载；详情接口（getCode）填充。
+   */
+  redemptions: CdkRedemptionRecord[];
   status: 'unused' | 'claiming' | 'claimed' | 'expired';
   claimed_player: string | null;
   claimed_at: string | null;
@@ -1267,6 +1327,13 @@ export interface CreateCdkCodesRequest {
       count: number;
       quality?: 'normal' | 'uncommon' | 'rare' | 'epic' | 'legendary';
     }>;
+    /**
+     * 最大使用次数（v4.37.0，可选，默认 1）：
+     * - 1 = 一次性（向后兼容）
+     * - N (>1) = 可被 N 个不同玩家兑换
+     * - 0 = 无限次（直到过期）
+     */
+    max_uses?: number;
   }>;
   expires_in_days?: number; // 默认 30 天
 }
@@ -1300,6 +1367,12 @@ export interface RedeemCdkRequest {
 export interface RedeemCdkResponse {
   code: CdkCodeSummary;
   delivered: boolean;
+  /**
+   * 兑换后剩余可用次数（v4.37.0）：
+   * - null = 无限次（max_uses=0）
+   * - 数字 = 剩余次数（max_uses - use_count）；0 表示已达上限
+   */
+  remaining_uses: number | null;
 }
 
 // ============================================================================
@@ -2104,6 +2177,18 @@ export interface WriteConfigFileResponse {
 export interface GetConfigFileSchemaResponse {
   name: string;
   schema: Record<string, unknown>;
+}
+
+/** POST /api/servers/:serverId/config-files 请求体 */
+export interface CreateConfigFileRequest {
+  name: string;
+  format: 'json' | 'yaml' | 'properties' | 'ini';
+  content?: string;
+}
+
+/** POST /api/servers/:serverId/config-files 响应体 */
+export interface CreateConfigFileResponse {
+  config_file: ConfigFileMeta;
 }
 
 // ----- World Generation (Task 11.2) -----
@@ -4399,6 +4484,168 @@ export interface PlatformEconomyConfig {
   'balance.recharge_max': number;
   'consumption.daily_max': number;
   'withdraw.ratio': number;
+}
+
+// ============================================================================
+// v4.38.0: /guild/servers 全平台市场重做 + 公开/私有混合绑定流程
+//
+// 依据：docs/plans/guild-servers-market-rework-plan.md
+//
+// 命名约定：用 BindingApplication（绑定申请）而非 BindingRequest，
+//   1) 避免与现有 CreateBindingRequest（POST /api/bindings 通用绑定创建）冲突
+//   2) 避免与 HTTP Request 概念混淆
+// 数据库表名仍为 binding_requests（复数 + requests 语义清晰）
+// ============================================================================
+
+/** 绑定申请状态：pending=待审批；approved=已通过；rejected=已拒绝；cancelled=申请人撤销 */
+export type BindingApplicationStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+/** 绑定申请记录（binding_requests 表的视图） */
+export interface BindingApplication {
+  id: string;
+  server_id: string;
+  /** 申请人用户 ID */
+  requester_user_id: string;
+  status: BindingApplicationStatus;
+  /** 申请留言（用户填，选填） */
+  message: string | null;
+  /** 审批人用户 ID（status=pending 时为 null） */
+  reviewer_user_id: string | null;
+  /** 审批备注（服主填，选填） */
+  review_note: string | null;
+  /** 审批时间（status=pending 时为 null） */
+  reviewed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 绑定申请记录（含申请人/审批人用户名，列表展示用） */
+export interface BindingApplicationWithNames extends BindingApplication {
+  /** 申请人用户名 */
+  requester_username: string;
+  /** 审批人用户名（status=pending 时为 null） */
+  reviewer_username: string | null;
+  /** 实例名（方便申请人查看自己的申请列表时识别） */
+  server_name: string;
+  /** 实例游戏类型 */
+  server_game_type: string;
+}
+
+/**
+ * 可绑定实例（市场列表项）
+ * GET /api/servers/bindable 返回，附带给定用户的绑定状态标记
+ */
+export interface BindableServer {
+  id: string;
+  name: string;
+  game_type: string;
+  pack_id: string;
+  status: string;
+  is_public: boolean;
+  /** 服主用户名（owner_user_id 关联 users.username） */
+  owner_username: string | null;
+  /** 当前用户是否 owner（owner_user_id === 当前 userId） */
+  is_owner: boolean;
+  /** 当前用户是否已 bindings 绑定（account/instance/verified） */
+  is_bound: boolean;
+  /** 当前用户是否已对该实例提交 pending 申请 */
+  has_pending_request: boolean;
+  /** 是否可直接绑定（is_public=true 或 is_owner=true）→ 卡片显示"立即绑定" */
+  can_direct_bind: boolean;
+  /** 是否可申请绑定（is_public=false 且非 owner 且 binding_requests_enabled=true 且未已绑定）→ 卡片显示"申请绑定" */
+  can_request_bind: boolean;
+  /** 实例是否开启绑定申请通道（服主管理端展示用） */
+  binding_requests_enabled: boolean;
+  /** v4.38.1: 实例是否开启申请自动审批（服主管理端展示用） */
+  auto_approve_binding_requests: boolean;
+  created_at: string;
+}
+
+// ----- GET /api/servers/bindable -----
+
+export interface ListBindableServersQuery {
+  limit?: number;
+  offset?: number;
+  game_type?: string;
+  keyword?: string;
+}
+
+export interface ListBindableServersResponse {
+  servers: BindableServer[];
+  total: number;
+}
+
+// ----- POST /api/servers/:serverId/binding-requests -----
+
+export interface CreateBindingApplicationRequest {
+  /** 申请留言（选填） */
+  message?: string;
+}
+
+export interface CreateBindingApplicationResponse {
+  application: BindingApplication;
+}
+
+// ----- GET /api/servers/:serverId/binding-requests -----
+
+export interface ListBindingApplicationsResponse {
+  applications: BindingApplicationWithNames[];
+}
+
+// ----- POST /api/binding-requests/:id/approve -----
+
+export interface ApproveBindingApplicationRequest {
+  /** 审批备注（选填） */
+  review_note?: string;
+}
+
+export interface ApproveBindingApplicationResponse {
+  application: BindingApplication;
+}
+
+// ----- POST /api/binding-requests/:id/reject -----
+
+export interface RejectBindingApplicationRequest {
+  /** 审批备注（选填） */
+  review_note?: string;
+}
+
+export interface RejectBindingApplicationResponse {
+  application: BindingApplication;
+}
+
+// ----- GET /api/my/binding-requests -----
+
+export interface ListMyBindingApplicationsResponse {
+  applications: BindingApplicationWithNames[];
+}
+
+// ----- PUT /api/servers/:serverId/binding-requests-settings -----
+
+export interface SetBindingRequestsSettingsRequest {
+  /** 是否开启绑定申请通道（仅对私有实例有意义） */
+  binding_requests_enabled?: boolean;
+  /** v4.38.1: 是否开启申请自动审批（仅对私有实例有意义） */
+  auto_approve_binding_requests?: boolean;
+}
+
+export interface SetBindingRequestsSettingsResponse {
+  server_id: string;
+  binding_requests_enabled: boolean;
+  auto_approve_binding_requests: boolean;
+}
+
+// ----- GET /api/servers/:id 403 响应扩展 -----
+
+/**
+ * 当用户访问无权访问的私有实例时，GET /api/servers/:id 返回 403，
+ * 响应体附带此字段，提示前端可走"申请绑定"流程
+ */
+export interface ServerForbiddenInfo {
+  /** 是否可走申请绑定流程（is_public=false 且 binding_requests_enabled=true） */
+  can_request_binding: boolean;
+  /** 实例是否开启绑定申请通道 */
+  binding_requests_enabled: boolean;
 }
 
 

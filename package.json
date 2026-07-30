@@ -1,6 +1,6 @@
 {
   "name": "gameserver-panel",
-  "version": "4.36.1",
+  "version": "4.39.1",
   "private": true,
   "description": "通用游戏服务器管理平台 — Panel + Daemon 双层架构",
   "workspaces": [

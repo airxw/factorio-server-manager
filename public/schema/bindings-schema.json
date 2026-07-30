@@ -42,7 +42,7 @@
       "minimum": 0,
       "maximum": 5,
       "default": 0,
-      "description": "VIP 等级 0-5（仅 binding_type='account' 有意义；binding_type='player' 恒为 0）"
+      "description": "VIP 等级 0-5。仅 verify 角色后才有意义（vip_level 由 verifyBindingByCode 赋予）；bindInstance 创建时为 0。binding_type='player' 恒为 0"
     },
     "wallet_id": {
       "type": ["integer", "null"],

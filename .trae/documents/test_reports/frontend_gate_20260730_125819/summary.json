@@ -1,0 +1,43 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "status": "未闭合",
+  "timestamp": "2026-07-30T12:58:19+08:00",
+  "evidence_path": ".trae/documents/test_reports/frontend_gate_20260730_125819/",
+  "change_scope": "info-card 布局拆分：2列网格(短行) + 单列运维分区(交互行)",
+  "files_changed": [
+    "panel/frontend/src/pages/instance-detail/ServerDetailCore.tsx",
+    "panel/frontend/src/styles.css"
+  ],
+  "summary": "将 info-card 拆为上下两分区：上半 2 列网格放 9 条短展示行，下半单列放 6 条交互行，解决长控件被半列挤压、横线不对齐问题。Test1 单测全绿、tsc/build/localhost 合规通过；Test2 浏览器核对因用户选择'先不部署'暂缓，标未闭合。",
+  "tests": {
+    "test1_unit": {
+      "status": "PASS",
+      "detail": "vitest 316/316 passed (28 files)",
+      "evidence": "test1_streamlit.log"
+    },
+    "test2_browser": {
+      "status": "未闭合",
+      "detail": "用户决定暂缓部署，浏览器核对待部署后执行",
+      "evidence": "test2_browser_check.md"
+    },
+    "test3_mock": {
+      "status": "PASS",
+      "detail": "纯布局改动，未触及 Mock 路径，无回归影响",
+      "evidence": "test3_mock_checklist.md"
+    }
+  },
+  "build_checks": {
+    "tsc_noEmit": "PASS (exit 0)",
+    "vite_build": "PASS (built in 9.05s)",
+    "localhost_3000_violation": "无违规",
+    "127.0.0.1_3000_violation": "无违规"
+  },
+  "failed_cases": [],
+  "next_actions": [
+    "用户决定部署时：bump 版本 4.37.1→4.37.2（12 处版本源同步）",
+    "运行 s0701 部署预检",
+    "关闭现有部署 → deploy.sh update",
+    "重跑 Test2 内置浏览器核对（导航实例详情页 + 截图取证）"
+  ],
+  "rerun_entry": "部署后重跑 Test2：内置浏览器导航 https://gsp.ecsrz.com:3001/instances/{id} → 展开信息卡 → 截图核对上下分区布局 → 回填 test2_browser_check.md 并将 summary.json status 改为 PASSED"
+}

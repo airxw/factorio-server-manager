@@ -1,0 +1,51 @@
+{
+  "skill": "s0402-frontend-triple-gate",
+  "timestamp": "2026-07-30T12:48:58+08:00",
+  "version": "v4.37.1",
+  "change_scope": [
+    "panel/frontend/src/pages/Forbidden.tsx (visual redesign, logic preserved)",
+    "panel/frontend/src/pages/Register.tsx (post-registration redirect /dashboard -> /)",
+    "panel/frontend/src/pages/NotFound.tsx (link /dashboard -> /)",
+    "panel/frontend/src/pages/ServerError.tsx (link /dashboard -> /)",
+    "panel/frontend/src/App.tsx (/dashboard redirect target /admin -> /)",
+    "panel/frontend/src/styles.css (new .forbidden-page styles)"
+  ],
+  "tests": {
+    "test1_unit": {
+      "status": "PASS",
+      "type": "vitest + tsc",
+      "details": {
+        "forbidden_test_file": "6/6 PASS (208ms)",
+        "frontend_full_suite": "316/316 PASS (28 files, 22.03s)",
+        "tsc_noEmit": "exit 0, 0 errors"
+      },
+      "evidence": "test1_streamlit.log"
+    },
+    "test2_browser": {
+      "status": "PASS",
+      "type": "integrated browser (browser_use subagent)",
+      "details": {
+        "register_page_load": "PASS",
+        "registration_submit": "PASS (test-forbidden-fix-1753878000@test.local)",
+        "post_registration_url": "http://127.0.0.1:5173/guild (NOT /forbidden) — bug fixed",
+        "forbidden_new_design_render": "PASS (card + shield icon + eyebrow + title + hint + button)",
+        "return_home_button": "PASS (navigates to /guild)"
+      },
+      "evidence": "test2_browser_check.md",
+      "screenshots_captured": true
+    },
+    "test3_mock": {
+      "status": "N/A",
+      "reason": "No API/WS/data contract changes; no Mock adaptation layer touched. Change is pure visual + route string fix.",
+      "evidence": "test3_mock_checklist.md"
+    }
+  },
+  "build_verification": {
+    "vite_build": "PASS (built in 6.96s)",
+    "localhost_3000_in_dist": "not found (PASS per 0.md highest rule)",
+    "127.0.0.1_3000_in_dist": "not found (PASS per 0.md highest rule)"
+  },
+  "overall_conclusion": "PASSED",
+  "closure_state": "已闭合",
+  "notes": "Bug fix verified end-to-end: new registered users now land on /guild (player portal) instead of /forbidden. The /forbidden page itself was modernized to Apple-inspired design language. All existing logic (role-based home, switch-to-instance-admin CTA) preserved — 6/6 existing unit tests pass without modification."
+}

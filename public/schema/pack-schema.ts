@@ -49,6 +49,8 @@ export const InstanceTabSchema = z.enum([
   // v4.x.x: 实例共管 tab（前端底座渲染，不在 pack.yaml 中声明）
   // admins: 实例共管员管理；roles: 角色权限分配
   'admins', 'roles',
+  // v4.38.0: 绑定申请管理 tab（服主审批私有实例的绑定申请 + 申请通道开关，仅 instance_admin+ 可见）
+  'binding-requests',
 ]);
 export type InstanceTab = z.infer<typeof InstanceTabSchema>;
 
