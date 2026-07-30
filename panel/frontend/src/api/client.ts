@@ -82,6 +82,9 @@ import type {
   UpdateUserResponse,
   UpdateUserRoleResponse,
   UpdateVipPermissionResponse,
+  UploadInitResponse,
+  UploadChunkResponse,
+  UploadFinishResponse,
   UpsertChatSettingsResponse,
   UpsertPlayerJoinSettingsResponse,
   UpsertShopItemResponse,
@@ -123,6 +126,7 @@ import type {
   ReadConfigFileResponse,
   WriteConfigFileResponse,
   GetConfigFileSchemaResponse,
+  CreateConfigFileResponse,
   RegenerateMapResponse,
   GetMapSettingsSchemaResponse,
   UpdateMapSettingsResponse,
@@ -206,6 +210,7 @@ import type { StorePlayerActionsApi } from './modules/store-player-actions';
 import type { MyApi, MyOrdersStatusFilter } from './modules/my';
 // v3-billing: VPS 式预付费实例计费 API 切片
 import type { InstanceBillingApi } from './modules/instance-billing';
+import type { BindingApplicationsApi } from './modules/binding-applications';
 export type { MyOrdersStatusFilter } from './modules/my';
 // 领域类型重新导出，保持 client.ts 公共 API 不变
 export type {
@@ -389,6 +394,21 @@ async function fetchWithTimeout(
   }
 }
 
+/** 将 Blob 转为 base64 字符串（用于文件分片上传） */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      // 去掉 data:...;base64, 前缀
+      const base64 = result.includes(',') ? result.split(',')[1] : result;
+      resolve(base64);
+    };
+    reader.onerror = () => reject(new Error('文件读取失败'));
+    reader.readAsDataURL(blob);
+  });
+}
+
 /** 将单个 snake_case 键转换为 camelCase */
 function snakeToCamelKey(key: string): string {
   return key.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -418,7 +438,7 @@ function snakeToCamel<T>(data: unknown): T {
  * 领域定义见 src/api/modules/{auth,servers,admin,shop}.ts
  * 实现集中在 createApiClient 工厂内，保持单一运行时入口。
  */
-export interface PanelApiClient extends AuthApi, ServersApi, AdminApi, ShopApi, SystemApi, SettingsApi, AssetApi, ShopConfigApi, StoreGmApi, StorePlayerActionsApi, MyApi, InstanceBillingApi {}
+export interface PanelApiClient extends AuthApi, ServersApi, AdminApi, ShopApi, SystemApi, SettingsApi, AssetApi, ShopConfigApi, StoreGmApi, StorePlayerActionsApi, MyApi, InstanceBillingApi, BindingApplicationsApi {}
 
 export function createApiClient(opts: ApiClientOptions = {}): PanelApiClient {
   const token = opts.token ?? null;
@@ -673,9 +693,10 @@ export function createApiClient(opts: ApiClientOptions = {}): PanelApiClient {
         method: 'DELETE',
       });
     },
-    startServer(id) {
+    startServer(id, opts) {
       return request<ServerStartResponse>(`/servers/${encodeURIComponent(id)}/start`, {
         method: 'POST',
+        body: opts?.savePath ? JSON.stringify({ save_path: opts.savePath }) : undefined,
       });
     },
     // v1.1.0: 启动前置引导——获取引导声明 + 当前已填配置
@@ -724,6 +745,47 @@ export function createApiClient(opts: ApiClientOptions = {}): PanelApiClient {
         method: 'POST',
         body: JSON.stringify({ command }),
       });
+    },
+    // 文件分片上传（三步：init → chunk* → finish）
+    uploadFileInit(serverId) {
+      return request<UploadInitResponse>(
+        `/servers/${encodeURIComponent(serverId)}/files/upload/init`,
+        { method: 'POST' },
+      );
+    },
+    uploadFileChunk(serverId, uploadId, index, content) {
+      return request<UploadChunkResponse>(
+        `/servers/${encodeURIComponent(serverId)}/files/upload/chunk`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ upload_id: uploadId, index, content }),
+        },
+      );
+    },
+    uploadFileFinish(serverId, uploadId, targetPath) {
+      return request<UploadFinishResponse>(
+        `/servers/${encodeURIComponent(serverId)}/files/upload/finish`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ upload_id: uploadId, target_path: targetPath }),
+        },
+      );
+    },
+    // 封装完整上传流程：file → base64 分片 → init/chunk*/finish
+    async uploadFile(serverId, file, targetPath, onProgress) {
+      const CHUNK_SIZE = 512 * 1024; // 512KB per chunk
+      const init = await this.uploadFileInit(serverId);
+      const uploadId = init.upload_id;
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const slice = file.slice(start, end);
+        const content = await blobToBase64(slice);
+        await this.uploadFileChunk(serverId, uploadId, i, content);
+        onProgress?.(i + 1, totalChunks);
+      }
+      return this.uploadFileFinish(serverId, uploadId, targetPath);
     },
     listUsers(query) {
       const qs = new URLSearchParams();
@@ -1256,6 +1318,12 @@ export function createApiClient(opts: ApiClientOptions = {}): PanelApiClient {
         `/servers/${encodeURIComponent(serverId)}/config-files/${encodeURIComponent(name)}/schema`,
       );
     },
+    createConfigFile(serverId, req) {
+      return request<CreateConfigFileResponse>(
+        `/servers/${encodeURIComponent(serverId)}/config-files`,
+        { method: 'POST', body: JSON.stringify(req) },
+      );
+    },
 
     // ---------- Task 11: World Gen ----------
     regenerateMap(serverId, saveName) {
@@ -1382,6 +1450,70 @@ export function createApiClient(opts: ApiClientOptions = {}): PanelApiClient {
       return request<void>(`/instances/${encodeURIComponent(serverId)}/bindings`, {
         method: 'DELETE',
       });
+    },
+
+    // ---------- v4.38.0: 公会服务器市场 + 绑定申请审批 ----------
+    /** GET /api/servers/bindable — 可绑定实例市场列表 */
+    listBindableServers(query) {
+      const qs = new URLSearchParams();
+      if (query?.limit !== undefined) qs.set('limit', String(query.limit));
+      if (query?.offset !== undefined) qs.set('offset', String(query.offset));
+      if (query?.game_type) qs.set('game_type', query.game_type);
+      if (query?.keyword) qs.set('keyword', query.keyword);
+      const suffix = qs.toString() ? `?${qs.toString()}` : '';
+      return request<import('@public/schema/panel-api-types').ListBindableServersResponse>(
+        `/servers/bindable${suffix}`,
+      );
+    },
+    /** PUT /api/admin/servers/:id/binding-requests-settings — 申请通道开关 + 自动审批开关 */
+    setBindingRequestsSettings(serverId, settings) {
+      return request<import('@public/schema/panel-api-types').SetBindingRequestsSettingsResponse>(
+        `/admin/servers/${encodeURIComponent(serverId)}/binding-requests-settings`,
+        {
+          method: 'PUT',
+          body: JSON.stringify(settings),
+        },
+      );
+    },
+    /** POST /api/servers/:serverId/binding-requests — 用户申请绑定私有实例 */
+    createBindingApplication(serverId, req) {
+      return request<import('@public/schema/panel-api-types').CreateBindingApplicationResponse>(
+        `/servers/${encodeURIComponent(serverId)}/binding-requests`,
+        { method: 'POST', body: JSON.stringify(req ?? {}) },
+      );
+    },
+    /** GET /api/servers/:serverId/binding-requests — 服主查看该实例的申请列表 */
+    listServerBindingApplications(serverId, status) {
+      const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+      return request<import('@public/schema/panel-api-types').ListBindingApplicationsResponse>(
+        `/servers/${encodeURIComponent(serverId)}/binding-requests${qs}`,
+      );
+    },
+    /** POST /api/binding-requests/:id/approve — 服主审批通过 */
+    approveBindingApplication(id, req) {
+      return request<import('@public/schema/panel-api-types').ApproveBindingApplicationResponse>(
+        `/binding-requests/${encodeURIComponent(id)}/approve`,
+        { method: 'POST', body: JSON.stringify(req ?? {}) },
+      );
+    },
+    /** POST /api/binding-requests/:id/reject — 服主审批拒绝 */
+    rejectBindingApplication(id, req) {
+      return request<import('@public/schema/panel-api-types').RejectBindingApplicationResponse>(
+        `/binding-requests/${encodeURIComponent(id)}/reject`,
+        { method: 'POST', body: JSON.stringify(req ?? {}) },
+      );
+    },
+    /** DELETE /api/binding-requests/:id — 申请人撤销自己的 pending 申请 */
+    cancelBindingApplication(id) {
+      return request<void>(`/binding-requests/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+    },
+    /** GET /api/my/binding-requests — 用户查看自己提交的全部申请 */
+    listMyBindingApplications() {
+      return request<import('@public/schema/panel-api-types').ListMyBindingApplicationsResponse>(
+        '/my/binding-requests',
+      );
     },
 
     // ---------- Pack 管理 ----------

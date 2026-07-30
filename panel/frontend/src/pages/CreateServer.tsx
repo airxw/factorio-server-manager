@@ -379,7 +379,7 @@ export default function CreateServer() {
   const INPUT_CLASS =
     'w-full rounded-[14px] border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60';
   const SELECT_CLASS = INPUT_CLASS;
-  const LABEL_CLASS = 'block text-xs font-medium uppercase tracking-[0.18em] text-slate-400';
+  const LABEL_CLASS = 'block text-xs font-medium uppercase tracking-[0.08em] text-slate-400';
   const HINT_CLASS = 'mt-1.5 text-xs leading-5 text-slate-500';
   const ERROR_CLASS = 'mt-1.5 text-xs leading-5 text-rose-600';
 
@@ -692,7 +692,7 @@ export default function CreateServer() {
                 {/* v3-billing: 价格预览 */}
                 <div className="rounded-[14px] border border-slate-200 bg-slate-50 p-4">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+                    <span className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
                       应付金额
                     </span>
                     {loadingPreview ? (

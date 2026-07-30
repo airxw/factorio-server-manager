@@ -16,7 +16,7 @@ import { getEffectiveRole, isAdminRole } from '../../utils/role';
 import { ErrorState, Skeleton } from '../../components/ui';
 import ShopItems from '../admin/ShopItems';
 import ShopOrders from '../ShopOrders';
-import CdkRedeem from '../CdkRedeem';
+import CdkCodes from '../admin/CdkCodes';
 import ChatTriggers from '../admin/ChatTriggers';
 import PlayerJoinSettings from '../admin/PlayerJoinSettings';
 import VoteSettings from '../admin/VoteSettings';
@@ -24,7 +24,7 @@ import VoteSettings from '../admin/VoteSettings';
 const SUB_TABS = [
   { key: 'shop', label: '商品配置' },
   { key: 'orders', label: '订单管理' },
-  { key: 'cdk', label: 'CDK 兑换' },
+  { key: 'cdk', label: 'CDK 发放' },
   { key: 'triggers', label: '聊天触发' },
   { key: 'join', label: '加入设置' },
   { key: 'vote', label: '投票踢人' },
@@ -154,9 +154,9 @@ export default function Business() {
       <div className="business-content" style={{ marginTop: 16 }}>
         {activeSubTab === 'shop' && <ShopItems serverId={server.id} packId={server.pack_id} />}
         {activeSubTab === 'orders' && <ShopOrders embedded />}
-        {activeSubTab === 'cdk' && <CdkRedeem embedded />}
+        {activeSubTab === 'cdk' && <CdkCodes embedded serverId={server.id} />}
         {activeSubTab === 'triggers' && <ChatTriggers serverId={server.id} />}
-        {activeSubTab === 'join' && <PlayerJoinSettings serverId={server.id} />}
+        {activeSubTab === 'join' && <PlayerJoinSettings serverId={server.id} packId={server.pack_id} />}
         {activeSubTab === 'vote' && <VoteSettings serverId={server.id} />}
       </div>
     </div>

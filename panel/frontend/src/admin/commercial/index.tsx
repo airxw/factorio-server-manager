@@ -150,7 +150,7 @@ export const CommercialAdminPanel: React.FC = () => {
           icon={ServerIcon}
         >
           {serversLoading && (
-            <div className="h-32 animate-pulse rounded-[20px] bg-slate-100/70" />
+            <div className="h-32 animate-pulse rounded-2xl bg-slate-100/70" />
           )}
           {serversError && (
             <WorkbenchEmpty
@@ -175,7 +175,7 @@ export const CommercialAdminPanel: React.FC = () => {
                   key={s.id}
                   type="button"
                   onClick={() => navigate(`/store/commercial/${encodeURIComponent(s.id)}`)}
-                  className="group flex items-center justify-between gap-3 rounded-[20px] border border-slate-200/80 bg-white/90 px-4 py-3 text-left shadow-[0_18px_40px_-34px_rgba(15,23,42,0.30)] transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                  className="group flex items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white px-4 py-3 text-left shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-slate-900">{s.name}</p>
@@ -214,12 +214,12 @@ export const CommercialAdminPanel: React.FC = () => {
       />
 
       {error && (
-        <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         <WorkbenchSection
           title="资产列表"
           description="全局标品 + 实例覆盖 + UGC 合并视图。"

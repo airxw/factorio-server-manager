@@ -140,67 +140,65 @@ export default function LogFiles({ serverId }: LogFilesPageProps) {
       ) : files.length === 0 ? (
         <div className="empty-state">暂无日志文件。</div>
       ) : (
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-          {/* 左侧：文件列表 */}
-          <div style={{ flex: '1 1 320px', minWidth: 280 }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>文件名</th>
-                  <th>大小</th>
-                  <th>修改时间</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {files.map((f) => {
-                  const isCurrent = f.filename === CURRENT_LOG;
-                  const isSelected = selectedFile === f.filename;
-                  return (
-                    <tr key={f.filename}>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-link"
-                          style={{
-                            padding: 0,
-                            border: 'none',
-                            background: 'transparent',
-                            color: isSelected ? '#1976d2' : 'inherit',
-                            cursor: 'pointer',
-                            textDecoration: 'underline',
-                          }}
-                          onClick={() => void handleRead(f.filename, readCount)}
-                          disabled={reading}
-                        >
-                          {f.filename}
-                          {isCurrent && ' (当前)'}
-                        </button>
-                      </td>
-                      <td>{formatSize(f.size)}</td>
-                      <td>{formatTime(f.mtime)}</td>
-                      <td>
-                        <button
-                          type="button"
-                          className="btn btn-danger btn-sm"
-                          onClick={() => void handleDelete(f.filename)}
-                          disabled={isCurrent}
-                          title={isCurrent ? '当前写入的日志文件不允许删除' : '删除此备份文件'}
-                        >
-                          删除
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+        <div>
+          {/* 文件列表 */}
+          <table className="data-table" style={{ marginBottom: 16 }}>
+            <thead>
+              <tr>
+                <th>文件名</th>
+                <th>大小</th>
+                <th>修改时间</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {files.map((f) => {
+                const isCurrent = f.filename === CURRENT_LOG;
+                const isSelected = selectedFile === f.filename;
+                return (
+                  <tr key={f.filename}>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-link"
+                        style={{
+                          padding: 0,
+                          border: 'none',
+                          background: 'transparent',
+                          color: isSelected ? '#1976d2' : 'inherit',
+                          cursor: 'pointer',
+                          textDecoration: 'underline',
+                        }}
+                        onClick={() => void handleRead(f.filename, readCount)}
+                        disabled={reading}
+                      >
+                        {f.filename}
+                        {isCurrent && ' (当前)'}
+                      </button>
+                    </td>
+                    <td>{formatSize(f.size)}</td>
+                    <td>{formatTime(f.mtime)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={() => void handleDelete(f.filename)}
+                        disabled={isCurrent}
+                        title={isCurrent ? '当前写入的日志文件不允许删除' : '删除此备份文件'}
+                      >
+                        删除
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
-          {/* 右侧：文件内容查看器 */}
-          <div style={{ flex: '2 1 480px', minWidth: 320 }}>
+          {/* 文件内容查看器 */}
+          <div>
             {!selectedFile ? (
-              <div className="empty-state">点击左侧文件名查看内容。</div>
+              <div className="empty-state">点击上方文件名查看内容。</div>
             ) : (
               <div className="console-card" style={{ padding: 12 }}>
                 <div

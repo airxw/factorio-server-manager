@@ -40,7 +40,7 @@ const INPUT_CLASS =
   'w-full rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300';
 const TEXTAREA_CLASS =
   'w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300';
-const LABEL_CLASS = 'block text-xs font-medium uppercase tracking-[0.18em] text-slate-400';
+const LABEL_CLASS = 'block text-xs font-medium uppercase tracking-[0.08em] text-slate-400';
 
 export default function ShopConfigEditor() {
   const { id } = useParams<{ id: string }>();
@@ -107,8 +107,8 @@ export default function ShopConfigEditor() {
   if (loading) {
     return (
       <WorkbenchShell>
-        <div className="h-40 animate-pulse rounded-[28px] border border-slate-200/80 bg-white/80" />
-        <div className="h-80 animate-pulse rounded-[26px] border border-slate-200/80 bg-white/80" />
+        <div className="h-32 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
+        <div className="h-72 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
       </WorkbenchShell>
     );
   }
@@ -165,7 +165,7 @@ export default function ShopConfigEditor() {
       />
 
       {error && (
-        <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {error}
         </div>
       )}

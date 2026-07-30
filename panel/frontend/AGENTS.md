@@ -25,7 +25,8 @@ panel/frontend/
 │   │   ├── Login.tsx               # 登录页
 │   │   ├── Servers.tsx             # 服务器列表 + 创建按钮
 │   │   ├── CreateServer.tsx        # 选 Pack + 填名称 + 端口
-│   │   └── ServerDetail.tsx        # 详情页（含 Console Tab）
+│   │   ├── ServerDetail.tsx        # 兼容再导出层（v4.36.0 拆分，指向 ServerDetailCore）
+│   │   └── instance-detail/ServerDetailCore.tsx  # 详情页核心（含 Console Tab + Tab 注册表）
 │   ├── components/
 │   │   └── RconConsole.tsx         # 命令输入 + WS 日志流 + 响应回显
 │   ├── api/

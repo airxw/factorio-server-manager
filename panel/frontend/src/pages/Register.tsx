@@ -1,8 +1,11 @@
 // ============================================================================
 // Register — 注册页
 // 邮箱 + 用户名 + 密码 + 确认密码表单，调用 useAuth.register，
-// 成功后自动登录（保存 token + user state）并跳转到 /instances
+// 成功后自动登录（保存 token + user state）并跳转到根路径
 // 五.7: 字段级实时校验（onBlur 触发，onChange 清错）+ 密码强度提示
+// v4.36.1: 修正注册后跳转目标——/dashboard 已于 v4.12.0 废弃并重定向到 /admin，
+//          新注册用户（role=user）命中 /admin 守卫被弹到 /forbidden。
+//          改为跳转 /，由 RootRedirect 按角色分流到对应基座（user → /guild）。
 // ============================================================================
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -70,9 +73,9 @@ export default function Register() {
     };
   }, []);
 
-  // 已登录用户访问 /register 直接跳走
+  // 已登录用户访问 /register 直接跳走（v4.36.1: /dashboard 已废弃，统一走 / 角色分流）
   if (user) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   const validateField = (field: RegisterField, value: string): string | null => {
@@ -126,7 +129,8 @@ export default function Register() {
     setSubmitting(true);
     try {
       await register(email.trim(), username.trim(), password);
-      navigate('/dashboard', { replace: true });
+      // v4.36.1: 跳转 / 由 RootRedirect 按角色分流（user → /guild），避免命中 /admin 守卫弹到 /forbidden
+      navigate('/', { replace: true });
     } catch (err) {
       // 3.15: 失败后递增冷却——第1次5s，第2次15s，第3次+30s
       failedAttemptsRef.current += 1;

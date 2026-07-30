@@ -10,7 +10,7 @@ const INPUT_CLASS =
 const TEXTAREA_CLASS =
   'mt-2 w-full rounded-[18px] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300';
 const LABEL_CLASS =
-  'block text-xs font-medium uppercase tracking-[0.18em] text-slate-400';
+  'block text-xs font-medium uppercase tracking-[0.08em] text-slate-400';
 
 export const UgcForm: React.FC<UgcFormProps> = ({ onSubmit }) => {
   const [name, setName] = useState('');

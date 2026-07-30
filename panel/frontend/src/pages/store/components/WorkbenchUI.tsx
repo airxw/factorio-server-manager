@@ -1,8 +1,10 @@
 // ============================================================================
 // WorkbenchUI — Store Workbench 设计系统（DS）核心
-// 视觉基线：浅色 Apple 生产力风 + 弥散阴影 + rounded-full 主按钮
+// 视觉基线：浅色 Apple 生产力风 + 克制阴影 + 统一圆角体系
 // 主 CTA 色：iOS 蓝 #007AFF（v4.x 起锁定，见 docs/plans/store-ui-polish-plan.md §3.2）
 // 装饰 Tone：blue/violet/emerald/amber/rose/slate 保留用于 KPI/状态分级
+// 圆角规范：大容器 16px(rounded-2xl)、卡片 12px(rounded-xl)、小元素 8px(rounded-lg)、胶囊 999px(rounded-full)
+// 间距规范：区块间距 20px(space-y-5)、卡片内距 20px(p-5)
 // 用法约束：所有 /store 业务页强制以此 DS 为唯一页面骨架语言，禁止再新增 daisyUI 裸拼页面
 // ============================================================================
 
@@ -47,7 +49,6 @@ const TONE_STYLES: Record<Tone, { icon: string; chip: string; accent: string }> 
 // iOS 蓝主 CTA 色常量（v4.x 锁定，全 /store 基座唯一主按钮色）
 export const IOS_BLUE = '#007AFF';
 export const IOS_BLUE_HOVER = '#0A84FF';
-export const IOS_BLUE_SHADOW = '0_18px_38px_-22px_rgba(0,122,255,0.55)';
 export const IOS_BLUE_RING = 'focus-visible:ring-blue-300';
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -59,7 +60,7 @@ function cx(...values: Array<string | false | null | undefined>) {
 // ---------------------------------------------------------------------------
 
 export function WorkbenchShell({ children }: { children: ReactNode }) {
-  return <div className="space-y-6">{children}</div>;
+  return <div className="space-y-5">{children}</div>;
 }
 
 interface WorkbenchHeaderProps {
@@ -78,23 +79,23 @@ export function WorkbenchHeader({
   badges,
 }: WorkbenchHeaderProps) {
   return (
-    <section className="overflow-hidden rounded-[28px] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(244,247,252,0.92))] p-6 shadow-[0_24px_70px_-42px_rgba(15,23,42,0.32)] backdrop-blur xl:p-7">
-      <div className="flex flex-wrap items-start justify-between gap-5">
+    <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm xl:p-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
           {eyebrow && (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-400">
               {eyebrow}
             </p>
           )}
-          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.03em] text-slate-900">
+          <h1 className="mt-2 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-slate-900">
             {title}
           </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-500">{description}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-500">{description}</p>
         </div>
         {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
       </div>
       {badges && badges.length > 0 && (
-        <div className="mt-5 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap gap-2">
           {badges.map((badge) => (
             <WorkbenchChip key={`${badge.label}-${badge.value}`} tone={badge.tone ?? 'slate'}>
               <span className="font-medium">{badge.label}</span>
@@ -127,18 +128,18 @@ export function WorkbenchMetricCard({
 }: WorkbenchMetricCardProps) {
   const toneStyle = TONE_STYLES[tone];
   return (
-    <article className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.35)]">
+    <article className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">{label}</p>
-          <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] tabular-nums text-slate-900">
+          <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">{label}</p>
+          <p className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.01em] tabular-nums text-slate-900">
             {value}
           </p>
-          {hint && <p className="mt-2 text-sm text-slate-500">{hint}</p>}
+          {hint && <p className="mt-2 text-sm leading-5 text-slate-500">{hint}</p>}
         </div>
         <div
           className={cx(
-            'flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ring-1',
+            'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ring-1',
             toneStyle.icon,
           )}
         >
@@ -170,21 +171,21 @@ export function WorkbenchSection({
   return (
     <section
       className={cx(
-        'rounded-[26px] border border-slate-200/80 bg-white/92 p-5 shadow-[0_18px_46px_-36px_rgba(15,23,42,0.34)] xl:p-6',
+        'rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm xl:p-6',
         className,
       )}
     >
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             {Icon && (
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-                <Icon size={16} />
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                <Icon size={14} />
               </span>
             )}
-            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            <h2 className="text-[17px] font-semibold tracking-[-0.01em] text-slate-900">{title}</h2>
           </div>
-          {description && <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>}
+          {description && <p className="mt-1.5 text-sm leading-6 text-slate-500">{description}</p>}
         </div>
         {action}
       </div>
@@ -210,20 +211,20 @@ export function WorkbenchEmpty({
 }: WorkbenchEmptyProps) {
   const toneStyle = TONE_STYLES[tone];
   return (
-    <div className="rounded-[22px] border border-dashed border-slate-200 bg-slate-50/80 px-5 py-8 text-center">
+    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-5 py-8 text-center">
       {Icon && (
         <div
           className={cx(
-            'mx-auto flex h-12 w-12 items-center justify-center rounded-2xl ring-1',
+            'mx-auto flex h-12 w-12 items-center justify-center rounded-xl ring-1',
             toneStyle.icon,
           )}
         >
-          <Icon size={18} />
+          <Icon size={20} />
         </div>
       )}
-      <p className="mt-3 text-sm font-medium text-slate-800">{title}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-500">{description}</p>
-      {action && <div className="mt-4 flex justify-center">{action}</div>}
+      <p className="mt-4 text-[15px] font-semibold tracking-[-0.01em] text-slate-800">{title}</p>
+      <p className="mt-1.5 text-sm leading-6 text-slate-500">{description}</p>
+      {action && <div className="mt-5 flex justify-center">{action}</div>}
     </div>
   );
 }
@@ -238,7 +239,7 @@ export function WorkbenchChip({
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ring-1',
+        'inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-medium ring-1',
         TONE_STYLES[tone].chip,
       )}
     >
@@ -287,7 +288,7 @@ export function WorkbenchPrimaryButton({
       type="button"
       {...rest}
       className={cx(
-        'inline-flex items-center gap-2 rounded-full bg-[#007AFF] px-5 py-2.5 text-sm font-medium text-white shadow-[0_18px_38px_-22px_rgba(0,122,255,0.55)] transition hover:bg-[#0A84FF] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
+        'inline-flex min-h-[40px] items-center gap-2 rounded-full bg-[#007AFF] px-5 py-2 text-sm font-medium text-white transition hover:bg-[#0A84FF] active:bg-[#0066DD] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2',
         className,
       )}
     >
@@ -314,7 +315,7 @@ export function WorkbenchSecondaryButton({
       type="button"
       {...rest}
       className={cx(
-        'inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
+        'inline-flex min-h-[40px] items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-2',
         className,
       )}
     >
@@ -345,14 +346,14 @@ export function WorkbenchIconButton({
       title={label}
       {...rest}
       className={cx(
-        'inline-flex h-9 w-9 items-center justify-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
+        'inline-flex h-11 w-11 items-center justify-center rounded-full transition disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 focus-visible:ring-offset-1',
         tone === 'rose'
           ? 'text-slate-500 hover:bg-rose-50 hover:text-rose-600'
           : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900',
         className,
       )}
     >
-      <Icon size={16} />
+      <Icon size={18} />
     </button>
   );
 }
@@ -363,7 +364,7 @@ export function WorkbenchIconButton({
 
 export function WorkbenchFilterBar({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 rounded-[22px] border border-slate-200/80 bg-white/90 p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.30)]">
+    <div className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm">
       {children}
     </div>
   );
@@ -383,7 +384,7 @@ export function WorkbenchSelect({ label, className, children, ...rest }: Workben
       <select
         {...rest}
         className={cx(
-          'rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60',
+          'rounded-full border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 focus:border-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60',
           className,
         )}
       >
@@ -415,7 +416,7 @@ export function WorkbenchSearchInput({
         type="text"
         {...rest}
         className={cx(
-          'w-full rounded-full border border-slate-200 bg-white py-2 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 focus:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
+          'w-full rounded-full border border-slate-200 bg-white py-2 text-sm text-slate-700 shadow-sm transition hover:border-slate-300 focus:border-blue-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-300',
           Icon ? 'pl-10 pr-4' : 'px-4',
         )}
       />
@@ -507,13 +508,13 @@ export function WorkbenchStatusBadge({
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ring-1',
+        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-medium ring-1',
         STATUS_TONE_CLASS[tone],
       )}
     >
       <span
         className={cx(
-          'inline-block h-1.5 w-1.5 rounded-full',
+          'inline-block h-2 w-2 rounded-full',
           STATUS_DOT_CLASS[tone],
           pulse && 'animate-pulse',
         )}
@@ -541,7 +542,7 @@ export function WorkbenchNote({ tone = 'blue', icon: Icon, children }: Workbench
     rose: 'bg-rose-50 text-rose-700 ring-rose-100',
   }[tone];
   return (
-    <div className={cx('rounded-2xl px-4 py-3 text-sm ring-1', cls)}>
+    <div className={cx('rounded-xl px-4 py-3 text-sm ring-1', cls)}>
       <div className="flex items-start gap-2">
         {Icon && <Icon size={15} className="mt-0.5 shrink-0" />}
         <span className="leading-6">{children}</span>
@@ -566,8 +567,8 @@ export function WorkbenchChartFrame({ title, description, legend, children }: Wo
     <div>
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold text-slate-900">{title}</p>
-          {description && <p className="mt-1 text-xs text-slate-500">{description}</p>}
+          <p className="text-[15px] font-semibold tracking-[-0.01em] text-slate-900">{title}</p>
+          {description && <p className="mt-1 text-xs leading-5 text-slate-500">{description}</p>}
         </div>
         {legend && <div className="flex flex-wrap items-center gap-3">{legend}</div>}
       </div>
@@ -583,18 +584,18 @@ export function WorkbenchChartFrame({ title, description, legend, children }: Wo
 export function WorkbenchPageSkeleton() {
   return (
     <WorkbenchShell>
-      <div className="h-40 animate-pulse rounded-[28px] border border-slate-200/80 bg-white/80" />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="h-36 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="h-36 animate-pulse rounded-[24px] border border-slate-200/80 bg-white/80"
+            className="h-32 animate-pulse rounded-xl border border-slate-200/80 bg-white/80"
           />
         ))}
       </div>
-      <div className="grid gap-4 xl:grid-cols-[1.45fr_0.95fr]">
-        <div className="h-80 animate-pulse rounded-[26px] border border-slate-200/80 bg-white/80" />
-        <div className="h-80 animate-pulse rounded-[26px] border border-slate-200/80 bg-white/80" />
+      <div className="grid gap-5 xl:grid-cols-[1.45fr_0.95fr]">
+        <div className="h-72 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
+        <div className="h-72 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
       </div>
     </WorkbenchShell>
   );
@@ -606,7 +607,7 @@ export function WorkbenchPageSkeleton() {
 
 export function WorkbenchTableWrap({ children }: { children: ReactNode }) {
   return (
-    <div className="overflow-hidden rounded-[20px] border border-slate-200/80 bg-white/90">
+    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
       <div className="table-wrap">{children}</div>
     </div>
   );

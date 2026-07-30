@@ -12,9 +12,10 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { Gamepad2 } from 'lucide-react';
+import { Gamepad2, Lock, Send, ShieldX } from 'lucide-react';
 import { useAuth } from '../../api/auth';
 import { PanelApiError } from '../../api/client';
+import { useToast } from '../../components/ui';
 import type {
   InstanceShopConfig,
   Binding,
@@ -35,14 +36,25 @@ const STATE_LABEL: Record<string, string> = {
   error: '异常',
 };
 
+/** 403 详情（私有实例访问被拒时后端在 error.details 内附带） */
+interface ForbiddenDetails {
+  can_request_binding?: boolean;
+  binding_requests_enabled?: boolean;
+  is_public?: boolean;
+}
+
 export default function ServerDetailGuild() {
   const { id } = useParams<{ id: string }>();
   const { api } = useAuth();
+  const toast = useToast();
   const [shopConfig, setShopConfig] = useState<InstanceShopConfig | null>(null);
   const [server, setServer] = useState<ServerSummary | null>(null);
   const [currentBinding, setCurrentBinding] = useState<Binding | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
   const [configError, setConfigError] = useState<string | null>(null);
+  // v4.38.0: 403 详情（用于展示"申请绑定"按钮）
+  const [forbiddenDetails, setForbiddenDetails] = useState<ForbiddenDetails | null>(null);
+  const [applyBusy, setApplyBusy] = useState(false);
 
   const handleBindingChange = useCallback((binding: Binding | null) => {
     setCurrentBinding(binding);
@@ -53,6 +65,7 @@ export default function ServerDetailGuild() {
     let cancelled = false;
     setConfigLoading(true);
     setConfigError(null);
+    setForbiddenDetails(null);
     // 并行拉取店铺配置 + 实例摘要（实例名/状态用于 Banner 叠加层）
     Promise.all([
       api.getInstanceShopConfig(id).catch((err) => {
@@ -60,6 +73,10 @@ export default function ServerDetailGuild() {
           // v4.15.2: 对 403 错误显示友好提示
           if (err instanceof PanelApiError && err.code === 'PANEL_FORBIDDEN') {
             setConfigError('您无权访问该实例');
+            // v4.38.0: 提取 error.details 中的 can_request_binding / binding_requests_enabled
+            if (err.details) {
+              setForbiddenDetails(err.details as ForbiddenDetails);
+            }
           } else {
             const msg = err instanceof PanelApiError ? err.message : '店铺配置加载失败';
             setConfigError(msg);
@@ -89,16 +106,139 @@ export default function ServerDetailGuild() {
   // 这是系统层面的权限错误（非"先显示再提示"），完全隐藏子项而非显示错误
   const isForbidden = configError === '您无权访问该实例';
 
+  // v4.38.0: 申请绑定（私有实例 + 服主开启申请通道时可用）
+  const handleApplyBind = async () => {
+    if (!id) return;
+    setApplyBusy(true);
+    try {
+      await api.createBindingApplication(id);
+      toast.success('已提交申请，请等待服主审批');
+      // 申请成功后刷新详情（仍会 403，但 details.can_request_binding 会变 false）
+      setForbiddenDetails((prev) =>
+        prev ? { ...prev, can_request_binding: false } : prev,
+      );
+    } catch (err) {
+      const code = err instanceof PanelApiError ? err.code : '';
+      if (code === 'BINDING_REQUEST_ALREADY_PENDING') {
+        toast.info('已存在待审批的申请，请等待服主处理');
+      } else if (code === 'BINDING_REQUEST_ALREADY_BOUND') {
+        toast.info('已绑定该实例');
+      } else if (code === 'BINDING_REQUEST_DISABLED') {
+        toast.error('该实例已关闭申请通道');
+        setForbiddenDetails((prev) =>
+          prev ? { ...prev, can_request_binding: false, binding_requests_enabled: false } : prev,
+        );
+      } else {
+        toast.error(err instanceof PanelApiError ? err.message : '提交申请失败');
+      }
+    } finally {
+      setApplyBusy(false);
+    }
+  };
+
   if (isForbidden && !configLoading) {
+    // v4.38.0: 根据 forbiddenDetails 渲染不同状态
+    const canRequest = forbiddenDetails?.can_request_binding === true;
+    const requestsEnabled = forbiddenDetails?.binding_requests_enabled === true;
     return (
       <div
         className="guild-server-detail-container"
-        style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center', paddingTop: 60 }}
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          alignItems: 'center',
+          paddingTop: 60,
+          paddingInline: 20,
+        }}
       >
-        <Gamepad2 size={48} style={{ color: 'var(--gp-text-dim, #86868B)' }} />
-        <p style={{ fontSize: 16, color: 'var(--gp-text-secondary, #424245)', margin: 0 }}>
-          您无权访问该实例
-        </p>
+        {canRequest ? (
+          <>
+            <Lock size={48} style={{ color: 'var(--gp-amber, #FF9500)' }} />
+            <p
+              style={{
+                fontSize: 16,
+                color: 'var(--gp-text-secondary, #424245)',
+                margin: 0,
+                fontWeight: 600,
+              }}
+            >
+              该实例为私有实例
+            </p>
+            <p
+              style={{
+                fontSize: 13,
+                color: 'var(--gp-text-faint, #86868B)',
+                margin: 0,
+                textAlign: 'center',
+                maxWidth: 320,
+              }}
+            >
+              需要服主审批通过后才能访问。提交绑定申请并等待服主处理。
+            </p>
+            <button
+              type="button"
+              className="gp-btn gp-btn-primary"
+              style={{ marginTop: 8, padding: '10px 22px', fontSize: 13 }}
+              onClick={() => void handleApplyBind()}
+              disabled={applyBusy}
+            >
+              <Send size={13} /> {applyBusy ? '提交中…' : '提交绑定申请'}
+            </button>
+          </>
+        ) : requestsEnabled ? (
+          // can_request_binding=false 但 requestsEnabled=true：通常意味着已提交过 pending 申请
+          // （后端 403 时 is_public=false + requestsEnabled=true，但用户已有 pending）
+          <>
+            <ShieldX size={48} style={{ color: 'var(--gp-amber, #FF9500)' }} />
+            <p
+              style={{
+                fontSize: 16,
+                color: 'var(--gp-text-secondary, #424245)',
+                margin: 0,
+                fontWeight: 600,
+              }}
+            >
+              您无权访问该实例
+            </p>
+            <p
+              style={{
+                fontSize: 13,
+                color: 'var(--gp-text-faint, #86868B)',
+                margin: 0,
+                textAlign: 'center',
+                maxWidth: 320,
+              }}
+            >
+              您的绑定申请正在等待服主审批，请耐心等候。
+            </p>
+          </>
+        ) : (
+          <>
+            <Gamepad2 size={48} style={{ color: 'var(--gp-text-dim, #86868B)' }} />
+            <p
+              style={{
+                fontSize: 16,
+                color: 'var(--gp-text-secondary, #424245)',
+                margin: 0,
+                fontWeight: 600,
+              }}
+            >
+              您无权访问该实例
+            </p>
+            <p
+              style={{
+                fontSize: 13,
+                color: 'var(--gp-text-faint, #86868B)',
+                margin: 0,
+                textAlign: 'center',
+                maxWidth: 320,
+              }}
+            >
+              该实例未开放绑定申请通道，请联系服主或管理员。
+            </p>
+          </>
+        )}
       </div>
     );
   }

@@ -215,7 +215,7 @@ export default function VersionsPage() {
 
       {/* 下载进度条 */}
       {downloading && (
-        <div className="rounded-[22px] border border-slate-200/80 bg-white/92 px-5 py-4 shadow-[0_18px_46px_-36px_rgba(15,23,42,0.34)]">
+        <div className="rounded-2xl border border-slate-200/80 bg-white px-5 py-4 shadow-sm">
           <div className="flex items-center justify-between text-sm">
             <span className="text-slate-700">{downloadMsg}</span>
             <span className="tabular-nums text-slate-500">{Math.round(downloadProgress)}%</span>

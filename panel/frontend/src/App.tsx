@@ -144,6 +144,8 @@ const GuildBind = lazy(() => import('./pages/guild/GuildBind'));
 const GuildCdk = lazy(() => import('./pages/guild/GuildCdk'));
 const GuildOrders = lazy(() => import('./pages/guild/GuildOrders'));
 const GuildShop = lazy(() => import('./pages/guild/GuildShop'));
+// v4.38.0: 我的绑定申请（用户查看自己提交的绑定申请进度 + 撤销 pending 申请）
+const GuildMyBindingRequests = lazy(() => import('./pages/guild/GuildMyBindingRequests'));
 // v4.16.1: 玩家门户发现页 + 消息中心（Apple 浅色风格）
 const GuildDiscover = lazy(() => import('./pages/guild/GuildDiscover'));
 const GuildMessages = lazy(() => import('./pages/guild/GuildMessages'));
@@ -525,6 +527,8 @@ export default function App() {
             <Route path="bind" element={<GuildBind />} />
             <Route path="cdk" element={<GuildCdk />} />
             <Route path="orders" element={<GuildOrders />} />
+            {/* v4.38.0: 我的绑定申请（用户查看自己提交的绑定申请进度 + 撤销 pending 申请） */}
+            <Route path="my-binding-requests" element={<GuildMyBindingRequests />} />
             {/* v4.12.0: 从 /store 迁入——消费侧页面（玩家视角） */}
             <Route path="shop" element={<GuildShop />} />
             {/* v4.29.0: /guild/me 重定向到个人中心 */}
@@ -562,16 +566,15 @@ export default function App() {
           {/* 剩余旧 Layout 路由（实例中心化 + 公开页面，暂不迁入基座） */}
           <Route element={<Layout />}>
             {/* v4.12.0: /dashboard 已并入 /admin（Platform Dashboard），重定向消除旧控制台独立入口 */}
-            <Route path="/dashboard" element={<Navigate to="/admin" replace />} />
+            {/* v4.36.1: 重定向目标改为 / （RootRedirect 按角色分流）——原 /admin 目标会让
+                非管理员（user/instance_admin）命中 /admin 守卫被弹到 /forbidden。
+                保留 /dashboard 路由仅为向后兼容旧书签/旧链接。 */}
+            <Route path="/dashboard" element={<Navigate to="/" replace />} />
             {/* v4.13.0: /instances 列表 + 详情按角色重定向到三套视图 */}
             <Route path="/instances" element={<InstanceListRoleRedirect />} />
             {/* v4.15.2: /instances/new 加 instance_admin+ 门控（普通用户不应创建实例） */}
             <Route element={<RequireRole allow={['instance_admin', 'server_admin', 'admin', 'system_admin']} />}>
               <Route path="/instances/new" element={<CreateServer />} />
-              {/* v4.15.2: 业务运营/玩家历史/礼包领取加门控（普通用户不应访问） */}
-              <Route path="/instances/:id/business" element={<Business />} />
-              <Route path="/instances/:id/player-histories" element={<PlayerHistories />} />
-              <Route path="/instances/:id/gift-claims" element={<GiftClaims />} />
             </Route>
             <Route path="/instances/:id" element={<InstanceDetailRoleRedirect />} />
             {/* 旧 /instances/:id/shop → 重定向到玩家门户风格商城页 */}
@@ -580,6 +583,19 @@ export default function App() {
             <Route path="/instances/:id/cdk-redeem" element={<CdkRedeem />} />
             {/* 403 无权限页 */}
             <Route path="/forbidden" element={<Forbidden />} />
+          </Route>
+
+          {/* v4.36.2: 实例业务运营/玩家历史/礼包领取改用 AdminLayout，
+              侧边栏与实例详情页（/admin/servers/:id）保持一致。
+              原 default Layout 会混入玩家消费入口（商城VIP/发现/消息/好友等），
+              与"实例业务运营"管理上下文不符，且从实例详情点"业务运营"tab 跳转后侧边栏突变。
+              AdminLayout 内部按角色分层：server_admin 看 ADMIN_GROUPS，instance_admin 看 INSTANCE_ADMIN_LINKS。 */}
+          <Route element={<RequireRole allow={['instance_admin', 'server_admin', 'admin', 'system_admin']} />}>
+            <Route element={<AdminLayout />}>
+              <Route path="/instances/:id/business" element={<Business />} />
+              <Route path="/instances/:id/player-histories" element={<PlayerHistories />} />
+              <Route path="/instances/:id/gift-claims" element={<GiftClaims />} />
+            </Route>
           </Route>
         </Route>
         <Route path="*" element={<NotFound />} />

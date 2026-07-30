@@ -5,7 +5,7 @@
 // L4: 新增 jar 元数据扫描，识别客户端 mod（OptiFine 等），防止误装到服务端
 // ============================================================================
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CreateModRequest, ModRecordSummary, ModFileInfo } from '@public/schema/panel-api-types';
 import { useAuth } from '../../api/auth';
 import { ListSkeleton } from '../../components/ui';
@@ -45,6 +45,11 @@ export default function Mods({ serverId, gameType }: ModsPageProps) {
   const [metadataScanning, setMetadataScanning] = useState(false);
   const [metadataError, setMetadataError] = useState<string | null>(null);
   const [metadataScanned, setMetadataScanned] = useState(false);
+
+  // Mod 文件上传
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -178,6 +183,32 @@ export default function Mods({ serverId, gameType }: ModsPageProps) {
       setMetadataError(err instanceof Error ? err.message : '扫描 Mod 元数据失败');
     } finally {
       setMetadataScanning(false);
+    }
+  };
+
+  // 上传 Mod 文件到 mods/ 目录
+  const handleUploadMod = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // 重置 input value 允许重复选择同一文件
+    e.target.value = '';
+    setError(null);
+    setSuccess(null);
+    setUploading(true);
+    setUploadProgress('上传中…');
+    try {
+      const modsDir = modConfig.modsDirLabel.replace(/\/$/, '');
+      const targetPath = `${modsDir}/${file.name}`;
+      await api.uploadFile(serverId, file, targetPath, (current, total) => {
+        setUploadProgress(`上传中… ${current}/${total} 片`);
+      });
+      setSuccess(`已上传 Mod 文件：${file.name}`);
+      await refreshModFiles();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '上传 Mod 文件失败');
+    } finally {
+      setUploading(false);
+      setUploadProgress('');
     }
   };
 
@@ -322,6 +353,20 @@ export default function Mods({ serverId, gameType }: ModsPageProps) {
       <div className="page-header" style={{ marginTop: 32 }}>
         <h3 className="page-title">Mod 文件管理（文件系统）</h3>
         <div className="page-actions">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip,.jar,.cs,.dll"
+            onChange={(e) => void handleUploadMod(e)}
+            style={{ display: 'none' }}
+          />
+          <button
+            className="btn btn-success"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? uploadProgress || '上传中…' : '上传 Mod'}
+          </button>
           <button
             className="btn btn-ghost"
             onClick={() => void refreshModFiles()}

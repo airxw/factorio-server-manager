@@ -223,7 +223,7 @@ export default function InstanceVipUsers() {
       </WorkbenchFilterBar>
 
       {error && (
-        <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {error}
         </div>
       )}
@@ -276,7 +276,7 @@ export default function InstanceVipUsers() {
             tone="slate"
           />
         ) : dataLoading ? (
-          <div className="h-32 animate-pulse rounded-[20px] bg-slate-100/70" />
+          <div className="h-32 animate-pulse rounded-2xl bg-slate-100/70" />
         ) : bindings.length === 0 ? (
           <WorkbenchEmpty
             title="该实例暂无绑定用户"

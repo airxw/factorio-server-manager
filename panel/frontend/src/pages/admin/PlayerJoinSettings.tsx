@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type {
+  PackItemSummary,
   PlayerJoinSettingsSummary,
   ReloginGiftItem,
   UpsertPlayerJoinSettingsRequest,
@@ -75,7 +76,7 @@ function toFormState(settings: PlayerJoinSettingsSummary): FormState {
   };
 }
 
-export default function PlayerJoinSettings({ serverId }: { serverId: string }) {
+export default function PlayerJoinSettings({ serverId, packId }: { serverId: string; packId: string }) {
   const { api, user } = useAuth();
 
   const [settings, setSettings] = useState<PlayerJoinSettingsSummary | null>(null);
@@ -84,6 +85,10 @@ export default function PlayerJoinSettings({ serverId }: { serverId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Pack 物品列表（用于礼包物品下拉选择）
+  const [packItems, setPackItems] = useState<PackItemSummary[]>([]);
+  const [packItemsLoading, setPackItemsLoading] = useState(false);
 
   const loadSettings = useCallback(
     async (id: string) => {
@@ -107,6 +112,30 @@ export default function PlayerJoinSettings({ serverId }: { serverId: string }) {
   useEffect(() => {
     void loadSettings(serverId);
   }, [serverId, loadSettings]);
+
+  // 加载 Pack 物品列表
+  useEffect(() => {
+    if (!packId) {
+      setPackItems([]);
+      return;
+    }
+    let cancelled = false;
+    setPackItemsLoading(true);
+    api
+      .listPackItems(packId)
+      .then((res) => {
+        if (!cancelled) setPackItems(res.items);
+      })
+      .catch(() => {
+        if (!cancelled) setPackItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setPackItemsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, packId]);
 
   // ----- P3 回归礼包物品编辑 -----
   const handleAddReloginGift = () => {
@@ -332,7 +361,7 @@ export default function PlayerJoinSettings({ serverId }: { serverId: string }) {
             </span>
           </label>
 
-          <label className="form-field">
+          <label className="form-field" style={{ flexDirection: 'row', alignItems: 'center' }}>
             <span className="form-label">启用入服礼包</span>
             <input
               type="checkbox"
@@ -344,13 +373,28 @@ export default function PlayerJoinSettings({ serverId }: { serverId: string }) {
           <div className="form-row">
             <label className="form-field">
               <span className="form-label">礼包物品</span>
-              <input
-                type="text"
-                value={form.gift_item}
-                onChange={(e) => setForm((f) => ({ ...f, gift_item: e.target.value }))}
-                placeholder="例如：iron-plate"
-                disabled={!form.gift_enabled}
-              />
+              {packItems.length > 0 ? (
+                <select
+                  value={form.gift_item}
+                  onChange={(e) => setForm((f) => ({ ...f, gift_item: e.target.value }))}
+                  disabled={!form.gift_enabled}
+                >
+                  <option value="">— 请选择 —</option>
+                  {packItems.map((it) => (
+                    <option key={it.name} value={it.name}>
+                      {it.display_name ? `${it.name}（${it.display_name}）` : it.name}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={form.gift_item}
+                  onChange={(e) => setForm((f) => ({ ...f, gift_item: e.target.value }))}
+                  placeholder={packItemsLoading ? '加载物品列表…' : '例如：iron-plate'}
+                  disabled={!form.gift_enabled || packItemsLoading}
+                />
+              )}
             </label>
             <label className="form-field">
               <span className="form-label">礼包数量</span>
@@ -390,7 +434,7 @@ export default function PlayerJoinSettings({ serverId }: { serverId: string }) {
             回归礼包（按离线时长触发）
           </h3>
 
-          <label className="form-field">
+          <label className="form-field" style={{ flexDirection: 'row', alignItems: 'center' }}>
             <span className="form-label">启用回归礼包</span>
             <input
               type="checkbox"
@@ -470,13 +514,28 @@ export default function PlayerJoinSettings({ serverId }: { serverId: string }) {
                   <div key={idx} className="form-row" style={{ alignItems: 'flex-end' }}>
                     <label className="form-field">
                       <span className="form-label">物品名</span>
-                      <input
-                        type="text"
-                        value={item.item}
-                        onChange={(e) => handleUpdateReloginGift(idx, { item: e.target.value })}
-                        placeholder="例如：iron-plate"
-                        disabled={!form.relogin_gift_enabled}
-                      />
+                      {packItems.length > 0 ? (
+                        <select
+                          value={item.item}
+                          onChange={(e) => handleUpdateReloginGift(idx, { item: e.target.value })}
+                          disabled={!form.relogin_gift_enabled}
+                        >
+                          <option value="">— 请选择 —</option>
+                          {packItems.map((it) => (
+                            <option key={it.name} value={it.name}>
+                              {it.display_name ? `${it.name}（${it.display_name}）` : it.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={item.item}
+                          onChange={(e) => handleUpdateReloginGift(idx, { item: e.target.value })}
+                          placeholder="例如：iron-plate"
+                          disabled={!form.relogin_gift_enabled}
+                        />
+                      )}
                     </label>
                     <label className="form-field">
                       <span className="form-label">数量</span>
@@ -539,7 +598,7 @@ export default function PlayerJoinSettings({ serverId }: { serverId: string }) {
             VIP 专属欢迎语
           </h3>
           <span className="form-hint" style={{ display: 'block', marginBottom: 12 }}>
-            按玩家 VIP 等级匹配欢迎语（VIP ≥ min_vip_level 时触发）；可用变量：{'{player_name}'}
+            按玩家 VIP 等级匹配欢迎语（VIP ≥ min_vip_level 时触发）；可用变量：{'{player}'} / {'{player_name}'} / {'{vip_level}'}
           </span>
 
           <div className="form-field">

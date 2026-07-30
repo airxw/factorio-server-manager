@@ -17,6 +17,8 @@ const apiMock = {
   // v3-billing: ServerDetail 挂载后加载计费设置 + 续费记录
   getInstanceBillingSettings: vi.fn(),
   listInstanceRenewals: vi.fn(),
+  // v4.x.0: 详情页加载当前用户绑定（解绑入口用）
+  listMyBindings: vi.fn().mockResolvedValue([]),
 };
 
 let mockUser: Partial<UserInfo> | null = null;
@@ -52,6 +54,12 @@ vi.mock('../../components/ui', () => ({
     </div>
   ),
   Skeleton: () => <div>loading</div>,
+  // v4.38.0 W8: TabSheetPicker 移动端选择器占位（断言以 aria-label 为准）
+  TabSheetPicker: (props: { activeTab: string; ariaLabel?: string }) => (
+    <div role="tablist" aria-label={props.ariaLabel ?? '实例标签页选择器'}>
+      mock-tab-sheet-picker:{props.activeTab}
+    </div>
+  ),
 }));
 
 vi.mock('../../context/ConfirmContext', () => ({
@@ -96,6 +104,14 @@ const baseServer = {
   disk_usage_bytes: 2048,
   disk_usage_updated_at: '2026-07-28T11:00:00.000Z',
   startup_config_set_at: null,
+  // v3-billing: 有效期字段
+  expires_at: null,
+  expiry_status: 'permanent' as const,
+  // v4.31.0: 部署节点名称
+  node_name: 'node-1',
+  // v4.38.0: 平台级公开标记 + 绑定申请通道开关
+  is_public: false,
+  binding_requests_enabled: false,
   created_at: '2026-07-28T09:00:00.000Z',
   updated_at: '2026-07-28T10:00:00.000Z',
 } as const;
@@ -182,6 +198,9 @@ describe('ServerDetail store mode', () => {
       },
     });
     apiMock.listInstanceRenewals.mockResolvedValue({ renewals: [] });
+    // v4.x.0: listMyBindings 被 clearAllMocks 清空实现，需在 beforeEach 中重新建立
+    // 否则组件挂载调用 api.listMyBindings().then() 时返回 undefined 抛 TypeError
+    apiMock.listMyBindings.mockResolvedValue([]);
   });
 
   it('在 store 嵌入态中隐藏旧返回按钮并展示产品化信息标签', async () => {
@@ -235,9 +254,10 @@ describe('ServerDetail store mode', () => {
     renderServerDetail();
 
     await waitFor(() => {
-      expect(screen.getByRole('tablist', { name: '移动端标签页' })).toBeInTheDocument();
+      // v4.38.0 W8: 横滑条已替换为 TabSheetPicker（aria-label=实例标签页选择器）
+      expect(screen.getByRole('tablist', { name: '实例标签页选择器' })).toBeInTheDocument();
     });
-    expect(screen.queryByRole('tablist', { name: '实例详情标签页' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tablist', { name: '实例详情分组' })).not.toBeInTheDocument();
   });
 
   // v4.29.8: error 状态恢复路径 UI 测试

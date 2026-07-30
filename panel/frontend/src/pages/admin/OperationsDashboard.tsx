@@ -271,18 +271,18 @@ export default function OperationsDashboard() {
   if (loading && !overview) {
     return (
       <WorkbenchShell>
-        <div className="h-48 animate-pulse rounded-[28px] border border-slate-200/80 bg-white/80" />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="h-36 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className="h-40 animate-pulse rounded-[24px] border border-slate-200/80 bg-white/80"
+              className="h-32 animate-pulse rounded-xl border border-slate-200/80 bg-white/80"
             />
           ))}
         </div>
-        <div className="grid gap-4 xl:grid-cols-2">
-          <div className="h-80 animate-pulse rounded-[26px] border border-slate-200/80 bg-white/80" />
-          <div className="h-80 animate-pulse rounded-[26px] border border-slate-200/80 bg-white/80" />
+        <div className="grid gap-5 xl:grid-cols-2">
+          <div className="h-72 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
+          <div className="h-72 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
         </div>
       </WorkbenchShell>
     );
@@ -354,13 +354,13 @@ export default function OperationsDashboard() {
       />
 
       {error && (
-        <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
           {error}
         </div>
       )}
 
       {overview && (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
           <WorkbenchMetricCard
             label="总实例数"
             value={overview.total_instances}
@@ -409,7 +409,7 @@ export default function OperationsDashboard() {
         />
       </WorkbenchFilterBar>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-2">
         <WorkbenchSection
           title={`收入趋势（${days} 天）`}
           description="保留曲线，但视觉和首页统一到同一套浅色卡片。"
@@ -427,7 +427,7 @@ export default function OperationsDashboard() {
         </WorkbenchSection>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
+      <div className="grid gap-5 xl:grid-cols-2">
         <WorkbenchSection
           title="备份健康度"
           description="把备份状态从密集表格改成更容易扫读的列表。"
@@ -438,7 +438,7 @@ export default function OperationsDashboard() {
               {overview.backup_health.map((backup) => (
                 <div
                   key={backup.instance_id}
-                  className="rounded-[20px] border border-slate-200/80 bg-slate-50/80 px-4 py-3"
+                  className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -472,7 +472,7 @@ export default function OperationsDashboard() {
               {overview.alerts.map((alert) => (
                 <div
                   key={alert.id}
-                  className="rounded-[20px] border border-slate-200/80 bg-slate-50/80 px-4 py-3"
+                  className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <AlertSeverityBadge severity={alert.severity} />
@@ -504,7 +504,7 @@ export default function OperationsDashboard() {
         {compare && compare.instances.length > 0 ? (
           <>
             {selectedIds.size > 0 && (
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[20px] border border-slate-200 bg-slate-50/80 px-4 py-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
                 <span className="text-sm font-medium text-slate-700">已选 {selectedIds.size} 项</span>
                 <div className="flex flex-wrap gap-2">
                   <WorkbenchPrimaryButton

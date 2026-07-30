@@ -460,9 +460,9 @@ export default function Servers() {
 
   // 8.3: 排序图标渲染
   const renderSortIcon = (field: SortField) => {
-    if (sortField !== field) return <span style={{ opacity: 0.3, marginLeft: 4 }}>↕</span>;
+    if (sortField !== field) return <span className="sort-icon">↕</span>;
     return (
-      <span style={{ marginLeft: 4, fontWeight: 'bold' }}>{sortOrder === 'asc' ? '↑' : '↓'}</span>
+      <span className="sort-icon sort-icon-active">{sortOrder === 'asc' ? '↑' : '↓'}</span>
     );
   };
 
@@ -483,7 +483,7 @@ export default function Servers() {
       {displayError && <div className="alert alert-error">{displayError}</div>}
 
       {/* 8.3: 搜索 + 筛选工具栏 */}
-      <div className="toolbar" style={{ marginBottom: 12 }}>
+      <div className="toolbar">
         <input
           ref={searchInputRef}
           type="search"
@@ -497,7 +497,7 @@ export default function Servers() {
           value={statusFilter}
           onChange={(e) => handleStatusChange(e.target.value)}
           aria-label="按状态筛选"
-          style={{ width: 'auto', minWidth: 120 }}
+          className="toolbar-select"
         >
           {STATUS_OPTIONS.map((opt) => (
             <option key={opt.value} value={opt.value}>
@@ -505,7 +505,7 @@ export default function Servers() {
             </option>
           ))}
         </select>
-        <span className="form-hint" style={{ marginLeft: 'auto' }}>
+        <span className="form-hint toolbar-count">
           共 {sortedServers.length} 条
         </span>
         {/* 7.7: 导出 CSV */}
@@ -521,38 +521,36 @@ export default function Servers() {
 
       {/* v4.6.0-E3: 配额进度条（仅 instance_admin / user 显示） */}
       {!isServerAdmin && quota && quota.quota && (
-        <div className="quota-bar" style={{ display: 'flex', gap: 24, alignItems: 'center', marginBottom: 12, padding: 8, background: 'var(--color-bg-secondary)', borderRadius: 6, flexWrap: 'wrap' }}>
+        <div className="quota-bar">
           {quota.quota.max_instances != null && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span className="form-hint" style={{ margin: 0 }}>实例配额：</span>
-              <span className="mono" style={{ fontSize: 13 }}>
+            <div className="quota-item">
+              <span className="form-hint quota-label">实例配额：</span>
+              <span className="mono quota-value">
                 {quota.usage.instances_used} / {quota.quota.max_instances}
               </span>
-              <div style={{ width: 200, height: 8, background: 'var(--color-border, #e5e7eb)', borderRadius: 4, overflow: 'hidden' }}>
+              <div className="progress-track">
                 <div
+                  className="progress-fill"
                   style={{
                     width: `${Math.min(100, (quota.usage.instances_used / quota.quota.max_instances) * 100)}%`,
-                    height: '100%',
-                    background: quota.can_create_instance === false ? 'var(--color-error, #ef4444)' : 'var(--color-primary, #2563eb)',
-                    transition: 'width 0.3s',
+                    background: quota.can_create_instance === false ? 'var(--color-danger)' : 'var(--color-primary)',
                   }}
                 />
               </div>
             </div>
           )}
           {quota.quota.max_disk_mb != null && (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <span className="form-hint" style={{ margin: 0 }}>磁盘配额：</span>
-              <span className="mono" style={{ fontSize: 13 }}>
+            <div className="quota-item">
+              <span className="form-hint quota-label">磁盘配额：</span>
+              <span className="mono quota-value">
                 {quota.usage.disk_used_mb} / {quota.quota.max_disk_mb} MB
               </span>
-              <div style={{ width: 200, height: 8, background: 'var(--color-border, #e5e7eb)', borderRadius: 4, overflow: 'hidden' }}>
+              <div className="progress-track">
                 <div
+                  className="progress-fill"
                   style={{
                     width: `${Math.min(100, (quota.usage.disk_used_mb / quota.quota.max_disk_mb) * 100)}%`,
-                    height: '100%',
-                    background: quota.can_create_instance === false ? 'var(--color-error, #ef4444)' : 'var(--color-primary, #2563eb)',
-                    transition: 'width 0.3s',
+                    background: quota.can_create_instance === false ? 'var(--color-danger)' : 'var(--color-primary)',
                   }}
                 />
               </div>
@@ -654,14 +652,7 @@ export default function Servers() {
                     <button
                       type="button"
                       onClick={() => handleSortToggle('name')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'pointer',
-                        font: 'inherit',
-                        color: 'inherit',
-                      }}
+                      className="sort-btn"
                       aria-label={`按${SORT_LABEL.name}排序`}
                     >
                       名称
@@ -673,14 +664,7 @@ export default function Servers() {
                     <button
                       type="button"
                       onClick={() => handleSortToggle('status')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'pointer',
-                        font: 'inherit',
-                        color: 'inherit',
-                      }}
+                      className="sort-btn"
                       aria-label={`按${SORT_LABEL.status}排序`}
                     >
                       状态
@@ -699,14 +683,7 @@ export default function Servers() {
                     <button
                       type="button"
                       onClick={() => handleSortToggle('created_at')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        padding: 0,
-                        cursor: 'pointer',
-                        font: 'inherit',
-                        color: 'inherit',
-                      }}
+                      className="sort-btn"
                       aria-label={`按${SORT_LABEL.created_at}排序`}
                     >
                       创建时间
@@ -758,12 +735,7 @@ export default function Servers() {
                       <td>{s.node_name ?? '—'}</td>
                       {/* v3.6.1-B1: 磁盘占用列，>10GB 加粗警示 */}
                       <td
-                        className="mono"
-                        style={
-                          s.disk_usage_bytes != null && s.disk_usage_bytes > 10 * 1024 * 1024 * 1024
-                            ? { fontWeight: 'bold', color: 'var(--color-warning, #d97706)' }
-                            : undefined
-                        }
+                        className={`mono${s.disk_usage_bytes != null && s.disk_usage_bytes > 10 * 1024 * 1024 * 1024 ? ' disk-usage-warn' : ''}`}
                         title={
                           s.disk_usage_updated_at
                             ? `更新于 ${new Date(s.disk_usage_updated_at).toLocaleString('zh-CN')}`
@@ -899,7 +871,7 @@ export default function Servers() {
           </div>
 
           {/* 8.3: 客户端分页 */}
-          <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center' }}>
+          <div className="pagination-wrap">
             <Pagination
               page={safePage}
               totalPages={totalPages}

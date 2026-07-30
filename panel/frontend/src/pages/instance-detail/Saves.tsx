@@ -7,7 +7,7 @@
 //       UI 仅暴露 save_name 与 is_active，其余字段以占位默认值提交。
 // ============================================================================
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CreateSaveRequest, SaveRecordSummary } from '@public/schema/panel-api-types';
 import { useAuth } from '../../api/auth';
 
@@ -46,6 +46,11 @@ export default function Saves({ serverId }: SavesPageProps) {
   const [saveName, setSaveName] = useState('');
   const [isActive, setIsActive] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // 存档文件上传
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -128,6 +133,30 @@ export default function Saves({ serverId }: SavesPageProps) {
     }
   };
 
+  // 上传存档文件到 saves/ 目录
+  const handleUploadSave = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setError(null);
+    setSuccess(null);
+    setUploading(true);
+    setUploadProgress('上传中…');
+    try {
+      const targetPath = `saves/${file.name}`;
+      await api.uploadFile(serverId, file, targetPath, (current, total) => {
+        setUploadProgress(`上传中… ${current}/${total} 片`);
+      });
+      setSuccess(`已上传存档文件：${file.name}`);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '上传存档文件失败');
+    } finally {
+      setUploading(false);
+      setUploadProgress('');
+    }
+  };
+
   return (
     <div className="page">
       <div className="page-header">
@@ -135,6 +164,20 @@ export default function Saves({ serverId }: SavesPageProps) {
         <div className="page-actions">
           <button className="btn btn-ghost" onClick={() => void refresh()} disabled={loading}>
             刷新
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".zip"
+            onChange={(e) => void handleUploadSave(e)}
+            style={{ display: 'none' }}
+          />
+          <button
+            className="btn btn-success"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+          >
+            {uploading ? uploadProgress || '上传中…' : '上传存档'}
           </button>
           <button className="btn btn-success" onClick={() => setShowForm((v) => !v)}>
             {showForm ? '收起表单' : '创建存档'}

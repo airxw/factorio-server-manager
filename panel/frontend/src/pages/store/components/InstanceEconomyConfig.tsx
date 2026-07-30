@@ -158,7 +158,7 @@ export default function InstanceEconomyConfig({ serverId }: InstanceEconomyConfi
 
   return (
     <section
-      className="rounded-[26px] border border-slate-200/80 bg-white/92 p-5 shadow-[0_18px_46px_-36px_rgba(15,23,42,0.34)] xl:p-6"
+      className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm xl:p-6"
       data-testid="instance-economy-config"
     >
       <div
@@ -194,13 +194,13 @@ export default function InstanceEconomyConfig({ serverId }: InstanceEconomyConfi
       {expanded && (
         <div className="mt-5 space-y-4 border-t border-slate-200/80 pt-5">
           {error && (
-            <div className="rounded-[22px] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
               {error}
             </div>
           )}
 
           {loading && !loaded ? (
-            <div className="h-24 animate-pulse rounded-[20px] bg-slate-100/70" />
+            <div className="h-24 animate-pulse rounded-2xl bg-slate-100/70" />
           ) : (
             <>
               {/* VIP 定价 */}

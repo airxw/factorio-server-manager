@@ -16,7 +16,7 @@ interface ProductListProps {
 
 export const ProductList: React.FC<ProductListProps> = ({ assets, loading, onSelectAsset }) => {
   if (loading) {
-    return <div className="h-32 animate-pulse rounded-[20px] bg-slate-100/70" />;
+    return <div className="h-32 animate-pulse rounded-2xl bg-slate-100/70" />;
   }
 
   if (assets.length === 0) {

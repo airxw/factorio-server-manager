@@ -1493,8 +1493,6 @@
   .gp-theme .mobile-bottom-nav.guild-bottom-nav {
     display: flex;
     max-width: 768px;
-    left: 50%;
-    transform: translateX(-50%);
     border-radius: 16px 16px 0 0;
     border-left: 1px solid var(--gp-border);
     border-right: 1px solid var(--gp-border);

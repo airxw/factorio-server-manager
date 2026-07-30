@@ -23,6 +23,7 @@ const QUALITY_LABEL: Record<CdkCodeItem['quality'], string> = {
 interface RedeemSuccessView {
   code: CdkCodeSummary;
   delivered: boolean;
+  remainingUses: number | null;
 }
 
 const ERROR_CODE_LABEL: Record<string, string> = {
@@ -72,7 +73,7 @@ export default function CdkRedeem({ embedded = false }: { embedded?: boolean } =
     try {
       const req: RedeemCdkRequest = { code: trimmedCode, player_name: trimmedPlayer };
       const res = await api.redeemCdk(id, req);
-      setSuccess({ code: res.code, delivered: res.delivered });
+      setSuccess({ code: res.code, delivered: res.delivered, remainingUses: res.remaining_uses });
       toast.success('兑换成功');
       setCode('');
       setPlayerName('');
@@ -148,6 +149,13 @@ export default function CdkRedeem({ embedded = false }: { embedded?: boolean } =
               ? new Date(success.code.claimed_at).toLocaleString('zh-CN')
               : '—'}
           </div>
+          {success.remainingUses !== null && (
+            <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 8, background: success.remainingUses === 0 ? 'rgba(255,149,0,0.1)' : 'rgba(0,122,255,0.08)' }}>
+              {success.remainingUses === 0
+                ? '该 CDK 已达兑换上限，无法再被兑换。'
+                : `该 CDK 还可被兑换 ${success.remainingUses} 次（同一玩家不可重复兑换）。`}
+            </div>
+          )}
         </div>
       )}
 
@@ -192,7 +200,7 @@ export default function CdkRedeem({ embedded = false }: { embedded?: boolean } =
       <div className="info-card" style={{ marginTop: 12 }}>
         <h3 className="card-title">说明</h3>
         <ul style={{ margin: 0, paddingLeft: 20, color: 'var(--text-secondary, #666)' }}>
-          <li>每个 CDK 兑换码仅可使用一次。</li>
+          <li>一次性 CDK 仅可被一个玩家兑换；可重复使用 CDK 可被多个不同玩家兑换（同一玩家不可重复）。</li>
           <li>兑换成功后，物品会通过游戏命令直接发放给指定玩家。</li>
           <li>玩家名必须与游戏内在线玩家名一致，且仅允许字母、数字、下划线、连字符。</li>
           <li>兑换码过期后无法再使用。</li>

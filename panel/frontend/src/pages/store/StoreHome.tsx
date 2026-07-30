@@ -154,9 +154,9 @@ function InstanceRow({ srv, onClick }: { srv: StoreServerItem; onClick: () => vo
     <button
       type="button"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_18px_36px_-32px_rgba(15,23,42,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+      className="flex w-full items-center gap-3 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
     >
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
         <Server size={18} />
       </div>
       <div className="min-w-0 flex-1">
@@ -186,7 +186,7 @@ function AlertItem({ type, message }: { type: string; message: string }) {
         ? 'bg-amber-50 text-amber-700 ring-amber-100'
         : 'bg-blue-50 text-blue-700 ring-blue-100';
   return (
-    <div className={`rounded-2xl px-4 py-3 text-sm ring-1 ${className}`}>
+    <div className={`rounded-xl px-4 py-3 text-sm ring-1 ${className}`}>
       <div className="flex items-start gap-2">
         <AlertTriangle size={15} className="mt-0.5 shrink-0" />
         <span className="leading-6">{message}</span>
@@ -278,18 +278,18 @@ export default function StoreHome() {
   if (loading && !overview) {
     return (
       <WorkbenchShell>
-        <div className="h-48 animate-pulse rounded-[28px] border border-slate-200/80 bg-white/80" />
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="h-36 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
+        <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
             <div
               key={index}
-              className="h-40 animate-pulse rounded-[24px] border border-slate-200/80 bg-white/80"
+              className="h-32 animate-pulse rounded-xl border border-slate-200/80 bg-white/80"
             />
           ))}
         </div>
-        <div className="grid gap-4 xl:grid-cols-[1.45fr_0.95fr]">
-          <div className="h-80 animate-pulse rounded-[26px] border border-slate-200/80 bg-white/80" />
-          <div className="h-80 animate-pulse rounded-[26px] border border-slate-200/80 bg-white/80" />
+        <div className="grid gap-5 xl:grid-cols-[1.45fr_0.95fr]">
+          <div className="h-72 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
+          <div className="h-72 animate-pulse rounded-2xl border border-slate-200/80 bg-white/80" />
         </div>
       </WorkbenchShell>
     );
@@ -333,7 +333,7 @@ export default function StoreHome() {
       <WorkbenchHeader
         eyebrow="GM Workbench"
         title={`${greeting}，${user?.username ?? '服主'}`}
-        description="先看待处理事项和最近活跃实例，再继续深入到商城、玩家和报表。首页只保留真正会影响当天运营判断的内容。"
+        description="集中查看实例状态、收入趋势和待处理事项。"
         badges={[
           { label: '日期', value: today, tone: 'slate' },
           { label: '运行中', value: `${data.running_instances} 个实例`, tone: 'blue' },
@@ -359,7 +359,7 @@ export default function StoreHome() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <WorkbenchMetricCard
           label="我的实例"
           value={data.total_instances}
@@ -396,11 +396,11 @@ export default function StoreHome() {
         />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[1.45fr_0.95fr]">
-        <div className="space-y-4">
+      <div className="grid gap-5 xl:grid-cols-[1.45fr_0.95fr]">
+        <div className="space-y-5">
           <WorkbenchSection
             title="收入趋势"
-            description="首页只看 7 天趋势和总额，深度分析留给报表页。"
+            description="近 7 天收入走势"
             icon={Wallet}
             action={
               <WorkbenchLinkAction
@@ -426,14 +426,14 @@ export default function StoreHome() {
               />
             ) : (
               <div className="grid gap-5 lg:grid-cols-[0.95fr_1.35fr]">
-                <div className="rounded-[22px] bg-slate-50/85 p-5">
-                  <p className="text-xs font-medium uppercase tracking-[0.22em] text-slate-400">
+                <div className="rounded-xl bg-slate-50/85 p-5">
+                  <p className="text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
                     近 7 天累计
                   </p>
-                  <p className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-900">
+                  <p className="mt-2 text-[28px] font-semibold leading-none tracking-[-0.01em] text-slate-900">
                     {formatMoney(weeklyRevenue)}
                   </p>
-                  <p className="mt-2 text-sm text-slate-500">{weeklyOrders} 笔订单</p>
+                  <p className="mt-2 text-sm leading-5 text-slate-500">{weeklyOrders} 笔订单</p>
                   <div className="mt-5 flex flex-wrap gap-2">
                     <WorkbenchChip tone="emerald">
                       今日收入 {formatMoney(data.revenue_today)}
@@ -450,7 +450,7 @@ export default function StoreHome() {
 
           <WorkbenchSection
             title="最近实例"
-            description="优先展示最近可操作的实例，减少回到列表页再找的成本。"
+            description={`${servers.length} 个最近活跃的实例`}
             icon={Server}
             action={
               <WorkbenchLinkAction label="全部实例" onClick={() => navigate('/store/servers')} />
@@ -500,10 +500,10 @@ export default function StoreHome() {
           </WorkbenchSection>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-5">
           <WorkbenchSection
             title="待处理事项"
-            description="异常优先级应该压过装饰信息，这一栏只放真正需要你处理的内容。"
+            description={alerts.length > 0 ? `${alerts.length} 项需要关注` : undefined}
             icon={AlertTriangle}
             action={
               alerts.length > 0 ? (
@@ -532,10 +532,9 @@ export default function StoreHome() {
 
           <WorkbenchSection
             title="快捷入口"
-            description="保留高频动作，但降级成轻量工具区，不再和主内容抢注意力。"
             icon={Activity}
           >
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
               {QUICK_ENTRIES.map((entry) => {
                 const Icon = entry.icon;
                 return (
@@ -543,13 +542,13 @@ export default function StoreHome() {
                     key={entry.to}
                     type="button"
                     onClick={() => navigate(entry.to)}
-                    className="rounded-[22px] border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-left transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_18px_36px_-32px_rgba(15,23,42,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                    className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-left transition hover:border-slate-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm">
-                      <Icon size={18} />
+                    <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-slate-700 shadow-sm">
+                      <Icon size={16} />
                     </div>
-                    <p className="mt-3 text-sm font-medium text-slate-900">{entry.label}</p>
-                    <p className="mt-1 text-xs leading-6 text-slate-500">{entry.description}</p>
+                    <p className="mt-2.5 text-sm font-medium text-slate-900">{entry.label}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-slate-500">{entry.description}</p>
                   </button>
                 );
               })}
@@ -561,10 +560,9 @@ export default function StoreHome() {
       {data.backup_health && data.backup_health.length > 0 && (
         <WorkbenchSection
           title="备份状态"
-          description="备份列表只展示健康度，不把整张首页拖成运维报表。"
           icon={Box}
         >
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
             {data.backup_health.slice(0, 6).map((backup) => {
               const healthy = backup.status === 'healthy';
               const label =
@@ -576,7 +574,7 @@ export default function StoreHome() {
               return (
                 <div
                   key={`${backup.instance_id}-${backup.status}`}
-                  className="rounded-[20px] border border-slate-200/80 bg-slate-50/80 px-4 py-3"
+                  className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3"
                 >
                   <div className="flex items-center gap-2">
                     <span

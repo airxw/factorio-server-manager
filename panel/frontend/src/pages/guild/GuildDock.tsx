@@ -3,7 +3,7 @@
 //
 // v4.17.0 变更（按 docs/plans/binding-unification-multi-role-plan.md §7.1）：
 //   1. 删除 QUICK_ACTIONS 中重复的"绑定角色"入口（与空状态卡片重复）
-//   2. 按 binding_type 分区：账户级（bindings: account/instance）+ 游戏角色级（bindings: player/game_type）
+//   2. 合并为单一「我的绑定」分区：按 server_id 聚合账户级 + 游戏角色级（VIP 来自 account.vipLevel，角色验证状态聚合 players）
 //   3. pending 验证码在首页卡片内直接展示（不再需要跳转 Profile 页面）
 //   4. 多角色账号显示"切换角色"入口
 //   5. 移动端视口守卫：min-height: 100dvh + overflow-y: auto
@@ -136,114 +136,83 @@ function ServerChip({ server }: { server: ServerSummary }) {
   );
 }
 
-/** 账户级绑定卡片（user↔instance） */
-function AccountBindingCard({
-  binding,
-  serverName,
-  gameType,
+/** 统一绑定卡片（合并账户级 + 游戏角色级，按 server_id 聚合展示） */
+function UnifiedBindingCard({
+  entry,
 }: {
-  binding: MyBinding;
-  serverName: string;
-  gameType: string;
+  entry: { server: ServerSummary | undefined; account?: MyBinding; players: Binding[] };
 }) {
   const navigate = useNavigate();
-  return (
-    <button
-      type="button"
-      onClick={() => navigate(`/guild/servers/${binding.serverId}`)}
-      className="gp-card gp-card-hover"
-      style={{ padding: 14, display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer', textAlign: 'left' }}
-    >
-      <div
-        style={{
-          width: 40,
-          height: 40,
-          borderRadius: 12,
-          background: 'var(--gp-grad-primary)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: '#fff',
-          flexShrink: 0,
-        }}
-      >
-        <Crown size={18} />
-      </div>
-      <div style={{ minWidth: 0, flex: 1 }}>
-        <p style={{ margin: 0, fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {serverName}
-        </p>
-        <p className="gp-text-faint" style={{ margin: '3px 0 0', fontSize: 12 }}>
-          {gameType} · VIP{binding.vipLevel}
-        </p>
-      </div>
-      <ChevronRight size={16} className="gp-text-faint" />
-    </button>
-  );
-}
-
-/** 游戏角色级绑定卡片（user↔game_player） */
-function PlayerBindingCard({ binding }: { binding: Binding }) {
   const toast = useToast();
-  const isVerified = binding.verify_status === 'verified';
-  const isPending = binding.verify_status === 'pending';
+  const { server, account, players } = entry;
 
-  const copyCode = () => {
-    if (!binding.verify_code) return;
+  // 防御：绑定引用了不存在的实例（理论上不应发生，serverMap 缺项时不渲染）
+  if (!server) return null;
+
+  const vipLevel = account?.vipLevel ?? 0;
+  const verifiedCount = players.filter((p) => p.verify_status === 'verified').length;
+  const pendingPlayers = players.filter((p) => p.verify_status === 'pending' && p.verify_code);
+
+  const copyCode = (code: string) => {
     void navigator.clipboard
-      .writeText(binding.verify_code)
+      .writeText(code)
       .then(() => toast.success('验证码已复制'))
       .catch(() => toast.error('复制失败'));
   };
 
   return (
-    <div
-      className="gp-card"
-      style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+    <div className="gp-card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {/* 头部：实例名 + 游戏类型 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <div
           style={{
             width: 40,
             height: 40,
             borderRadius: 12,
-            background: isVerified ? 'var(--gp-grad-primary)' : 'var(--gp-bg-card-strong)',
-            border: isVerified ? 'none' : '1px solid var(--gp-border)',
+            background: 'var(--gp-grad-primary)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: isVerified ? '#fff' : 'var(--gp-text-faint)',
+            color: '#fff',
             flexShrink: 0,
           }}
         >
-          <Gamepad2 size={18} />
+          <Crown size={18} />
         </div>
         <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {binding.player_name ?? ''}
-            </p>
-            {isVerified ? (
-              <span className="gp-badge gp-badge-emerald">
-                <BadgeCheck size={11} /> 已验证
-              </span>
-            ) : isPending ? (
-              <span className="gp-badge gp-badge-amber">
-                <KeyRound size={11} /> 待验证
-              </span>
-            ) : (
-              <span className="gp-badge gp-badge-rose">已失效</span>
-            )}
-          </div>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {server.name}
+          </p>
           <p className="gp-text-faint" style={{ margin: '3px 0 0', fontSize: 12 }}>
-            {binding.scope_ref ?? ''}
+            {server.game_type}
           </p>
         </div>
       </div>
 
-      {/* v4.17.0: pending 态在首页卡片内直接展示验证码（不再需要跳转 Profile 页面） */}
-      {isPending && binding.verify_code && (
+      {/* 徽章：VIP 等级（来自 account.vipLevel）+ 角色验证状态（players 中 verified 数量） */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+        {vipLevel > 0 ? (
+          <span className="gp-badge gp-badge-amber">
+            <Crown size={11} /> VIP{vipLevel}
+          </span>
+        ) : (
+          <span className="gp-badge gp-badge-blue">未开通 VIP</span>
+        )}
+        {verifiedCount > 0 ? (
+          <span className="gp-badge gp-badge-emerald">
+            <BadgeCheck size={11} /> 已验证 {verifiedCount} 角色
+          </span>
+        ) : (
+          <span className="gp-badge" style={{ background: 'var(--gp-bg-card-strong)', color: 'var(--gp-text-faint)' }}>
+            <Gamepad2 size={11} /> 未验证角色
+          </span>
+        )}
+      </div>
+
+      {/* pending 验证码（保留 v4.17.0 首页直接展示，不再跳转 Profile 页面） */}
+      {pendingPlayers.map((p) => (
         <div
+          key={p.id}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -256,24 +225,44 @@ function PlayerBindingCard({ binding }: { binding: Binding }) {
           }}
         >
           <KeyRound size={14} style={{ color: 'var(--gp-amber)', flexShrink: 0 }} />
-          <span className="gp-text-dim" style={{ fontSize: 12 }}>游戏内输入：</span>
+          <span className="gp-text-dim" style={{ fontSize: 12 }}>{p.player_name ?? '角色'} 待验证：</span>
           <code
             className="gp-mono-num"
             style={{ fontSize: 14, fontWeight: 700, color: 'var(--gp-amber)', letterSpacing: '0.08em' }}
           >
-            {binding.verify_code}
+            {p.verify_code}
           </code>
           <button
             type="button"
             className="gp-btn gp-btn-ghost"
             style={{ padding: '4px 10px', fontSize: 12 }}
-            onClick={copyCode}
+            onClick={() => copyCode(p.verify_code!)}
             aria-label="复制验证码"
           >
             <Copy size={12} /> 复制
           </button>
         </div>
-      )}
+      ))}
+
+      {/* 操作：进入实例 / 管理绑定 */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="gp-btn gp-btn-primary"
+          style={{ padding: '8px 16px', fontSize: 13, flex: 1, minWidth: 120 }}
+          onClick={() => navigate(`/guild/servers/${server.id}`)}
+        >
+          进入实例
+        </button>
+        <button
+          type="button"
+          className="gp-btn gp-btn-ghost"
+          style={{ padding: '8px 16px', fontSize: 13 }}
+          onClick={() => navigate('/guild/bind')}
+        >
+          管理绑定
+        </button>
+      </div>
     </div>
   );
 }
@@ -480,6 +469,22 @@ export default function GuildDock() {
     return m;
   }, [servers]);
 
+  // 合并展示：按 server_id 聚合账户级绑定（account）+ 游戏角色级绑定（players）
+  const aggregated = useMemo(() => {
+    const map = new Map<string, { server: ServerSummary | undefined; account?: MyBinding; players: Binding[] }>();
+    for (const b of accountBindings) {
+      map.set(b.serverId, { server: serverMap.get(b.serverId), account: b, players: [] });
+    }
+    for (const p of playerBindings) {
+      const sid = p.scope_ref ?? '';
+      if (!map.has(sid)) {
+        map.set(sid, { server: serverMap.get(sid), account: undefined, players: [] });
+      }
+      map.get(sid)!.players.push(p);
+    }
+    return Array.from(map.values());
+  }, [accountBindings, playerBindings, serverMap]);
+
   const claimableServers = servers.filter((s) => wallets[s.id]?.can_claim_daily);
   const stats = [
     { label: '账户绑定', value: accountBindings.length, to: '/guild/bind' },
@@ -550,71 +555,13 @@ export default function GuildDock() {
         </div>
       </div>
 
-      {/* 账户级绑定区（binding_type='account'，user↔instance VIP/钱包） */}
+      {/* 我的绑定（合并展示：账户级 + 游戏角色级，按 server_id 聚合） */}
       <section>
         <h2 className="gp-section-title" style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Crown size={18} style={{ color: 'var(--gp-amber)' }} />
-          账户级绑定
-          {accountBindings.length > 0 && (
-            <span className="gp-badge gp-badge-blue gp-mono-num">{accountBindings.length}</span>
-          )}
-          <button
-            type="button"
-            className="gp-text-faint"
-            style={{ marginLeft: 'auto', background: 'none', border: 'none', fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 2, padding: '4px 8px', color: 'var(--gp-blue)' }}
-            onClick={() => navigate('/guild/servers')}
-          >
-            全部 <ChevronRight size={14} />
-          </button>
-        </h2>
-        {loading && accountBindings.length === 0 ? (
-          <div className="gp-hscroll">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <div key={i} className="gp-skeleton" style={{ height: 70, minWidth: 220 }} />
-            ))}
-          </div>
-        ) : accountBindings.length > 0 ? (
-          <div style={{ display: 'grid', gap: 8 }}>
-            {accountBindings.slice(0, 5).map((b) => {
-              const srv = serverMap.get(b.serverId);
-              return (
-                <AccountBindingCard
-                  key={b.id}
-                  binding={b}
-                  serverName={srv?.name ?? b.serverId}
-                  gameType={srv?.game_type ?? ''}
-                />
-              );
-            })}
-          </div>
-        ) : (
-          <div className="gp-card" style={{ padding: '20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <div>
-              <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>还没有绑定任何实例</p>
-              <p className="gp-text-faint" style={{ margin: '4px 0 0', fontSize: 12 }}>
-                绑定实例后即可获得 VIP 身份、每日点券福利
-              </p>
-            </div>
-            <button
-              type="button"
-              className="gp-btn gp-btn-primary"
-              style={{ padding: '8px 18px', fontSize: 13 }}
-              onClick={() => navigate('/guild/servers')}
-            >
-              <UsersRound size={14} />
-              浏览服务器
-            </button>
-          </div>
-        )}
-      </section>
-
-      {/* 游戏角色级绑定区（binding_type='player'，user↔game_player 验证码） */}
-      <section>
-        <h2 className="gp-section-title" style={{ margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Gamepad2 size={18} />
-          游戏角色绑定
-          {playerBindings.length > 0 && (
-            <span className="gp-badge gp-badge-blue gp-mono-num">{playerBindings.length}</span>
+          我的绑定
+          {aggregated.length > 0 && (
+            <span className="gp-badge gp-badge-blue gp-mono-num">{aggregated.length}</span>
           )}
           <button
             type="button"
@@ -625,16 +572,16 @@ export default function GuildDock() {
             管理 <ChevronRight size={14} />
           </button>
         </h2>
-        {loading && playerBindings.length === 0 ? (
+        {loading && aggregated.length === 0 ? (
           <div style={{ display: 'grid', gap: 8 }}>
-            {Array.from({ length: 2 }).map((_, i) => (
-              <div key={i} className="gp-skeleton" style={{ height: 70 }} />
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="gp-skeleton" style={{ height: 90 }} />
             ))}
           </div>
-        ) : playerBindings.length > 0 ? (
+        ) : aggregated.length > 0 ? (
           <div style={{ display: 'grid', gap: 8 }}>
-            {playerBindings.slice(0, 5).map((b) => (
-              <PlayerBindingCard key={b.id} binding={b} />
+            {aggregated.map((entry, idx) => (
+              <UnifiedBindingCard key={entry.server?.id ?? idx} entry={entry} />
             ))}
           </div>
         ) : (
@@ -642,18 +589,29 @@ export default function GuildDock() {
             <div>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>还没有绑定游戏角色</p>
               <p className="gp-text-faint" style={{ margin: '4px 0 0', fontSize: 12 }}>
-                绑定游戏内角色后即可在商城购买道具并自动到账
+                绑定游戏内角色后即可获得 VIP 身份、每日点券福利
               </p>
             </div>
-            <button
-              type="button"
-              className="gp-btn gp-btn-primary"
-              style={{ padding: '8px 18px', fontSize: 13 }}
-              onClick={() => navigate('/guild/bind')}
-            >
-              <UserPlus size={14} />
-              立即绑定
-            </button>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="gp-btn gp-btn-primary"
+                style={{ padding: '8px 18px', fontSize: 13 }}
+                onClick={() => navigate('/guild/bind')}
+              >
+                <UserPlus size={14} />
+                立即绑定游戏角色
+              </button>
+              <button
+                type="button"
+                className="gp-btn gp-btn-ghost"
+                style={{ padding: '8px 18px', fontSize: 13 }}
+                onClick={() => navigate('/guild/servers')}
+              >
+                <UsersRound size={14} />
+                浏览服务器
+              </button>
+            </div>
           </div>
         )}
       </section>

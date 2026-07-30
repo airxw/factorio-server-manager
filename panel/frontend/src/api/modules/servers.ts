@@ -56,6 +56,9 @@ import type {
   ListPeriodicMessagesResponse,
   UpdatePeriodicMessageRequest,
   UpdatePeriodicMessageResponse,
+  UploadInitResponse,
+  UploadChunkResponse,
+  UploadFinishResponse,
   CreateModRequest,
   CreateModResponse,
   DeleteModResponse,
@@ -97,6 +100,8 @@ import type {
   WriteConfigFileRequest,
   WriteConfigFileResponse,
   GetConfigFileSchemaResponse,
+  CreateConfigFileRequest,
+  CreateConfigFileResponse,
   RegenerateMapResponse,
   GetMapSettingsSchemaResponse,
   UpdateMapSettingsRequest,
@@ -118,6 +123,8 @@ import type {
   CreateNodeInviteRequest,
   CreateNodeInviteResponse,
   DeleteNodeResponse,
+  ListBindableServersQuery,
+  ListBindableServersResponse,
 } from '@public/schema/panel-api-types';
 
 /**
@@ -268,10 +275,21 @@ export interface ServersApi {
   /** 主动探测节点延迟 */
   pingNode(id: string): Promise<{ latency_ms: number }>;
   listServers(): Promise<ListServersResponse>;
+  /**
+   * v4.38.0: 获取可绑定实例市场列表（GET /api/servers/bindable）
+   * 返回 is_public=1 的所有实例 + owner_user_id=当前用户 的实例（合并去重），
+   * 附带 is_owner/is_bound/has_pending_request/can_direct_bind/can_request_bind 标记
+   */
+  listBindableServers(query?: ListBindableServersQuery): Promise<ListBindableServersResponse>;
   getServer(id: string): Promise<ServerDetailResponse>;
   createServer(req: CreateServerRequest): Promise<CreateServerResponse>;
   deleteServer(id: string): Promise<DeleteServerResponse>;
-  startServer(id: string): Promise<ServerStartResponse>;
+  /**
+   * 启动实例。
+   * @param id 实例 ID
+   * @param opts.savePath 可选：指定启动存档路径（如 saves/world.zip），覆盖默认存档
+   */
+  startServer(id: string, opts?: { savePath?: string }): Promise<ServerStartResponse>;
   /** v1.1.0: 获取启动前置引导声明 + 当前已填配置 */
   getStartupGuide(id: string): Promise<GetStartupGuideResponse>;
   /** v1.1.0: 保存启动配置（含 config_writes 写入） */
@@ -287,6 +305,27 @@ export interface ServersApi {
   /** v4.31.0: 获取节点上的实例列表 */
   listNodeInstances(nodeId: string): Promise<NodeInstancesResponse>;
   sendCommand(id: string, command: string): Promise<ServerCommandResponse>;
+
+  // 文件分片上传
+  uploadFileInit(serverId: string): Promise<UploadInitResponse>;
+  uploadFileChunk(
+    serverId: string,
+    uploadId: string,
+    index: number,
+    content: string,
+  ): Promise<UploadChunkResponse>;
+  uploadFileFinish(
+    serverId: string,
+    uploadId: string,
+    targetPath: string,
+  ): Promise<UploadFinishResponse>;
+  /** 封装完整上传流程（init → chunk* → finish），onProgress 回调报告进度 */
+  uploadFile(
+    serverId: string,
+    file: File,
+    targetPath: string,
+    onProgress?: (current: number, total: number) => void,
+  ): Promise<UploadFinishResponse>;
 
   // P3 聊天 API
   getChatSettings(serverId: string): Promise<GetChatSettingsResponse>;
@@ -423,6 +462,10 @@ export interface ServersApi {
     req: WriteConfigFileRequest,
   ): Promise<WriteConfigFileResponse>;
   getConfigFileSchema(serverId: string, name: string): Promise<GetConfigFileSchemaResponse>;
+  createConfigFile(
+    serverId: string,
+    req: CreateConfigFileRequest,
+  ): Promise<CreateConfigFileResponse>;
 
   // Task 11: Game Update
   checkUpdate(serverId: string): Promise<CheckUpdateResponse>;

@@ -127,18 +127,18 @@ export default function Servers() {
           }
         />
       ) : !error ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {servers.map((s) => {
             const meta = getInstanceStatusMeta(s.status);
             return (
               <Link
                 key={s.id}
                 to={`/store/servers/${s.id}`}
-                className="group rounded-[22px] border border-slate-200/80 bg-white/92 p-5 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.35)] transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white hover:shadow-[0_22px_50px_-32px_rgba(15,23,42,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                className="group rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-100 text-slate-600">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                       <ServerIcon size={18} />
                     </div>
                     <div className="min-w-0">

@@ -13,6 +13,7 @@ export { default as Pagination } from './Pagination';
 export { default as SensitiveInput } from './SensitiveInput';
 export { default as Skeleton } from './Skeleton';
 export { default as ListSkeleton } from './ListSkeleton';
+export { default as TabSheetPicker, type TabSheetPickerGroup, type TabSheetPickerProps } from './TabSheetPicker';
 export { ToastProvider, useToast } from '../../context/ToastContext';
 export { ConfirmProvider, useConfirm, type ConfirmOptions } from '../../context/ConfirmContext';
 export {

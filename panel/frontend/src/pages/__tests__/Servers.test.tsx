@@ -37,6 +37,11 @@ describe('Servers Component', () => {
               startup_config_set_at: null,
               expires_at: null,
               expiry_status: 'permanent',
+              // v4.38.0: ServerSummary 新增字段
+              is_public: false,
+              binding_requests_enabled: false,
+              // v4.38.1: 自动审批开关
+              auto_approve_binding_requests: false,
               created_at: '2025-06-01T00:00:00.000Z',
               updated_at: '2025-06-01T00:00:00.000Z',
             },
@@ -59,6 +64,11 @@ describe('Servers Component', () => {
               startup_config_set_at: null,
               expires_at: null,
               expiry_status: 'permanent',
+              // v4.38.0: ServerSummary 新增字段
+              is_public: false,
+              binding_requests_enabled: false,
+              // v4.38.1: 自动审批开关
+              auto_approve_binding_requests: false,
               created_at: '2025-06-01T00:00:00.000Z',
               updated_at: '2025-06-01T00:00:00.000Z',
             },

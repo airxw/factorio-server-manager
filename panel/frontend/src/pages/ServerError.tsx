@@ -2,6 +2,7 @@
 // ServerError — 500 服务器错误页面 (v3.9.0-S9)
 // 当后端 API 返回 500 + PANEL_INTERNAL_ERROR 时，前端可显式跳转到本页面
 // 当前实现：作为公开路由，用户可通过 /500 直接访问
+// v4.36.1: 返回入口改为 / （/dashboard 已废弃，会重定向到 /admin 导致非管理员 403）
 // ============================================================================
 
 import { Link } from 'react-router-dom';
@@ -25,8 +26,8 @@ export default function ServerError() {
         >
           刷新页面
         </button>
-        <Link to="/dashboard" className="btn btn-primary">
-          返回控制台
+        <Link to="/" className="btn btn-primary">
+          返回首页
         </Link>
       </div>
     </div>

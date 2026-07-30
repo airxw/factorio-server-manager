@@ -30,10 +30,10 @@ import {
   Crown,
   Gauge,
   Globe,
-  Group,
   HelpCircle,
   Home,
   KeyRound,
+  Layers,
   LogOut,
   Menu,
   Network,
@@ -73,6 +73,7 @@ import { useRecentPages } from '../hooks/useRecentPages';
 import { notificationStore } from '../stores/notificationStore';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebarCollapsed';
+const SIDEBAR_GROUPS_KEY = 'sidebarCollapsedGroups';
 
 // v4.28.0: 角色中文标签（头像菜单当前身份显示）
 const ROLE_LABEL_ZH: Record<string, string> = {
@@ -87,9 +88,10 @@ interface SidebarLink {
   icon: LucideIcon;
 }
 
-// v3.7.0-E1: 侧边栏分组容器——10 项管理功能聚合为 6 组
+// v4.38.0-W12: 侧边栏分组精简——10组→5组，按工作流聚合
 interface SidebarLinkGroup {
   title: string;
+  icon: LucideIcon;
   links: SidebarLink[];
 }
 
@@ -118,85 +120,60 @@ const INSTANCE_ADMIN_LINKS: SidebarLink[] = [
   { to: '/admin/servers', label: '实例管理', icon: Box },
 ];
 
-// 系统管理分组（v3.7.0-E1：10 项 → 6 组）
-// - 用户与权限 / 系统监控 / 配置管理 / 审计与日志 / 运维清理 / 业务运营
-// - v3.7.0-D2: 系统诊断已合并到系统监控页（diagnostics Tab），不再单独入口
+// 系统管理分组（v4.38.0-W12：10 组 → 5 组，按工作流聚合）
+// 1. 总览：大盘监控 + 配额
+// 2. 用户与权限：用户管理 + API Keys + 玩家绑定 + 提现审批
+// 3. 资源管理：节点 + 实例 + 版本
+// 4. 系统配置：底座设置 + Pack + SSL/隧道 + 审计日志/Webhooks
+// 5. 运维：清理工具 + 个人中心/设置
 const ADMIN_GROUPS: SidebarLinkGroup[] = [
   {
-    title: '全平台总览',
-    links: [{ to: '/admin/platform', label: '全平台总览', icon: Globe }],
+    title: '总览',
+    icon: Gauge,
+    links: [
+      { to: '/admin/platform', label: '全平台总览', icon: Globe },
+      { to: '/admin/system-health', label: '系统监控', icon: Activity },
+      { to: '/admin/quotas', label: '配额管理', icon: Gauge },
+    ],
   },
   {
     title: '用户与权限',
+    icon: Users,
     links: [
       { to: '/admin/users', label: '用户管理', icon: Users },
-      // I3: API Key 管理（v4.4.0-M2，绕过认证）
       { to: '/admin/api-keys', label: 'API Keys', icon: KeyRound },
+      { to: '/admin/player-bindings', label: '玩家绑定', icon: UserCheck },
+      { to: '/admin/withdraws', label: '提现审批', icon: Wallet },
     ],
   },
   {
-    title: '系统监控',
+    title: '资源管理',
+    icon: Server,
     links: [
-      { to: '/admin/system-health', label: '系统监控', icon: Activity },
-    ],
-  },
-  {
-    title: '部署节点',
-    links: [
-      // I4: 部署节点管理（Java 环境扫描）
-      { to: '/admin/nodes', label: '节点管理', icon: Server },
-      // v4.31.0: 实例管理入口（管理员视角，跨用户查看全部实例）
+      { to: '/admin/nodes', label: '节点管理', icon: Network },
       { to: '/admin/servers', label: '实例管理', icon: Box },
-      // v4.32.x: 版本管理入口（admin 基座内，避免穿台到 /store）
       { to: '/admin/versions', label: '版本管理', icon: Package },
     ],
   },
   {
-    title: '配置管理',
+    title: '系统配置',
+    icon: Settings,
     links: [
       { to: '/admin/system-config', label: '底座配置', icon: Settings },
-      // v3.8.0-S12: 结构化设置面板（表单式 UI）
       { to: '/admin/settings', label: '面板设置', icon: Sliders },
-      { to: '/admin/packs', label: 'Pack 管理', icon: Package },
-      // I1: SSL 证书管理（v4.4.0-L1）
+      { to: '/admin/packs', label: 'Pack 管理', icon: Layers },
       { to: '/admin/ssl', label: 'SSL 证书', icon: ShieldCheck },
-      // I2: 隧道管理（v4.4.0-O1）
       { to: '/admin/tunnel', label: '隧道管理', icon: Network },
-    ],
-  },
-  {
-    title: '审计与日志',
-    links: [
       { to: '/admin/audit-logs', label: '审计日志', icon: ScrollText },
       { to: '/admin/webhooks', label: 'Webhooks', icon: Webhook },
     ],
   },
   {
-    title: '运维清理',
+    title: '运维',
+    icon: Wrench,
     links: [
       { to: '/admin/cleanup', label: '实例清理', icon: Trash2 },
       { to: '/admin/maintenance', label: '运维清理', icon: Wrench },
-    ],
-  },
-  {
-    title: '业务运营',
-    links: [
-      { to: '/admin/player-bindings', label: '玩家绑定', icon: UserCheck },
-      // v4.26.0: 用户中心经济系统——平台提现审批（server_admin 核销提现码）
-      { to: '/admin/withdraws', label: '提现审批', icon: Wallet },
-      // v4.25.2: VIP管理已迁至 /store 基座（instance_admin+ 职能），从 admin 侧边栏移除以避免跨基座穿台
-    ],
-  },
-  {
-    title: '运营与配额',
-    links: [
-      // v4.25.2: 运营仪表盘已迁至 /store 基座（instance_admin+ 职能），从 admin 侧边栏移除以避免跨基座穿台
-      { to: '/admin/quotas', label: '配额管理', icon: Gauge },
-    ],
-  },
-  {
-    title: '个人',
-    links: [
       { to: '/admin/center', label: '个人中心', icon: Wallet },
       { to: '/admin/profile', label: '个人设置', icon: Settings },
     ],
@@ -209,6 +186,7 @@ const ADMIN_GROUPS: SidebarLinkGroup[] = [
 const STORE_NAV_GROUPS: SidebarLinkGroup[] = [
   {
     title: '店铺运营',
+    icon: ShoppingBag,
     links: [
       { to: '/store', label: '工作台首页', icon: Home },
       { to: '/store/commercial', label: '商城管理', icon: ShoppingBag },
@@ -217,6 +195,7 @@ const STORE_NAV_GROUPS: SidebarLinkGroup[] = [
   },
   {
     title: '玩家管理',
+    icon: Users,
     links: [
       { to: '/store/players', label: '玩家列表', icon: Users },
       { to: '/store/instance-vip', label: 'VIP 管理', icon: Crown },
@@ -224,6 +203,7 @@ const STORE_NAV_GROUPS: SidebarLinkGroup[] = [
   },
   {
     title: '数据报表',
+    icon: BarChart3,
     links: [
       { to: '/store/reports/revenue', label: '流水报表', icon: Wallet },
       { to: '/store/reports/playtime', label: '时长统计', icon: Gauge },
@@ -231,6 +211,7 @@ const STORE_NAV_GROUPS: SidebarLinkGroup[] = [
   },
   {
     title: '实例运营',
+    icon: Server,
     links: [
       { to: '/store/servers', label: '我的实例', icon: Server },
       // v4.15.0: 版本管理从 /guild 迁入（服主/管理员职能归位）
@@ -239,6 +220,7 @@ const STORE_NAV_GROUPS: SidebarLinkGroup[] = [
   },
   {
     title: '个人',
+    icon: User,
     links: [
       { to: '/store/center', label: '个人中心', icon: Wallet },
       { to: '/store/profile', label: '个人设置', icon: Settings },
@@ -549,6 +531,27 @@ function saveCollapsed(collapsed: boolean): void {
   }
 }
 
+function loadCollapsedGroups(): Set<string> {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_GROUPS_KEY);
+    if (raw) {
+      const arr = JSON.parse(raw) as string[];
+      return new Set(arr);
+    }
+  } catch {
+    // ignore
+  }
+  return new Set();
+}
+
+function saveCollapsedGroups(groups: Set<string>): void {
+  try {
+    localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify([...groups]));
+  } catch {
+    // ignore
+  }
+}
+
 // v4.12.0: Layout variant——三层操作逻辑差异化
 //   'default'：旧 Layout（给 /instances 等剩余旧路由用），显示完整 MAIN_LINKS + 角色相关 ADMIN_GROUPS
 //   'admin'：Platform Dashboard（/admin 基座），只显示系统管理组，不显示玩家入口
@@ -579,7 +582,8 @@ export default function Layout({ children, variant = 'default' }: LayoutProps = 
   // 第十一章 11.1: 版本信息模态状态
   const [versionModalOpen, setVersionModalOpen] = useState(false);
   // v4.8.0-P3 (J2): 侧边栏分组折叠状态——记录被折叠的分组标题
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  // v4.38.0-W12: 持久化到 localStorage
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(loadCollapsedGroups);
   // v4.14.0: player 顶部栏用户菜单下拉状态
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement | null>(null);
@@ -739,6 +743,7 @@ export default function Layout({ children, variant = 'default' }: LayoutProps = 
   }, []);
 
   // v4.8.0-P3 (J2): 切换侧边栏分组折叠状态
+  // v4.38.0-W12: 持久化到 localStorage
   const toggleGroup = useCallback((title: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev);
@@ -747,6 +752,7 @@ export default function Layout({ children, variant = 'default' }: LayoutProps = 
       } else {
         next.add(title);
       }
+      saveCollapsedGroups(next);
       return next;
     });
   }, []);
@@ -861,27 +867,31 @@ export default function Layout({ children, variant = 'default' }: LayoutProps = 
       const Icon = link.icon;
       const isActive = activePath === link.to;
       return (
-        <button
-          key={link.to}
-          type="button"
-          className={`sidebar-item${isActive ? ' active' : ''}`}
-          title={collapsed ? link.label : undefined}
-          onClick={() => navigate(link.to)}
-          aria-current={isActive ? 'page' : undefined}
-          aria-label={collapsed ? link.label : undefined}
-        >
-          <Icon size={18} />
-          <span className="sidebar-label">{link.label}</span>
-          {/* 通知未读数角标 */}
-          {link.to === '/admin/notifications' && unreadCount > 0 && (
-            <span
-              className="badge badge-error"
-              style={{ fontSize: 10, padding: '0 4px', marginLeft: 'auto' }}
-            >
-              {unreadCount}
-            </span>
-          )}
-        </button>
+        <div key={link.to} className="sidebar-tooltip-wrap">
+          <button
+            type="button"
+            className={`sidebar-item${isActive ? ' active' : ''}`}
+            onClick={() => navigate(link.to)}
+            aria-current={isActive ? 'page' : undefined}
+            aria-label={link.label}
+          >
+            <Icon size={18} />
+            <span className="sidebar-label">{link.label}</span>
+            {/* 通知未读数角标 */}
+            {(link.to === '/admin/notifications' ||
+              link.to === '/store/notifications' ||
+              link.to === '/guild/notifications') &&
+              unreadCount > 0 && (
+                <span
+                  className="badge badge-error"
+                  style={{ fontSize: 10, padding: '0 4px', marginLeft: 'auto' }}
+                >
+                  {unreadCount}
+                </span>
+              )}
+          </button>
+          {collapsed && <span className="sidebar-tooltip">{link.label}</span>}
+        </div>
       );
     },
     [activePath, collapsed, navigate, unreadCount],
@@ -1196,80 +1206,107 @@ export default function Layout({ children, variant = 'default' }: LayoutProps = 
 
         <nav className="sidebar-nav">
           {variant === 'store' ? (
-            // v4.12.0: GM Workbench 服主工作台导航——店铺运营/玩家管理/数据报表/实例运营
-            STORE_NAV_GROUPS.map((group) => {
-              const isGroupCollapsed = collapsedGroups.has(group.title);
-              return (
-                <div
-                  key={group.title}
-                  className={`sidebar-group${isGroupCollapsed ? ' group-collapsed' : ''}`}
-                >
-                  <button
-                    type="button"
-                    className="sidebar-group-title sidebar-group-toggle"
-                    onClick={() => toggleGroup(group.title)}
-                    aria-expanded={!isGroupCollapsed}
-                    title={isGroupCollapsed ? `展开「${group.title}」` : `折叠「${group.title}」`}
+            collapsed ? (
+              // Collapsed: show all items as icons only, ignore group collapse state
+              STORE_NAV_GROUPS.flatMap((g) => g.links).map((link) => renderLink(link))
+            ) : (
+              // Expanded: collapsible groups with group icons
+              STORE_NAV_GROUPS.map((group) => {
+                const GroupIcon = group.icon;
+                const isGroupCollapsed = collapsedGroups.has(group.title);
+                return (
+                  <div
+                    key={group.title}
+                    className={`sidebar-group${isGroupCollapsed ? ' group-collapsed' : ''}`}
                   >
-                    <Group size={12} />
-                    <span>{group.title}</span>
-                    <ChevronDown size={14} className="sidebar-group-chevron" />
-                  </button>
-                  {!isGroupCollapsed && group.links.map((link) => renderLink(link))}
-                </div>
-              );
-            })
+                    <button
+                      type="button"
+                      className="sidebar-group-title sidebar-group-toggle"
+                      onClick={() => toggleGroup(group.title)}
+                      aria-expanded={!isGroupCollapsed}
+                      title={isGroupCollapsed ? `展开「${group.title}」` : `折叠「${group.title}」`}
+                    >
+                      <GroupIcon size={14} />
+                      <span>{group.title}</span>
+                      <ChevronDown size={14} className="sidebar-group-chevron" />
+                    </button>
+                    {!isGroupCollapsed && group.links.map((link) => renderLink(link))}
+                  </div>
+                );
+              })
+            )
           ) : (
             <>
-              {/* v4.14.2: default variant 侧边栏按角色分层显示 */}
-              {variant !== 'admin' && (
-                <div className="sidebar-group">
-                  {/* 消费侧入口（所有登录用户可见） */}
-                  {PLAYER_LINKS.map(renderLink)}
-                </div>
-              )}
-
-              {/* instance_admin+ 可见的实例管理分组（default/admin variant 下，非 server_admin） */}
-              {/* v4.28.0: variant='admin' 时 instance_admin 进入 /admin/nodes 独立路由，需渲染此分组 */}
-              {(variant === 'default' || variant === 'admin') && isInstanceAdminOrHigher && !isServerAdmin && (
-                <div className="sidebar-group">
-                  <div className="sidebar-group-title">
-                    <Crown size={12} />
-                    <span>实例管理</span>
-                  </div>
-                  {INSTANCE_ADMIN_LINKS.map(renderLink)}
-                </div>
-              )}
-
-              {/* v4.28.0: variant='admin' 时仅 server_admin 才渲染 ADMIN_GROUPS（避免 instance_admin 看到无权访问的入口） */}
-              {((variant === 'admin' && isServerAdmin) || (variant === 'default' && isServerAdmin)) && (
+              {collapsed ? (
+                // Collapsed mode: show all items flat (no group headers visible)
                 <>
-                  {/* v3.7.0-E1: 系统管理分组——用户与权限 / 系统监控 / 配置管理 / 审计与日志 / 运维清理 / 业务运营 */}
-                  {/* v4.8.0-P3 (J2): 分组标题可点击折叠，减少移动端抽屉滚动距离 */}
-                  {ADMIN_GROUPS.map((group) => {
-                    const isGroupCollapsed = collapsedGroups.has(group.title);
-                    return (
-                      <div
-                        key={group.title}
-                        className={`sidebar-group${isGroupCollapsed ? ' group-collapsed' : ''}`}
-                      >
-                        <button
-                          type="button"
-                          className="sidebar-group-title sidebar-group-toggle"
-                          onClick={() => toggleGroup(group.title)}
-                          aria-expanded={!isGroupCollapsed}
-                          title={
-                            isGroupCollapsed ? `展开「${group.title}」` : `折叠「${group.title}」`
-                          }
-                        >
-                          <Group size={12} />
-                          <span>{group.title}</span>
-                          <ChevronDown size={14} className="sidebar-group-chevron" />
-                        </button>
-                        {!isGroupCollapsed && group.links.map((link) => renderLink(link))}
+                  {variant !== 'admin' && PLAYER_LINKS.map((link) => renderLink(link))}
+                  {(variant === 'default' || variant === 'admin') &&
+                    isInstanceAdminOrHigher &&
+                    !isServerAdmin &&
+                    INSTANCE_ADMIN_LINKS.map((link) => renderLink(link))}
+                  {((variant === 'admin' && isServerAdmin) ||
+                    (variant === 'default' && isServerAdmin)) &&
+                    ADMIN_GROUPS.flatMap((g) => g.links).map((link) => renderLink(link))}
+                </>
+              ) : (
+                // Expanded mode: collapsible groups
+                <>
+                  {/* v4.14.2: default variant 侧边栏按角色分层显示 */}
+                  {variant !== 'admin' && (
+                    <div className="sidebar-group">
+                      {/* 消费侧入口（所有登录用户可见） */}
+                      {PLAYER_LINKS.map(renderLink)}
+                    </div>
+                  )}
+
+                  {/* instance_admin+ 可见的实例管理分组（default/admin variant 下，非 server_admin） */}
+                  {/* v4.28.0: variant='admin' 时 instance_admin 进入 /admin/nodes 独立路由，需渲染此分组 */}
+                  {(variant === 'default' || variant === 'admin') &&
+                    isInstanceAdminOrHigher &&
+                    !isServerAdmin && (
+                      <div className="sidebar-group">
+                        <div className="sidebar-group-title">
+                          <Crown size={14} />
+                          <span>实例管理</span>
+                        </div>
+                        {INSTANCE_ADMIN_LINKS.map(renderLink)}
                       </div>
-                    );
-                  })}
+                    )}
+
+                  {/* v4.28.0: variant='admin' 时仅 server_admin 才渲染 ADMIN_GROUPS */}
+                  {((variant === 'admin' && isServerAdmin) ||
+                    (variant === 'default' && isServerAdmin)) && (
+                    <>
+                      {ADMIN_GROUPS.map((group) => {
+                        const GroupIcon = group.icon;
+                        const isGroupCollapsed = collapsedGroups.has(group.title);
+                        return (
+                          <div
+                            key={group.title}
+                            className={`sidebar-group${isGroupCollapsed ? ' group-collapsed' : ''}`}
+                          >
+                            <button
+                              type="button"
+                              className="sidebar-group-title sidebar-group-toggle"
+                              onClick={() => toggleGroup(group.title)}
+                              aria-expanded={!isGroupCollapsed}
+                              title={
+                                isGroupCollapsed
+                                  ? `展开「${group.title}」`
+                                  : `折叠「${group.title}」`
+                              }
+                            >
+                              <GroupIcon size={14} />
+                              <span>{group.title}</span>
+                              <ChevronDown size={14} className="sidebar-group-chevron" />
+                            </button>
+                            {!isGroupCollapsed && group.links.map((link) => renderLink(link))}
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
                 </>
               )}
             </>
@@ -1278,44 +1315,48 @@ export default function Layout({ children, variant = 'default' }: LayoutProps = 
 
         <div className="sidebar-footer">
           {/* 十.5: 帮助中心入口——? 图标按钮（顶部） */}
-          <button
-            type="button"
-            className="btn btn-ghost sidebar-help-btn"
-            onClick={() => setHelpModalOpen(true)}
-            title="帮助中心"
-            aria-label="帮助中心"
-          >
-            <HelpCircle size={16} />
-            <span className="sidebar-label">帮助</span>
-          </button>
+          <div className="sidebar-tooltip-wrap">
+            <button
+              type="button"
+              className="btn btn-ghost sidebar-help-btn"
+              onClick={() => setHelpModalOpen(true)}
+              aria-label="帮助中心"
+            >
+              <HelpCircle size={16} />
+              <span className="sidebar-label">帮助</span>
+            </button>
+            {collapsed && <span className="sidebar-tooltip">帮助中心</span>}
+          </div>
           {/* v4.25.0: 用户名按钮——点击弹出二级菜单（用户管理 / 退出登录） */}
           {user && (
             <div className="sidebar-user-menu" ref={sidebarUserMenuRef}>
-              <button
-                type="button"
-                className="sidebar-user-trigger"
-                onClick={() => setSidebarUserMenuOpen((v) => !v)}
-                aria-label="用户菜单"
-                aria-expanded={sidebarUserMenuOpen}
-                title={user.username}
-              >
-                <span className="sidebar-user-avatar" aria-hidden="true">
-                  {(user.username?.charAt(0) || '?').toUpperCase()}
-                </span>
-                <span className="sidebar-user-text">
-                  <span className="user-name">{user.username}</span>
-                  <span className="user-role">
-                    {effectiveRole === 'server_admin'
-                      ? '服务器管理员'
-                      : effectiveRole === 'instance_admin'
-                        ? '实例管理员'
-                        : effectiveRole === 'user'
-                          ? '普通用户'
-                          : effectiveRole}
+              <div className="sidebar-tooltip-wrap">
+                <button
+                  type="button"
+                  className="sidebar-user-trigger"
+                  onClick={() => setSidebarUserMenuOpen((v) => !v)}
+                  aria-label="用户菜单"
+                  aria-expanded={sidebarUserMenuOpen}
+                >
+                  <span className="sidebar-user-avatar" aria-hidden="true">
+                    {(user.username?.charAt(0) || '?').toUpperCase()}
                   </span>
-                </span>
-                <ChevronDown size={14} className="sidebar-user-chevron" aria-hidden="true" />
-              </button>
+                  <span className="sidebar-user-text">
+                    <span className="user-name">{user.username}</span>
+                    <span className="user-role">
+                      {effectiveRole === 'server_admin'
+                        ? '服务器管理员'
+                        : effectiveRole === 'instance_admin'
+                          ? '实例管理员'
+                          : effectiveRole === 'user'
+                            ? '普通用户'
+                            : effectiveRole}
+                    </span>
+                  </span>
+                  <ChevronDown size={14} className="sidebar-user-chevron" aria-hidden="true" />
+                </button>
+                {collapsed && <span className="sidebar-tooltip">{user.username}</span>}
+              </div>
               {sidebarUserMenuOpen && (
                 <div className="sidebar-user-dropdown" role="menu">
                   {isServerAdmin && (
@@ -1379,22 +1420,24 @@ export default function Layout({ children, variant = 'default' }: LayoutProps = 
             </div>
           )}
           {/* 第十一章 11.1: 版本号可点击打开版本信息模态（检查更新/回退）——置底 */}
-          <button
-            type="button"
-            className="version"
-            onClick={() => setVersionModalOpen(true)}
-            title="查看版本信息 / 检查更新"
-            aria-label="查看版本信息"
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-              color: 'inherit',
-            }}
-          >
-            v{version}
-          </button>
+          <div className="sidebar-tooltip-wrap">
+            <button
+              type="button"
+              className="version"
+              onClick={() => setVersionModalOpen(true)}
+              aria-label="查看版本信息"
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                color: 'inherit',
+              }}
+            >
+              v{version}
+            </button>
+            {collapsed && <span className="sidebar-tooltip">v{version}</span>}
+          </div>
         </div>
       </aside>
 

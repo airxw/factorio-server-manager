@@ -10,6 +10,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import type { ShopOrderItemSummary, ShopOrderSummary } from '@public/schema/panel-api-types';
 import { useAuth } from '../api/auth';
 import { EmptyState, ErrorState, Skeleton, useToast } from '../components/ui';
+import { getEffectiveRole, isAdminRole } from '../utils/role';
 
 const STATUS_LABEL: Record<ShopOrderSummary['status'], string> = {
   pending: '待领取',
@@ -41,9 +42,12 @@ interface ClaimState {
 // - embedded=false（独立路由 /instances/:id/shop-orders）：返回按钮跳转到 /instances/:id?tab=business
 export default function ShopOrders({ embedded = false }: { embedded?: boolean } = {}) {
   const { id } = useParams<{ id: string }>();
-  const { api } = useAuth();
+  const { api, user } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
+
+  // v4.36.1: 按角色分流——admin 视角为「销售记录」（管理玩家订单），玩家视角为「我的订单」
+  const admin = isAdminRole(getEffectiveRole(user));
 
   const [orders, setOrders] = useState<ShopOrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -163,15 +167,17 @@ export default function ShopOrders({ embedded = false }: { embedded?: boolean } 
               ← 返回详情
             </button>
           )}
-          <h2 className="page-title">我的订单</h2>
+          <h2 className="page-title">{admin ? '销售记录' : '我的订单'}</h2>
         </div>
         <div className="page-actions">
           <button className="btn btn-ghost" onClick={() => void refresh()} disabled={loading}>
             刷新
           </button>
-          <button className="btn btn-ghost" onClick={() => navigate(`/instances/${idParam}/shop`)}>
-            去商店
-          </button>
+          {!admin && (
+            <button className="btn btn-ghost" onClick={() => navigate(`/instances/${idParam}/shop`)}>
+              去商店
+            </button>
+          )}
         </div>
       </div>
 
@@ -184,8 +190,12 @@ export default function ShopOrders({ embedded = false }: { embedded?: boolean } 
         </div>
       ) : orders.length === 0 ? (
         <EmptyState
-          title="暂无订单记录"
-          description="去商店购买物品后，订单将显示在此处。"
+          title={admin ? '暂无销售记录' : '暂无订单记录'}
+          description={
+            admin
+              ? '玩家在商城购买物品后，销售记录将显示在此处。'
+              : '去商店购买物品后，订单将显示在此处。'
+          }
         />
       ) : (
         <div className="table-wrap">
@@ -193,8 +203,11 @@ export default function ShopOrders({ embedded = false }: { embedded?: boolean } 
             <thead>
               <tr>
                 <th>领取码</th>
+                {admin && <th>买家</th>}
                 <th>物品数</th>
+                {admin && <th>总价</th>}
                 <th>状态</th>
+                {admin && <th>领取玩家</th>}
                 <th>过期时间</th>
                 <th>下单时间</th>
                 <th className="col-actions">操作</th>
@@ -205,10 +218,20 @@ export default function ShopOrders({ embedded = false }: { embedded?: boolean } 
                 <Fragment key={o.id}>
                   <tr>
                     <td className="mono">{o.claim_code}</td>
+                    {admin && (
+                      <td
+                        className="mono"
+                        title={o.buyer_username ? `${o.buyer_username} (${o.user_id})` : o.user_id}
+                      >
+                        {o.buyer_username ?? `${o.user_id.slice(0, 8)}…`}
+                      </td>
+                    )}
                     <td>{o.items_count}</td>
+                    {admin && <td>{o.total_price}</td>}
                     <td>
                       <span className={statusClass(o.status)}>{STATUS_LABEL[o.status]}</span>
                     </td>
+                    {admin && <td>{o.claimed_player ?? '—'}</td>}
                     <td>{new Date(o.expires_at).toLocaleString('zh-CN')}</td>
                     <td>{new Date(o.created_at).toLocaleString('zh-CN')}</td>
                     <td className="col-actions">
@@ -229,7 +252,7 @@ export default function ShopOrders({ embedded = false }: { embedded?: boolean } 
                   </tr>
                   {expanded === o.id && (
                     <tr className="detail-row">
-                      <td colSpan={6}>
+                      <td colSpan={admin ? 9 : 6}>
                         {loadingDetail ? (
                           <div className="form-hint">加载中…</div>
                         ) : detailMap[o.id] ? (

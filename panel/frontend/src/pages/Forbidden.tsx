@@ -2,11 +2,12 @@
 // Forbidden — 403 无权限页面
 // v4.15.2: 返回按钮按角色返回对应基座首页（避免 /dashboard→/admin→403 死循环）
 // v4.28.0: 全员服主——目标页所需角色已在账号角色集内时，提供免密切换引导按钮
+// v4.36.1: 视觉重做——对齐 Apple 浅色设计语言（lucide 图标 + 设计 token + 卡片化布局）
 // ============================================================================
 
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowLeftRight } from 'lucide-react';
+import { ArrowLeftRight, ShieldAlert } from 'lucide-react';
 import type { UserRole } from '@public/schema/panel-api-types';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useAuth } from '../api/auth';
@@ -64,38 +65,42 @@ export default function Forbidden() {
   };
 
   return (
-    <div className="page" style={{ textAlign: 'center', paddingTop: 64 }}>
-      <h1 className="page-title" style={{ fontSize: 48, marginBottom: 8 }}>
-        403
-      </h1>
-      <p className="form-hint" style={{ fontSize: 16, marginBottom: 24 }}>
-        抱歉，您没有权限访问该页面
-      </p>
-      <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-        {canSwitchToContinue && (
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => void handleSwitch()}
-            disabled={switching}
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
-          >
-            <ArrowLeftRight size={16} />
-            {switching ? '切换中…' : '切换为服主身份继续'}
-          </button>
-        )}
-        <Link
-          to={homePath}
-          className={canSwitchToContinue ? 'btn btn-ghost' : 'btn btn-primary'}
-        >
-          返回首页
-        </Link>
-      </div>
-      {canSwitchToContinue && (
-        <p className="form-hint" style={{ marginTop: 16 }}>
-          您的账号已具备服主身份，免密切换后即可继续访问
+    <div className="forbidden-page">
+      <div className="forbidden-card">
+        <div className="forbidden-icon" aria-hidden="true">
+          <ShieldAlert size={40} strokeWidth={1.75} />
+        </div>
+
+        <p className="forbidden-eyebrow">403 · 访问受限</p>
+        <h1 className="forbidden-title">抱歉，您没有权限访问该页面</h1>
+        <p className="forbidden-hint">
+          当前身份无权查看此内容。如果您拥有多个身份，可切换后继续；或返回首页查看可用功能。
         </p>
-      )}
+
+        <div className="forbidden-actions">
+          {canSwitchToContinue && (
+            <button
+              type="button"
+              className="btn btn-primary forbidden-action-primary"
+              onClick={() => void handleSwitch()}
+              disabled={switching}
+            >
+              <ArrowLeftRight size={16} />
+              {switching ? '切换中…' : '切换为服主身份继续'}
+            </button>
+          )}
+          <Link
+            to={homePath}
+            className={canSwitchToContinue ? 'btn btn-ghost' : 'btn btn-primary forbidden-action-primary'}
+          >
+            返回首页
+          </Link>
+        </div>
+
+        {canSwitchToContinue && (
+          <p className="forbidden-footnote">您的账号已具备服主身份，免密切换后即可继续访问</p>
+        )}
+      </div>
     </div>
   );
 }

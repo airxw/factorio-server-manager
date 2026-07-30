@@ -1,18 +1,24 @@
 // ============================================================================
 // CdkCodes — CDK 兑换码管理（仅 admin/system_admin 可见）
-// 顶部服务器选择 → 生成 CDK 表单（支持多物品礼包）+ CDK 列表表格（含复制/删除操作）
+// 顶部服务器选择 → 生成 CDK 表单（支持多物品礼包 + 使用次数）+ CDK 列表表格（含复制/删除/兑换记录）
 //
 // v2 礼包逻辑：
 // - 一个 CDK = 一个礼包，礼包由 1 个或多个物品组成
 // - 生成表单支持动态添加多个物品（物品选择 + 数量 + 品质）
 // - 可选填礼包名称和描述，便于识别和分发
 // - 批量生成数量控制一次生成多少个相同的 CDK
+//
+// v4.37.0 可重复使用 CDK：
+// - 生成表单支持选择使用次数：一次性（max_uses=1）/ 限 N 次（max_uses=N）/ 无限次（max_uses=0）
+// - 列表显示 use_count/max_uses，多次用 CDK 可展开查看兑换记录
+// - 支持 embedded 模式：在 Business 业务运营子 Tab 中嵌入（传入 serverId，隐藏服务器选择）
 // ============================================================================
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import type {
   CdkCodeItem,
   CdkCodeSummary,
+  CdkRedemptionRecord,
   CreateCdkCodesRequest,
   PackItemSummary,
   ServerSummary,
@@ -75,18 +81,24 @@ function renderGiftItems(
     .join('；');
 }
 
-export default function CdkCodes() {
+export default function CdkCodes({
+  embedded = false,
+  serverId: propServerId,
+}: {
+  embedded?: boolean;
+  serverId?: string;
+} = {}) {
   const { api, user } = useAuth();
   const { confirm } = useConfirm();
 
   const [servers, setServers] = useState<ServerSummary[]>([]);
-  const [selectedServerId, setSelectedServerId] = useState<string>('');
+  const [selectedServerId, setSelectedServerId] = useState<string>(propServerId ?? '');
   const [packItems, setPackItems] = useState<PackItemSummary[]>([]);
   const [codes, setCodes] = useState<CdkCodeSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // 生成表单：礼包信息 + 动态物品列表 + 生成数量 + 过期天数
+  // 生成表单：礼包信息 + 动态物品列表 + 生成数量 + 过期天数 + 使用次数
   const [giftName, setGiftName] = useState('');
   const [giftDescription, setGiftDescription] = useState('');
   const [itemRows, setItemRows] = useState<ItemFormRow[]>([
@@ -94,15 +106,23 @@ export default function CdkCodes() {
   ]);
   const [quantity, setQuantity] = useState('1');
   const [expiresInDays, setExpiresInDays] = useState('30');
+  // v4.37.0: 使用次数模式 once=一次性 / limited=限N次 / unlimited=无限次
+  const [maxUsesMode, setMaxUsesMode] = useState<'once' | 'limited' | 'unlimited'>('once');
+  const [maxUsesValue, setMaxUsesValue] = useState('10');
 
   const [creating, setCreating] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  // v4.37.0: 展开的 CDK id（查看兑换记录）；记录展开项的兑换记录缓存
+  const [expandedCodeId, setExpandedCodeId] = useState<number | null>(null);
+  const [redemptionMap, setRedemptionMap] = useState<Record<number, CdkRedemptionRecord[]>>({});
+  const [loadingRedemptions, setLoadingRedemptions] = useState(false);
 
   const isAdmin = isAdminRole(getEffectiveRole(user));
 
-  // 加载服务器列表
+  // 加载服务器列表（embedded 模式跳过，直接用传入的 serverId）
   useEffect(() => {
     if (!isAdmin) return;
+    if (embedded && propServerId) return; // embedded 模式直接使用传入的 serverId
     let cancelled = false;
     (async () => {
       try {
@@ -124,10 +144,16 @@ export default function CdkCodes() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, isAdmin]);
 
-  const selectedServer = useMemo(
-    () => servers.find((s) => s.id === selectedServerId) ?? null,
-    [servers, selectedServerId],
-  );
+  // embedded 模式：propServerId 变化时同步 selectedServerId（实例切换场景）
+  useEffect(() => {
+    if (embedded && propServerId && propServerId !== selectedServerId) {
+      setSelectedServerId(propServerId);
+      // 切换实例时清空缓存的兑换记录，避免错位展示
+      setRedemptionMap({});
+      setExpandedCodeId(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [embedded, propServerId]);
 
   // 服务器变化时加载 Pack items + CDK 列表
   const refreshAll = useCallback(async () => {
@@ -208,6 +234,19 @@ export default function CdkCodes() {
       setError('过期天数必须为正整数');
       return;
     }
+    // v4.37.0: 解析 max_uses
+    let maxUses: number | undefined;
+    if (maxUsesMode === 'unlimited') {
+      maxUses = 0;
+    } else if (maxUsesMode === 'limited') {
+      const n = parseInt(maxUsesValue, 10);
+      if (!Number.isFinite(n) || n < 2) {
+        setError('限次使用的次数必须为 ≥ 2 的整数（1 请选「一次性」）');
+        return;
+      }
+      maxUses = n;
+    }
+    // maxUsesMode === 'once' → maxUses 保持 undefined（后端缺省 1）
 
     setCreating(true);
     setError(null);
@@ -223,6 +262,7 @@ export default function CdkCodes() {
           gift_name: giftName.trim() || undefined,
           gift_description: giftDescription.trim() || undefined,
           items: itemsPayload,
+          ...(maxUses !== undefined ? { max_uses: maxUses } : {}),
         })),
         expires_in_days: expiresInDaysNum,
       };
@@ -269,6 +309,41 @@ export default function CdkCodes() {
     }
   };
 
+  /** v4.37.0: 渲染使用次数单元格（一次性/限N次/无限次） */
+  const renderUseCount = (c: CdkCodeSummary): string => {
+    if (c.max_uses === 1) {
+      return c.use_count >= 1 ? '1/1' : '一次性';
+    }
+    if (c.max_uses === 0) {
+      return `${c.use_count}/∞`;
+    }
+    return `${c.use_count}/${c.max_uses}`;
+  };
+
+  /** v4.37.0: 展开/收起兑换记录（仅多次用 CDK；调用 getCode 拉取 redemptions） */
+  const handleToggleRedemptions = async (c: CdkCodeSummary) => {
+    if (expandedCodeId === c.id) {
+      setExpandedCodeId(null);
+      return;
+    }
+    // 已缓存直接展开
+    if (redemptionMap[c.id]) {
+      setExpandedCodeId(c.id);
+      return;
+    }
+    setLoadingRedemptions(true);
+    setError(null);
+    try {
+      const res = await api.getCdkCode(selectedServerId, c.id);
+      setRedemptionMap((prev) => ({ ...prev, [c.id]: res.code.redemptions ?? [] }));
+      setExpandedCodeId(c.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载兑换记录失败');
+    } finally {
+      setLoadingRedemptions(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="page">
@@ -288,26 +363,28 @@ export default function CdkCodes() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div className="info-card">
-        <div className="info-row">
-          <span className="info-label">选择服务器</span>
-          <select
-            className="input"
-            value={selectedServerId}
-            onChange={(e) => setSelectedServerId(e.target.value)}
-            disabled={servers.length === 0}
-          >
-            {servers.length === 0 && <option value="">暂无服务器</option>}
-            {servers.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} ({s.pack_id})
-              </option>
-            ))}
-          </select>
+      {!embedded && (
+        <div className="info-card">
+          <div className="info-row">
+            <span className="info-label">选择服务器</span>
+            <select
+              className="input"
+              value={selectedServerId}
+              onChange={(e) => setSelectedServerId(e.target.value)}
+              disabled={servers.length === 0}
+            >
+              {servers.length === 0 && <option value="">暂无服务器</option>}
+              {servers.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} ({s.pack_id})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-      </div>
+      )}
 
-      {selectedServer && (
+      {selectedServerId && (
         <>
           <div className="info-card" style={{ marginTop: 12 }}>
             <h3 className="card-title">生成 CDK（礼包）</h3>
@@ -472,6 +549,45 @@ export default function CdkCodes() {
                 </button>
               </div>
             </div>
+
+            {/* v4.37.0: 使用次数选择 */}
+            <div className="form-grid" style={{ marginTop: 16 }}>
+              <div className="form-field">
+                <label className="form-label">使用次数</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {([
+                    { key: 'once', label: '一次性' },
+                    { key: 'limited', label: '限 N 次' },
+                    { key: 'unlimited', label: '无限次' },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      className={`btn btn-sm ${maxUsesMode === opt.key ? 'btn-primary' : 'btn-ghost'}`}
+                      onClick={() => setMaxUsesMode(opt.key)}
+                      disabled={creating}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                  {maxUsesMode === 'limited' && (
+                    <input
+                      className="input"
+                      type="number"
+                      min={2}
+                      style={{ width: 100 }}
+                      value={maxUsesValue}
+                      onChange={(e) => setMaxUsesValue(e.target.value)}
+                      disabled={creating}
+                      aria-label="限次使用次数"
+                    />
+                  )}
+                </div>
+                <p className="form-hint" style={{ marginTop: 6 }}>
+                  一次性：每个 CDK 仅一个玩家可兑换。限 N 次：可被 N 个不同玩家兑换（同一玩家不可重复）。无限次：过期前任意已登录玩家均可兑换（同一玩家不可重复）。
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="info-card" style={{ marginTop: 12 }}>
@@ -489,6 +605,7 @@ export default function CdkCodes() {
                       <th>礼包名称</th>
                       <th>礼包内容</th>
                       <th>状态</th>
+                      <th>使用次数</th>
                       <th>兑换玩家</th>
                       <th>兑换时间</th>
                       <th>过期时间</th>
@@ -497,41 +614,104 @@ export default function CdkCodes() {
                     </tr>
                   </thead>
                   <tbody>
-                    {codes.map((c) => (
-                      <tr key={c.id}>
-                        <td>
-                          <code className="cdk-code">{c.code}</code>
-                        </td>
-                        <td>{c.gift_name ?? '—'}</td>
-                        <td style={{ maxWidth: 320, wordBreak: 'break-all' }}>
-                          {renderGiftItems(c.items, c.item_name, c.count, c.quality)}
-                        </td>
-                        <td>
-                          <span className={statusClass(c.status)}>{STATUS_LABEL[c.status]}</span>
-                        </td>
-                        <td>{c.claimed_player ?? '—'}</td>
-                        <td>{formatTime(c.claimed_at)}</td>
-                        <td>{formatTime(c.expires_at)}</td>
-                        <td>{formatTime(c.created_at)}</td>
-                        <td>
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => void handleCopy(c.code)}
-                          >
-                            {copiedCode === c.code ? '已复制' : '复制'}
-                          </button>
-                          {c.status === 'unused' && (
-                            <button
-                              className="btn btn-danger btn-sm"
-                              onClick={() => void handleDelete(c.id, c.code)}
-                              style={{ marginLeft: 8 }}
-                            >
-                              删除
-                            </button>
+                    {codes.map((c) => {
+                      const isMultiUse = c.max_uses !== 1;
+                      const canExpand = isMultiUse && c.use_count > 0;
+                      const isExpanded = expandedCodeId === c.id;
+                      const canDelete = c.status === 'unused' && c.use_count === 0;
+                      return (
+                        <Fragment key={c.id}>
+                          <tr>
+                            <td>
+                              <code className="cdk-code">{c.code}</code>
+                            </td>
+                            <td>{c.gift_name ?? '—'}</td>
+                            <td style={{ maxWidth: 320, wordBreak: 'break-all' }}>
+                              {renderGiftItems(c.items, c.item_name, c.count, c.quality)}
+                            </td>
+                            <td>
+                              <span className={statusClass(c.status)}>{STATUS_LABEL[c.status]}</span>
+                            </td>
+                            <td>
+                              <span style={{ whiteSpace: 'nowrap' }}>{renderUseCount(c)}</span>
+                              {canExpand && (
+                                <button
+                                  className="btn btn-ghost btn-sm"
+                                  type="button"
+                                  onClick={() => void handleToggleRedemptions(c)}
+                                  disabled={loadingRedemptions}
+                                  style={{ marginLeft: 6 }}
+                                  aria-expanded={isExpanded}
+                                  aria-label={isExpanded ? '收起兑换记录' : '展开兑换记录'}
+                                >
+                                  {isExpanded ? '收起' : '查看记录'}
+                                </button>
+                              )}
+                            </td>
+                            <td>{c.claimed_player ?? '—'}</td>
+                            <td>{formatTime(c.claimed_at)}</td>
+                            <td>{formatTime(c.expires_at)}</td>
+                            <td>{formatTime(c.created_at)}</td>
+                            <td>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                onClick={() => void handleCopy(c.code)}
+                              >
+                                {copiedCode === c.code ? '已复制' : '复制'}
+                              </button>
+                              {canDelete && (
+                                <button
+                                  className="btn btn-danger btn-sm"
+                                  onClick={() => void handleDelete(c.id, c.code)}
+                                  style={{ marginLeft: 8 }}
+                                >
+                                  删除
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr className="cdk-redemptions-row">
+                              <td colSpan={10}>
+                                {loadingRedemptions && expandedCodeId === c.id ? (
+                                  <div className="empty-state" style={{ padding: 12 }}>
+                                    加载兑换记录中…
+                                  </div>
+                                ) : (redemptionMap[c.id]?.length ?? 0) === 0 ? (
+                                  <div className="empty-state" style={{ padding: 12 }}>
+                                    暂无兑换记录
+                                  </div>
+                                ) : (
+                                  <div className="cdk-redemptions-inner">
+                                    <div className="cdk-redemptions-title">
+                                      兑换记录（{redemptionMap[c.id]?.length ?? 0} 条）
+                                    </div>
+                                    <table className="data-table data-table-compact">
+                                      <thead>
+                                        <tr>
+                                          <th>#</th>
+                                          <th>玩家名</th>
+                                          <th>兑换时间</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {(redemptionMap[c.id] ?? []).map((r, idx) => (
+                                          <tr key={r.id}>
+                                            <td>{idx + 1}</td>
+                                            <td>{r.player_name}</td>
+                                            <td>{formatTime(r.redeemed_at)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
                           )}
-                        </td>
-                      </tr>
-                    ))}
+                        </Fragment>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

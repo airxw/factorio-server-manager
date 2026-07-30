@@ -61,6 +61,8 @@ export default function ConfigFileEditor({
 
   useEffect(() => {
     let cancelled = false;
+    let pending = 2;
+
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -68,23 +70,35 @@ export default function ConfigFileEditor({
     setSchema(null);
     setMode('form');
 
-    Promise.all([
-      api.readConfigFile(serverId, configName),
-      api.getConfigFileSchema(serverId, configName),
-    ])
-      .then(([contentRes, schemaRes]) => {
+    const checkDone = () => {
+      pending--;
+      if (pending === 0 && !cancelled) setLoading(false);
+    };
+
+    // 分别加载内容与 schema：schema 加载失败时（如用户自定义文件无 Pack schema）
+    // 不阻断整体流程，仅回退到 JSON 模式编辑
+    api.readConfigFile(serverId, configName)
+      .then((contentRes) => {
         if (cancelled) return;
         setText(serializeData(contentRes.data));
-        setSchema(schemaRes.schema);
       })
       .catch((err: unknown) => {
         if (!cancelled) {
           setError(err instanceof Error ? err.message : '加载配置文件失败');
         }
       })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .finally(checkDone);
+
+    api.getConfigFileSchema(serverId, configName)
+      .then((schemaRes) => {
+        if (cancelled) return;
+        setSchema(schemaRes.schema);
+      })
+      .catch(() => {
+        // schema 不存在时静默处理（回退到 JSON 模式）
+        if (!cancelled) setSchema(null);
+      })
+      .finally(checkDone);
 
     return () => {
       cancelled = true;

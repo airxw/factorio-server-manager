@@ -28,7 +28,7 @@ export const PriceOverridePanel: React.FC<PriceOverridePanelProps> = ({ asset, o
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-xs font-medium uppercase tracking-[0.18em] text-slate-400">
+        <label className="block text-xs font-medium uppercase tracking-[0.08em] text-slate-400">
           资产名称
         </label>
         <div className="mt-2 rounded-full border border-slate-200 bg-slate-50/80 px-4 py-2 text-sm text-slate-600">
@@ -39,7 +39,7 @@ export const PriceOverridePanel: React.FC<PriceOverridePanelProps> = ({ asset, o
       <div>
         <label
           htmlFor="override-price"
-          className="block text-xs font-medium uppercase tracking-[0.18em] text-slate-400"
+          className="block text-xs font-medium uppercase tracking-[0.08em] text-slate-400"
         >
           价格（覆盖）
         </label>

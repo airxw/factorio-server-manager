@@ -89,6 +89,11 @@ export const serverSummarySchema = z.object({
   expiry_status: z.enum(['permanent', 'active', 'grace', 'expired', 'cleaned']),
   // v4.31.0: 部署节点名称
   node_name: z.string().nullable(),
+  // v4.38.0: 平台级公开标记 + 绑定申请通道开关
+  // v4.38.1: 自动审批开关
+  is_public: z.boolean(),
+  binding_requests_enabled: z.boolean(),
+  auto_approve_binding_requests: z.boolean(),
   created_at: z.string(),
   updated_at: z.string(),
 });

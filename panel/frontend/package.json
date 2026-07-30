@@ -1,6 +1,6 @@
 {
   "name": "@gameserver-panel/frontend",
-  "version": "4.36.1",
+  "version": "4.39.1",
   "private": true,
   "description": "GameServer Panel 4.15.0 — Panel 前端（React 19 + Vite 6 + TypeScript）",
   "type": "module",

@@ -29,11 +29,14 @@ import { PanelApiError } from '../../api/client';
 import { useUpdateServerExpiry } from '../../api/queries/servers';
 import { getEffectiveRole, isAdminRole, isInstanceAdminOrAbove } from '../../utils/role';
 import { formatBytes } from '../../utils/formatBytes';
-import { useToast, ErrorState, Skeleton } from '../../components/ui';
+import { useToast, ErrorState, Skeleton, TabSheetPicker } from '../../components/ui';
 import { useConfirm } from '../../context/ConfirmContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import RconConsole from '../../components/RconConsole';
 import ExpiryEditModal from './ExpiryEditModal';
+// v4.x.0: 账户级绑定管理（复用 GuildBind 的 AccountBindingRow，Task 6）
+import { AccountBindingRow } from '../guild/GuildBind';
+import type { MyBinding } from '../../api/modules/auth';
 // v4.2.0-D2: 玩家管理页（替代 PlayerHistories，包含在线操作 + 白/黑名单 + 历史）
 // v3.7.0-B4: 业务相关 tab（shop-admin/chat-triggers/player-join-settings/vote-settings）
 // 已迁移到 /instances/:id/business 二级页面，不再在此导入
@@ -43,6 +46,7 @@ const ConfigFiles = lazy(() => import('./ConfigFiles'));
 const WorldGen = lazy(() => import('./WorldGen'));
 const Mods = lazy(() => import('./Mods'));
 const Saves = lazy(() => import('./Saves'));
+const StartOptionsModal = lazy(() => import('./StartOptionsModal'));
 const Players = lazy(() => import('./Players'));
 const ChatLogs = lazy(() => import('./ChatLogs'));
 const UpdateCheck = lazy(() => import('./UpdateCheck'));
@@ -50,6 +54,8 @@ const LogFiles = lazy(() => import('./LogFiles'));
 const Admins = lazy(() => import('./Admins'));
 const InstanceRoles = lazy(() => import('./InstanceRoles'));
 const GameCommandHelp = lazy(() => import('./GameCommandHelp'));
+// v4.38.0: 绑定申请管理 Tab（服主审批 + 申请通道开关）
+const BindingRequestsTab = lazy(() => import('./BindingRequestsTab'));
 
 // Tab 元数据：key → 显示名
 // console / shop-admin 为底座通用 tab，始终显示；
@@ -72,6 +78,8 @@ const TAB_LABELS: Record<string, string> = {
   admins: '共管管理',
   // v4.7.0-H2: 实例级角色管理（instance_admin+）
   roles: '角色管理',
+  // v4.38.0: 绑定申请管理（服主审批私有实例的绑定申请 + 申请通道开关）
+  'binding-requests': '绑定申请',
   // v3.7.0-B4: 业务运营 pseudo-tab，点击跳转到 /instances/:id/business
   __business__: '业务运营',
 };
@@ -104,6 +112,8 @@ const BASE_USER_TAB_OBJECTS: UITabObject[] = [
   // v4.x.x: admins/roles 已纳入 InstanceTabSchema 枚举（public/schema/pack-schema.ts）
   { tab: 'admins', group: 'ops', order: 70, require_state: ALL_STATES },
   { tab: 'roles', group: 'ops', order: 71, require_state: ALL_STATES },
+  // v4.38.0: 绑定申请管理（仅 instance_admin+ 可见，且仅私有实例显示——见 allTabs 过滤）
+  { tab: 'binding-requests', group: 'ops', order: 72, require_state: ALL_STATES },
 ];
 
 // v3.7.0-B4: 管理员业务 tab（shop-admin/chat-triggers/player-join-settings/vote-settings）
@@ -272,6 +282,8 @@ export default function ServerDetailCore({
   const [actioning, setActioning] = useState(false);
   // v1.1.0: 启动前置引导向导
   const [showStartupWizard, setShowStartupWizard] = useState(false);
+  // 启动前选项弹窗（选择存档）
+  const [showStartOptions, setShowStartOptions] = useState(false);
   // 一.4: 删除二次确认弹窗
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   // v3.6.1-B2: 磁盘占用刷新中状态
@@ -294,6 +306,10 @@ export default function ServerDetailCore({
   >(1);
   const [renewing, setRenewing] = useState(false);
   const [showRenewals, setShowRenewals] = useState(false);
+
+  // v4.x.0: 当前用户在该实例的账户级绑定（详情页解绑入口，Task 6）
+  const [myBinding, setMyBinding] = useState<MyBinding | null>(null);
+  const [unbinding, setUnbinding] = useState(false);
 
   // Pack.ui_tabs：用于动态渲染实例详情子页 tab
   // v3.7.0: 后端 loader 已规范化为 UITabObject[] 对象数组
@@ -416,6 +432,28 @@ export default function ServerDetailCore({
     };
   }, [api, server]);
 
+  // v4.x.0: 加载当前用户在该实例的账户级绑定（详情页解绑入口，Task 6）
+  // 数据源：GET /api/profile/bindings → 筛选 serverId 匹配且未解绑（unboundAt === null）的记录
+  // 仅当存在绑定记录时渲染管理区块；刷新实例时随 server 变更重新拉取
+  useEffect(() => {
+    if (!server) return;
+    let cancelled = false;
+    api
+      .listMyBindings()
+      .then((bindings) => {
+        if (cancelled) return;
+        setMyBinding(
+          bindings.find((b) => b.serverId === server.id && b.unboundAt === null) ?? null,
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setMyBinding(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [api, server]);
+
   // v3-billing: 手动续费
   const handleRenew = useCallback(async () => {
     if (!server || renewing) return;
@@ -441,6 +479,29 @@ export default function ServerDetailCore({
     }
   }, [api, server, renewing, renewCycle, toast, refresh]);
 
+  // v4.x.0: 账户级解绑（详情页入口，复用 AccountBindingRow，Task 6）
+  // 参考 Profile.tsx handleUnbind：confirm 二次确认 → unbindInstance → 乐观更新隐藏区块
+  const handleUnbind = async (sid: string) => {
+    if (!server || unbinding) return;
+    const ok = await confirm({
+      title: '解绑确认',
+      message: `确认解绑实例「${server.name}」？解绑后该实例的 VIP 等级与相关权限将失效。`,
+      danger: true,
+      confirmText: '解绑',
+    });
+    if (!ok) return;
+    setUnbinding(true);
+    try {
+      await api.unbindInstance(sid);
+      setMyBinding(null);
+      toast.success('解绑成功');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '解绑失败');
+    } finally {
+      setUnbinding(false);
+    }
+  };
+
   // v3.7.0: 最终展示的 tab 列表（UITabObject[] 格式，含 group/order/require_state）
   // - 合并底座 tab（BASE_USER_TAB_OBJECTS）+ Pack.ui_tabs（去重，按 group+order 排序）
   // - B4: business group 的 tab 替换为 __business__ pseudo-tab（点击导航到 /business）
@@ -457,6 +518,11 @@ export default function ServerDetailCore({
     if (!instanceAdminOrAbove) {
       result = result.filter((t) => String(t.tab) !== 'roles');
     }
+    // v4.38.0: binding-requests tab 仅 instance_admin+ 可见，且仅私有实例有意义
+    // 公开实例不展示（公开实例可直接绑定，无需审批流程）
+    if (!instanceAdminOrAbove || server?.is_public === true) {
+      result = result.filter((t) => String(t.tab) !== 'binding-requests');
+    }
 
     if (uiTabs) {
       const seen = new Set(result.map((t) => t.tab));
@@ -468,7 +534,7 @@ export default function ServerDetailCore({
       }
     }
     return result;
-  }, [uiTabs, effectiveRole]);
+  }, [uiTabs, effectiveRole, server?.is_public]);
 
   // v3.7.0-B3: 按当前实例状态过滤 tab（require_state 不匹配的不渲染）
   // 同时 B4: 把 business group 的所有 tab 替换为单个 __business__ pseudo-tab
@@ -658,6 +724,9 @@ export default function ServerDetailCore({
     (connected: boolean) => {
       // 仅在 false → true（重连成功）时触发 refresh
       if (prevConnectedRef.current === false && connected) {
+        // v4.36.1: 重置 liveState，让 displayState 回退到 server.status（来自 API 最新数据）
+        // 避免 WS 断连期间 liveState 残留旧值（如 running）导致页面状态与后端不一致
+        setLiveState(null);
         void refresh();
       }
       prevConnectedRef.current = connected;
@@ -678,16 +747,18 @@ export default function ServerDetailCore({
     } catch {
       // 获取引导失败不阻断启动（向后兼容，后端 /start 也会再校验）
     }
-    await doStart();
+    // 引导已完成或无需引导 → 打开启动选项弹窗（选择存档）
+    setShowStartOptions(true);
   };
 
   // v1.1.0: 实际调用 /start（引导完成或无需引导时）
-  const doStart = async () => {
+  // savePath 可选：由启动选项弹窗传入，指定本次启动加载的存档
+  const doStart = async (savePath?: string) => {
     if (!server) return;
     setActioning(true);
     setError(null);
     try {
-      await api.startServer(server.id);
+      await api.startServer(server.id, savePath ? { savePath } : undefined);
       setLiveState('starting');
       toast.success('实例启动中');
     } catch (err) {
@@ -696,13 +767,24 @@ export default function ServerDetailCore({
       toast.error(msg);
     } finally {
       setActioning(false);
+      setShowStartOptions(false);
     }
   };
 
   // v1.1.0: 启动向导完成（配置已保存）→ 执行启动
   const handleStartupWizardComplete = () => {
     setShowStartupWizard(false);
-    void doStart();
+    setShowStartOptions(true);
+  };
+
+  // 启动选项弹窗确认 → 执行启动
+  const handleStartOptionsConfirm = (savePath?: string) => {
+    void doStart(savePath);
+  };
+
+  // 启动选项弹窗取消
+  const handleStartOptionsCancel = () => {
+    setShowStartOptions(false);
   };
 
   const handleStop = async () => {
@@ -719,6 +801,22 @@ export default function ServerDetailCore({
       toast.error(msg);
     } finally {
       setActioning(false);
+    }
+  };
+
+  // 运行时保存世界（通过 RCON 发送 save 命令）
+  const [savingWorld, setSavingWorld] = useState(false);
+  const handleSaveWorld = async () => {
+    if (!server) return;
+    setSavingWorld(true);
+    try {
+      await api.sendCommand(server.id, 'save');
+      toast.success('世界已保存');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '保存失败';
+      toast.error(msg);
+    } finally {
+      setSavingWorld(false);
     }
   };
 
@@ -915,6 +1013,16 @@ export default function ServerDetailCore({
           启动
         </button>
       )}
+      {canStop && displayState === 'running' && (
+        <button
+          className="btn btn-ghost"
+          onClick={() => void handleSaveWorld()}
+          disabled={savingWorld || actioning}
+          title="保存当前游戏世界"
+        >
+          {savingWorld ? '保存中…' : '保存'}
+        </button>
+      )}
       {canStop && (
         <button className="btn btn-warning" onClick={() => void handleStop()} disabled={actioning}>
           停止
@@ -1076,7 +1184,8 @@ export default function ServerDetailCore({
           id="info-card-details"
           className={`info-card-details${infoExpanded ? '' : ' collapsed'}`}
         >
-          <div className="info-card info-card-2col">
+          <div className="info-card">
+            <div className="info-card-2col">
             <div className="info-row">
               <span className="info-label">状态</span>
               <span
@@ -1110,7 +1219,7 @@ export default function ServerDetailCore({
             </div>
             <div className="info-row">
               <span className="info-label">{nodeLabel}</span>
-              <span className="info-value">{server.node_id}</span>
+              <span className="info-value">{server.node_name ?? server.node_id}</span>
             </div>
             <div className="info-row">
               <span className="info-label">{ownerLabel}</span>
@@ -1122,6 +1231,10 @@ export default function ServerDetailCore({
                 {new Date(server.created_at).toLocaleString('zh-CN')}
               </span>
             </div>
+            </div>
+            <div className="info-card-ops">
+            {/* v3-billing: 有效期 + 实例计费 合并为一行（双列网格） */}
+            <div className={billingSettings ? 'info-card-2col' : undefined}>
             {/* v3-billing: 有效期信息行 */}
             <div className="info-row">
               <span className="info-label">有效期</span>
@@ -1130,19 +1243,15 @@ export default function ServerDetailCore({
                   {expiryDisplay.text}
                 </span>
                 {expiryDisplay.warning && (
-                  <span
-                    className="info-hint"
-                    style={{ marginLeft: 8, color: 'var(--color-warning)' }}
-                  >
+                  <span className="info-hint info-hint-warning">
                     {expiryDisplay.warning}
                   </span>
                 )}
                 {isAdminRole(effectiveRole) && (
                   <button
                     type="button"
-                    className="btn btn-ghost btn-sm"
+                    className="btn btn-ghost btn-sm info-action-btn"
                     onClick={() => setShowExpiryEdit(true)}
-                    style={{ marginLeft: 8, padding: '2px 8px' }}
                     aria-label="修改有效期"
                     title="修改有效期"
                   >
@@ -1156,26 +1265,25 @@ export default function ServerDetailCore({
               <div className="info-row">
                 <span className="info-label">实例计费</span>
                 <span className="info-value">
-                  <Wallet size={13} style={{ marginRight: 4, verticalAlign: '-2px' }} />
-                  <span className="mono">
-                    {INSTANCE_TYPE_LABELS[billingSettings.instance_type] ??
-                      billingSettings.instance_type}
+                  <span className="info-billing-display">
+                    <Wallet size={13} />
+                    <span className="mono">
+                      {INSTANCE_TYPE_LABELS[billingSettings.instance_type] ??
+                        billingSettings.instance_type}
+                    </span>
                   </span>
                   {billingSettings.last_billing_cycle_months && (
-                    <span className="info-hint" style={{ marginLeft: 8 }}>
+                    <span className="info-hint info-inline-hint">
                       ·{' '}
                       {BILLING_CYCLE_LABELS[billingSettings.last_billing_cycle_months] ??
                         `${billingSettings.last_billing_cycle_months}个月`}
                     </span>
                   )}
-                  <span className="info-hint" style={{ marginLeft: 8 }}>
+                  <span className="info-hint info-inline-hint">
                     · {billingSettings.auto_renew_enabled ? '自动续扣' : '手动续费'}
                   </span>
                   {billingSettings.billing_exempt && (
-                    <span
-                      className="info-hint"
-                      style={{ marginLeft: 8, color: 'var(--color-success, #16a34a)' }}
-                    >
+                    <span className="info-hint info-hint-success">
                       · 免计费
                       {billingSettings.exempt_reason &&
                         `（${
@@ -1187,41 +1295,42 @@ export default function ServerDetailCore({
                 </span>
               </div>
             )}
+            </div>
             {/* v3-billing: 手动续费操作行（仅非豁免实例展示续费入口） */}
             {billingSettings && !billingSettings.billing_exempt && (
               <div className="info-row">
                 <span className="info-label">续费</span>
                 <span className="info-value">
-                  <select
-                    value={renewCycle}
-                    onChange={(e) =>
-                      setRenewCycle(
-                        Number(e.target.value) as import('@public/interface_stub/shared-types').BillingCycleMonths,
-                      )
-                    }
-                    className="select select-sm"
-                    style={{ marginRight: 8, padding: '2px 8px' }}
-                    disabled={renewing}
-                    aria-label="续费周期"
-                  >
-                    <option value={1}>月付</option>
-                    <option value={3}>季付</option>
-                    <option value={6}>半年付</option>
-                    <option value={12}>年付</option>
-                  </select>
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => void handleRenew()}
-                    disabled={renewing}
-                    style={{ marginRight: 8 }}
-                  >
-                    {renewing ? '续费中…' : '立即续费'}
-                  </button>
+                  <span className="info-renew-display">
+                    <select
+                      value={renewCycle}
+                      onChange={(e) =>
+                        setRenewCycle(
+                          Number(e.target.value) as import('@public/interface_stub/shared-types').BillingCycleMonths,
+                        )
+                      }
+                      className="select select-sm info-compact-select"
+                      disabled={renewing}
+                      aria-label="续费周期"
+                    >
+                      <option value={1}>月付</option>
+                      <option value={3}>季付</option>
+                      <option value={6}>半年付</option>
+                      <option value={12}>年付</option>
+                    </select>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => void handleRenew()}
+                      disabled={renewing}
+                    >
+                      {renewing ? '续费中…' : '立即续费'}
+                    </button>
+                  </span>
                   {renewals.length > 0 && (
                     <button
                       type="button"
-                      className="btn btn-ghost btn-sm"
+                      className="btn btn-ghost btn-sm info-inline-hint"
                       onClick={() => setShowRenewals((v) => !v)}
                       aria-expanded={showRenewals}
                     >
@@ -1233,30 +1342,12 @@ export default function ServerDetailCore({
             )}
             {/* v3-billing: 续费记录列表（展开时显示最近 20 条） */}
             {billingSettings && showRenewals && renewals.length > 0 && (
-              <div className="info-row" style={{ alignItems: 'flex-start' }}>
+              <div className="info-row info-row-top">
                 <span className="info-label">续费明细</span>
-                <span className="info-value" style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      maxHeight: 200,
-                      overflowY: 'auto',
-                      borderRadius: 8,
-                      border: '1px solid var(--color-border, #e2e8f0)',
-                      padding: '4px 0',
-                    }}
-                  >
+                <span className="info-value info-value-flex">
+                  <div className="renewals-list">
                     {renewals.map((r) => (
-                      <div
-                        key={r.id}
-                        style={{
-                          display: 'flex',
-                          flexWrap: 'wrap',
-                          gap: 8,
-                          padding: '4px 12px',
-                          fontSize: 12,
-                          borderBottom: '1px solid var(--color-border-subtle, #f1f5f9)',
-                        }}
-                      >
+                      <div key={r.id} className="renewal-item">
                         <span className="mono">
                           {new Date(r.renewed_at).toLocaleString('zh-CN')}
                         </span>
@@ -1289,27 +1380,20 @@ export default function ServerDetailCore({
               <span className="info-label">磁盘占用</span>
               <span className="info-value">
                 <span
-                  className="mono"
-                  style={
-                    server.disk_usage_bytes != null &&
-                    server.disk_usage_bytes > 10 * 1024 * 1024 * 1024
-                      ? { fontWeight: 'bold', color: 'var(--color-warning, #d97706)' }
-                      : undefined
-                  }
+                  className={`mono${server.disk_usage_bytes != null && server.disk_usage_bytes > 10 * 1024 * 1024 * 1024 ? ' disk-usage-warn' : ''}`}
                 >
                   {formatBytes(server.disk_usage_bytes)}
                 </span>
                 {server.disk_usage_updated_at && (
-                  <span className="info-hint" style={{ marginLeft: 8, fontSize: 12, opacity: 0.7 }}>
+                  <span className="info-hint info-hint-dim">
                     更新于 {new Date(server.disk_usage_updated_at).toLocaleString('zh-CN')}
                   </span>
                 )}
                 <button
                   type="button"
-                  className="btn btn-ghost btn-sm"
+                  className="btn btn-ghost btn-sm info-inline-hint"
                   onClick={() => void handleRefreshDiskUsage()}
                   disabled={refreshingDisk}
-                  style={{ marginLeft: 8 }}
                   aria-label="刷新磁盘占用"
                 >
                   {refreshingDisk ? '刷新中…' : '刷新'}
@@ -1330,10 +1414,9 @@ export default function ServerDetailCore({
                     <button
                       key={subdir}
                       type="button"
-                      className="btn btn-ghost btn-sm"
+                      className="btn btn-ghost btn-sm subdir-btn"
                       onClick={() => void handleCleanupSubdir(subdir)}
                       disabled={isRunning || isCleaning || cleaningSubdir !== null}
-                      style={{ marginRight: 4 }}
                       title={isRunning ? '实例运行中，无法清理' : `清理${subdirLabel}`}
                     >
                       {isCleaning ? `${subdirLabel}…` : subdirLabel}
@@ -1342,9 +1425,27 @@ export default function ServerDetailCore({
                 })}
               </span>
             </div>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* v4.x.0: 账户级绑定管理区块——仅当前用户已绑定该实例时显示（Task 6）
+          复用 GuildBind 导出的 AccountBindingRow，展示 VIP 等级 + 绑定时间 + 解绑按钮 */}
+      {myBinding && (
+        <div className="info-section-gap">
+          <h3 className="card-title info-section-title">
+            账户级绑定
+          </h3>
+          <AccountBindingRow
+            binding={myBinding}
+            serverName={server.name}
+            gameType={server.game_type}
+            busy={unbinding}
+            onUnbind={handleUnbind}
+          />
+        </div>
+      )}
 
       {/* v3.7.0-B6: Tab 警告条（基于 activeTab + displayState 动态显示） */}
       {activeTabWarning && (
@@ -1357,30 +1458,15 @@ export default function ServerDetailCore({
       {/* v3.7.0-B2: Tab 抽屉分组导航——4 组（runtime/config/ops/business），可折叠 */}
       {/* 五.10: WAI-ARIA Tabs 模式——aria-controls 关联面板 / 键盘 ←→ 切换 / tabindex roving */}
       {isMobileTabView ? (
-        <div className="mobile-tab-scroller" role="tablist" aria-label="移动端标签页">
-          {tabs.map((tabKey) => {
-            const key = String(tabKey);
-            const isBusinessPseudo = key === BUSINESS_TAB_KEY;
-            const active = activeTab === tabKey;
-            return (
-              <button
-                key={key}
-                role="tab"
-                aria-selected={active}
-                className={`mobile-tab-btn${active ? ' active' : ''}`}
-                onClick={() => {
-                  if (isBusinessPseudo) {
-                    navigate(businessPath);
-                    return;
-                  }
-                  switchTab(tabKey);
-                }}
-              >
-                {getTabLabel(key)}
-              </button>
-            );
-          })}
-        </div>
+        <TabSheetPicker
+          activeTab={activeTab}
+          groupedTabs={groupedTabs}
+          groupLabels={GROUP_LABELS}
+          getTabLabel={getTabLabel}
+          onSelectTab={switchTab}
+          onSelectBusiness={() => navigate(businessPath)}
+          businessTabKey={BUSINESS_TAB_KEY}
+        />
       ) : (
         <div className="tab-groups-2level">
           {/* 第一级：分组 pill */}
@@ -1480,7 +1566,7 @@ export default function ServerDetailCore({
       {/* 三.4: keep-alive——子页首次访问后保持挂载，切换 tab 用 display 隐藏，保留内部状态 */}
       {/* 五.10: 使用 TabPanel 统一注入 role="tabpanel" / aria-labelledby / id */}
       {/* 9.6: 移动端左右滑动切换 Tab */}
-      <div style={{ marginTop: 16 }} ref={tabContentRef}>
+      <div className="tab-content-gap" ref={tabContentRef}>
         <TabPanel
           tabKey="console"
           activeTab={activeTab}
@@ -1587,6 +1673,25 @@ export default function ServerDetailCore({
               <InstanceRoles serverId={server.id} />
             </LazyTabContent>
         </TabPanel>
+
+        {/* v4.38.0: 绑定申请管理（instance_admin+，仅私有实例显示——见 allTabs 过滤）
+            服主在此审批私有实例的绑定申请 + 开关申请通道
+            通过审批后自动创建 binding（vip_level=1），申请人无需再确认
+            v4.38.1: 支持自动审批开关（开启后申请即自动通过） */}
+        <TabPanel
+          tabKey="binding-requests"
+          activeTab={activeTab}
+          activated={activatedTabs.has('binding-requests')}
+        >
+          <LazyTabContent>
+            <BindingRequestsTab
+              serverId={server.id}
+              isPublic={server.is_public}
+              initialRequestsEnabled={server.binding_requests_enabled}
+              initialAutoApprove={server.auto_approve_binding_requests}
+            />
+          </LazyTabContent>
+        </TabPanel>
       </div>
 
       {/* 一.4: 删除二次确认弹窗 */}
@@ -1611,6 +1716,16 @@ export default function ServerDetailCore({
             onCancel={() => setShowStartupWizard(false)}
           />
         </Suspense>
+
+      {/* 启动选项弹窗（选择存档） */}
+      <Suspense fallback={null}>
+        <StartOptionsModal
+          open={showStartOptions}
+          serverId={server.id}
+          onConfirm={handleStartOptionsConfirm}
+          onCancel={handleStartOptionsCancel}
+        />
+      </Suspense>
 
       {/* 管理员修改有效期弹窗（v4.36.0 抽离为 ExpiryEditModal） */}
       {showExpiryEdit && (

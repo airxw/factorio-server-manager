@@ -36,6 +36,9 @@ interface CdkPreview {
   expires_at: string;
   status: string;
   server_id: string;
+  // v4.37.0: 可重复使用 CDK 预览字段
+  max_uses?: number;
+  use_count?: number;
 }
 
 /** 兑换成功结果卡片 */
@@ -43,16 +46,24 @@ function SuccessCard({
   code,
   followed,
   boundPlayerName,
+  remainingUses,
   onReset,
 }: {
   code: CdkCodeSummary;
   followed: boolean;
   boundPlayerName: string;
+  remainingUses: number | null;
   onReset: () => void;
 }) {
   const items = code.items.length > 0
     ? code.items
     : [{ item_name: code.item_name, count: code.count, quality: code.quality }];
+
+  // v4.37.0: 多次用 CDK 兑换后展示剩余次数提示
+  const showRemaining = remainingUses !== null;
+  const remainingText = remainingUses === 0
+    ? '该 CDK 已达兑换上限'
+    : `该 CDK 还可被兑换 ${remainingUses} 次`;
 
   return (
     <div className="gp-card-strong gp-pop-in" style={{ padding: 24, textAlign: 'center' }}>
@@ -104,6 +115,26 @@ function SuccessCard({
       <p style={{ margin: '14px 0 0', fontSize: 12, color: '#86868B' }}>
         奖励已发放到游戏角色 <strong style={{ color: '#1D1D1F' }}>{boundPlayerName}</strong>，请上线查收
       </p>
+      {showRemaining && (
+        <div style={{
+          marginTop: 12,
+          padding: '10px 14px',
+          borderRadius: 10,
+          background: remainingUses === 0 ? 'rgba(255,149,0,0.1)' : 'rgba(0,122,255,0.08)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+          justifyContent: 'center',
+        }}>
+          <span style={{
+            fontSize: 12,
+            fontWeight: 500,
+            color: remainingUses === 0 ? '#FF9500' : '#007AFF',
+          }}>
+            {remainingText}
+          </span>
+        </div>
+      )}
       {followed && (
         <div style={{
           marginTop: 12,
@@ -147,7 +178,7 @@ export default function GuildCdk() {
   const [preview, setPreview] = useState<CdkPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [redeeming, setRedeeming] = useState(false);
-  const [success, setSuccess] = useState<{ code: CdkCodeSummary; followed: boolean; playerName: string } | null>(null);
+  const [success, setSuccess] = useState<{ code: CdkCodeSummary; followed: boolean; playerName: string; remainingUses: number | null } | null>(null);
 
   const loadBindings = useCallback(async () => {
     setLoadingBindings(true);
@@ -219,7 +250,7 @@ export default function GuildCdk() {
     try {
       const res = await api.redeemCdkGlobal({ code: trimmedCode, player_name: trimmedPlayer });
       if (res.delivered) {
-        setSuccess({ code: res.code, followed: res.followed, playerName: trimmedPlayer });
+        setSuccess({ code: res.code, followed: res.followed, playerName: trimmedPlayer, remainingUses: res.remaining_uses });
         setCode('');
         setPlayerName('');
         setPreview(null);
@@ -248,6 +279,7 @@ export default function GuildCdk() {
         code={success.code}
         followed={success.followed}
         boundPlayerName={success.playerName}
+        remainingUses={success.remainingUses}
         onReset={handleReset}
       />
     );
@@ -336,6 +368,16 @@ export default function GuildCdk() {
                 </span>
               )}
             </div>
+            {/* v4.37.0: 多次用 CDK 预览提示剩余次数 */}
+            {preview.max_uses !== undefined && preview.max_uses !== 1 && preview.use_count !== undefined && (
+              <p style={{ margin: '10px 0 0', fontSize: 12, color: '#86868B' }}>
+                {preview.max_uses === 0
+                  ? `可重复兑换（已兑换 ${preview.use_count} 次）`
+                  : preview.use_count >= preview.max_uses
+                    ? '该 CDK 已达兑换上限'
+                    : `可重复兑换：剩余 ${preview.max_uses - preview.use_count}/${preview.max_uses} 次`}
+              </p>
+            )}
           </div>
         )}
 

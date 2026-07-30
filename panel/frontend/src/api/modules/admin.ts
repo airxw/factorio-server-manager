@@ -231,6 +231,7 @@ export interface AdminApi {
     limit?: number,
   ): Promise<import('@public/schema/panel-api-types').DiscoverListResponse>;
   // v4.8.0-K1: 服务器推荐位管理（server_admin）
+  // v4.38.0: visibility 下放给 owner/instance_admin（requireInstanceAdmin）
   setServerVisibility(
     serverId: string,
     isPublic: boolean,
@@ -239,6 +240,16 @@ export interface AdminApi {
     serverId: string,
     isRecommended: boolean,
   ): Promise<{ success: true }>;
+  /**
+   * v4.38.0 / v4.38.1: 设置实例的绑定申请通道 + 自动审批开关（PUT /api/admin/servers/:id/binding-requests-settings）
+   * 权限：owner / instance_admin / server_admin
+   * 语义：只对私有实例（is_public=0）有意义；公开实例调用此端点返回 200 但无实际效果
+   * v4.38.1: 支持同时/单独设置 auto_approve_binding_requests 字段
+   */
+  setBindingRequestsSettings(
+    serverId: string,
+    settings: import('@public/schema/panel-api-types').SetBindingRequestsSettingsRequest,
+  ): Promise<import('@public/schema/panel-api-types').SetBindingRequestsSettingsResponse>;
 
   // v4.8.0-L1: 好友系统（已登录用户）
   sendFriendRequest(

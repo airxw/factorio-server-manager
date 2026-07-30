@@ -102,6 +102,11 @@ export const mockServersResponse: ListServersResponse = {
       expires_at: null,
       expiry_status: 'permanent',
       node_name: '主节点',
+      // v4.38.0: 平台级公开标记 + 绑定申请通道开关
+      // v4.38.1: 自动审批开关
+      is_public: true,
+      binding_requests_enabled: false,
+      auto_approve_binding_requests: false,
       created_at: '2025-06-01T00:00:00.000Z',
       updated_at: '2025-06-01T00:00:00.000Z',
     },
@@ -265,6 +270,32 @@ export const handlers = [
     const unauth = requireAuth(request);
     if (unauth) return unauth;
     return HttpResponse.json(mockServersResponse);
+  }),
+
+  // v4.38.0: GET /api/servers/bindable — 服务器市场列表（公开实例 + 自己 owner 的实例）
+  // Mock 默认返回 1 个公开可绑定实例（基于 mockServersResponse.srv-001 派生）
+  http.get('/api/servers/bindable', ({ request }) => {
+    const unauth = requireAuth(request);
+    if (unauth) return unauth;
+    const user = getUserFromRequest(request);
+    const userId = user?.id ?? 'user-user-001';
+    const servers = mockServersResponse.servers.map((s) => ({
+      id: s.id,
+      name: s.name,
+      game_type: s.game_type,
+      pack_id: s.pack_id,
+      status: s.status,
+      is_public: s.is_public,
+      owner_username: s.owner_username,
+      is_owner: s.owner_user_id === userId,
+      is_bound: false,
+      has_pending_request: false,
+      can_direct_bind: s.is_public || s.owner_user_id === userId,
+      can_request_bind: !s.is_public && s.owner_user_id !== userId && s.binding_requests_enabled,
+      binding_requests_enabled: s.binding_requests_enabled,
+      created_at: s.created_at,
+    }));
+    return HttpResponse.json({ servers, total: servers.length });
   }),
 
   // 七.2: GET /api/servers/:id — 返回单个服务器详情
@@ -547,6 +578,7 @@ export const handlers = [
   // POST /api/player-bindings/:id/verify
   // v4.19.3: 响应体改用统一 Binding 契约
   // v4.27.0: scope_type='instance', scope_ref=server_id（与 POST 创建响应语义对齐）
+  // v4.x.0: 验证通过后 vip_level=1（强制绑定才有 VIP，与 instanceBindingService.verifyBindingByCode 对齐）
   http.post('/api/player-bindings/:id/verify', async ({ request, params }) => {
     const unauth = requireAuth(request);
     if (unauth) return unauth;
@@ -559,7 +591,7 @@ export const handlers = [
         scope_type: 'instance' as const,
         scope_ref: 'srv-001',
         player_name: 'MockPlayer',
-        vip_level: 0,
+        vip_level: 1,
         wallet_id: null,
         verify_status: 'verified' as const,
         verify_code: body.verify_code,
