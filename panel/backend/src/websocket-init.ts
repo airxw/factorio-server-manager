@@ -167,6 +167,9 @@ export function initWebSocket(server: http.Server, deps: WebSocketDeps): WebSock
     onConnect: () => {
       logger.info('Daemon WS 已连接，事件流就绪');
       // v4.4.0-N1: 重连后全量状态同步：拉取 Daemon 实例列表覆盖 DB，修复断连期间丢失的状态变更
+      // v4.36.1: 补充反向同步——Daemon 重启后内存表清空，DB 中 running/starting 的实例
+      //          在 Daemon 侧已无记录（进程丢失），需标记为 stopped，否则用户操作时会
+      //          触发 "Instance not found" 错误（DB=running 但 Daemon 内存表为空）。
       // 订阅恢复由 DaemonEventStream.resubscribeAll() 内部处理（基于跟踪集），
       // 此处不再为所有实例盲订 — 订阅完全由前端引用计数驱动
       void (async () => {
@@ -174,6 +177,9 @@ export function initWebSocket(server: http.Server, deps: WebSocketDeps): WebSock
           const daemonHttp = new DaemonHttpClient({ baseUrl: DAEMON_URL, token: DAEMON_TOKEN });
           const resp = await daemonHttp.listInstances();
           const now = new Date().toISOString();
+          const daemonIds = new Set(resp.instances.map((i) => i.id));
+
+          // 1. 正向同步：Daemon 存在的实例状态 → DB
           let synced = 0;
           for (const inst of resp.instances) {
             await db('servers').where({ id: inst.id }).update({
@@ -182,6 +188,41 @@ export function initWebSocket(server: http.Server, deps: WebSocketDeps): WebSock
             });
             synced++;
           }
+
+          // 2. 反向同步：DB 中 running/starting 但 Daemon 无记录 → stopped
+          //    （Daemon 重启后内存表清空，这些实例的进程已丢失）
+          if (daemonIds.size === 0) {
+            // Daemon 内存表完全为空：所有 DB 中的活跃实例都是孤儿
+            const orphans = await db('servers')
+              .whereIn('status', ['running', 'starting'])
+              .select('id', 'name');
+            if (orphans.length > 0) {
+              await db('servers')
+                .whereIn('status', ['running', 'starting'])
+                .update({ status: 'stopped', updated_at: now });
+              logger.warn(
+                { count: orphans.length, ids: orphans.map((o) => o.id) },
+                'Daemon 重连后检测到孤儿实例（DB=running/starting 但 Daemon 内存表为空），已标记为 stopped',
+              );
+            }
+          } else {
+            // Daemon 有部分实例：仅清理不在 Daemon 列表中的活跃实例
+            const orphans = await db('servers')
+              .whereIn('status', ['running', 'starting'])
+              .whereNotIn('id', [...daemonIds])
+              .select('id', 'name');
+            if (orphans.length > 0) {
+              await db('servers')
+                .whereIn('status', ['running', 'starting'])
+                .whereNotIn('id', [...daemonIds])
+                .update({ status: 'stopped', updated_at: now });
+              logger.warn(
+                { count: orphans.length, ids: orphans.map((o) => o.id) },
+                'Daemon 重连后检测到孤儿实例（DB=running/starting 但 Daemon 无记录），已标记为 stopped',
+              );
+            }
+          }
+
           if (synced > 0) {
             logger.info({ synced }, 'Daemon WS 重连后已全量同步实例状态到 DB');
           }

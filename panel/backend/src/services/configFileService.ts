@@ -26,9 +26,9 @@ import type { FileReadResponse } from '@public/schema/daemon-api-types';
 import {
   InstanceNotFoundError,
   PackNotFoundError,
-  PackCapabilityNotDeclaredError,
   ConfigFileNotFoundError,
   ConfigFileReadOnlyError,
+  ValidationError,
 } from './errors.js';
 
 // ----- Server 行类型 -----
@@ -58,23 +58,52 @@ export class ConfigFileServiceImpl {
   ) {}
 
   /**
-   * 列出 Pack 声明的所有 config_files 元信息。
+   * 列出配置文件元信息（Pack 声明 + 用户自定义）。
    *
    * v4.33.0：path 返回渲染后的相对路径（如 `config/server-settings.json`），
    *          而非原始模板 `{{config_dir}}/server-settings.json`，让前端能展示真实文件位置。
    */
   async listConfigFiles(serverId: string): Promise<ConfigFileMeta[]> {
     const pack = await this.resolveServerPack(serverId);
-    if (!pack.config_files || pack.config_files.length === 0) {
-      return [];
+    const result: ConfigFileMeta[] = [];
+    const packNames = new Set<string>();
+
+    // Pack 声明的配置文件
+    if (pack.config_files && pack.config_files.length > 0) {
+      const { instanceRoot, vars } = this.buildPathVars(serverId, pack);
+      for (const f of pack.config_files) {
+        packNames.add(f.name);
+        result.push({
+          name: f.name,
+          path: toRelPath(renderTemplate(f.path, vars), instanceRoot),
+          format: f.format,
+          read_only: f.read_only,
+        });
+      }
     }
-    const { instanceRoot, vars } = this.buildPathVars(serverId, pack);
-    return pack.config_files.map((f) => ({
-      name: f.name,
-      path: toRelPath(renderTemplate(f.path, vars), instanceRoot),
-      format: f.format,
-      read_only: f.read_only,
-    }));
+
+    // 用户自定义配置文件（config/ 目录下的文件，排除 Pack 声明的）
+    try {
+      const { nodeId } = await this.resolveServerPackWithNode(serverId);
+      const listing = await this.daemonClient.listFiles(nodeId, serverId, 'config');
+      for (const entry of listing.entries) {
+        if (entry.type !== 'file') continue;
+        const fmt = formatFromPath(entry.name);
+        if (!fmt) continue;
+        const name = dropExtension(entry.name);
+        if (packNames.has(name)) continue; // 排除 Pack 已声明的
+        result.push({
+          name,
+          path: `config/${entry.name}`,
+          format: fmt,
+          read_only: false,
+        });
+      }
+    } catch {
+      // config 目录不存在或 daemon 不可达时忽略（不影响 Pack 文件列表）
+    }
+
+    return result;
   }
 
   /**
@@ -88,9 +117,7 @@ export class ConfigFileServiceImpl {
    */
   async readConfigFile(serverId: string, configName: string): Promise<unknown> {
     const { pack, nodeId } = await this.resolveServerPackWithNode(serverId);
-    const { configFile } = this.requireConfigFile(pack, configName);
-
-    const relPath = await this.resolveConfigRelPath(serverId, pack, configFile);
+    const { relPath, format } = await this.resolveConfigFileInfo(pack, nodeId, serverId, configName);
     let content: string;
     try {
       const resp: FileReadResponse = await this.daemonClient.readFile(nodeId, serverId, relPath);
@@ -111,7 +138,7 @@ export class ConfigFileServiceImpl {
       }
       throw err;
     }
-    return parseByFormat(content, configFile.format);
+    return parseByFormat(content, format);
   }
 
   /**
@@ -131,29 +158,69 @@ export class ConfigFileServiceImpl {
     data: unknown,
   ): Promise<void> {
     const { pack, nodeId } = await this.resolveServerPackWithNode(serverId);
-    const { configFile } = this.requireConfigFile(pack, configName);
+    const { relPath, format, readOnly } = await this.resolveConfigFileInfo(pack, nodeId, serverId, configName);
 
-    if (configFile.read_only) {
+    if (readOnly) {
       throw new ConfigFileReadOnlyError(
         `配置文件 ${configName} 只读，禁止写入`,
       );
     }
 
-    const relPath = await this.resolveConfigRelPath(serverId, pack, configFile);
-    const content = serializeByFormat(data, configFile.format);
+    const content = serializeByFormat(data, format);
     await this.daemonClient.writeFile(nodeId, serverId, relPath, { content });
   }
 
   /**
+   * 创建新的配置文件（用户自定义，非 Pack 声明）。
+   *
+   * 文件写入 `{instanceRoot}/config/{name}.{ext}`，ext 由 format 推导：
+   *   json→.json, yaml→.yaml, properties→.properties, ini→.ini
+   *
+   * @throws {ValidationError} 配置文件名称与 Pack 声明的 config_files 重名
+   */
+  async createConfigFile(
+    serverId: string,
+    name: string,
+    format: ConfigFormat,
+    content?: string,
+  ): Promise<ConfigFileMeta> {
+    const { pack, nodeId } = await this.resolveServerPackWithNode(serverId);
+
+    // 检查是否与 Pack 声明的配置重名
+    if (pack.config_files?.some((f) => f.name === name)) {
+      throw new ValidationError(
+        `配置文件名称 "${name}" 与 Pack 声明的配置重名，请使用其他名称`,
+      );
+    }
+
+    const ext = FORMAT_EXT[format];
+    const relPath = `config/${name}${ext}`;
+
+    const initialData = content
+      ? formatContentByFormat(content, format)
+      : defaultContentForFormat(format);
+    await this.daemonClient.writeFile(nodeId, serverId, relPath, {
+      content: initialData,
+    });
+
+    return { name, path: relPath, format, read_only: false };
+  }
+
+  /**
    * 获取配置文件的 schema（供前端渲染表单）。
+   * 用户自定义文件（非 Pack 声明）无 schema，返回空对象。
    */
   async getConfigFileSchema(
     serverId: string,
     configName: string,
   ): Promise<Record<string, unknown>> {
     const pack = await this.resolveServerPack(serverId);
-    const { configFile } = this.requireConfigFile(pack, configName);
-    return configFile.schema;
+    const packFile = pack.config_files?.find((f) => f.name === configName);
+    if (!packFile) {
+      // 用户自定义文件无 schema
+      return {};
+    }
+    return packFile.schema;
   }
 
   // -------------------------------------------------------------------------
@@ -188,23 +255,41 @@ export class ConfigFileServiceImpl {
     return { pack, nodeId: row.node_id };
   }
 
-  /** 查找 Pack.config_files 中指定 name 的配置；不存在抛错 */
-  private requireConfigFile(
+  /**
+   * 解析配置文件信息（Pack 声明 或 用户自定义）。
+   * @returns { relPath, format, readOnly }
+   * @throws {ConfigFileNotFoundError} 两者都找不到
+   */
+  private async resolveConfigFileInfo(
     pack: GamePack,
+    nodeId: string,
+    serverId: string,
     configName: string,
-  ): { configFile: PackConfigFile } {
-    if (!pack.config_files || pack.config_files.length === 0) {
-      throw new PackCapabilityNotDeclaredError(
-        `Pack ${pack.pack.id} 未声明 config_files`,
-      );
+  ): Promise<{ relPath: string; format: ConfigFormat; readOnly: boolean }> {
+    // 先查 Pack 声明
+    const packFile = pack.config_files?.find((f) => f.name === configName);
+    if (packFile) {
+      const relPath = await this.resolveConfigRelPath(serverId, pack, packFile);
+      return { relPath, format: packFile.format, readOnly: packFile.read_only };
     }
-    const configFile = pack.config_files.find((f) => f.name === configName);
-    if (!configFile) {
-      throw new ConfigFileNotFoundError(
-        `配置文件不存在: ${configName}`,
-      );
+
+    // 再查用户自定义（config/ 目录）
+    try {
+      const listing = await this.daemonClient.listFiles(nodeId, serverId, 'config');
+      for (const entry of listing.entries) {
+        if (entry.type !== 'file') continue;
+        const fmt = formatFromPath(entry.name);
+        if (!fmt) continue;
+        const name = dropExtension(entry.name);
+        if (name === configName) {
+          return { relPath: `config/${entry.name}`, format: fmt, readOnly: false };
+        }
+      }
+    } catch {
+      // config 目录不存在，继续抛错
     }
-    return { configFile };
+
+    throw new ConfigFileNotFoundError(`配置文件不存在: ${configName}`);
   }
 
   /** 构建路径渲染变量（listConfigFiles 与 resolveConfigRelPath 共用） */
@@ -364,6 +449,60 @@ function serializeIni(data: unknown): string {
 }
 
 // ----- 工厂 -----
+
+// ----- createConfigFile 辅助 -----
+
+/** format → 文件扩展名（含点） */
+const FORMAT_EXT: Record<ConfigFormat, string> = {
+  json: '.json',
+  yaml: '.yaml',
+  properties: '.properties',
+  ini: '.ini',
+};
+
+/** 从文件名推导 format，不匹配时返回 null */
+function formatFromPath(filename: string): ConfigFormat | null {
+  const lower = filename.toLowerCase();
+  if (lower.endsWith('.json')) return 'json';
+  if (lower.endsWith('.yaml') || lower.endsWith('.yml')) return 'yaml';
+  if (lower.endsWith('.properties')) return 'properties';
+  if (lower.endsWith('.ini')) return 'ini';
+  return null;
+}
+
+/** 去掉文件扩展名 */
+function dropExtension(filename: string): string {
+  const idx = filename.lastIndexOf('.');
+  return idx > 0 ? filename.slice(0, idx) : filename;
+}
+
+/** 各 format 默认初始内容 */
+function defaultContentForFormat(format: ConfigFormat): string {
+  switch (format) {
+    case 'json':
+    case 'yaml':
+      return '{}';
+    case 'properties':
+      return '# 新建配置文件\n';
+    case 'ini':
+      return '[default]\n';
+  }
+}
+
+/**
+ * 格式化用户提供的初始内容：JSON/YAML 尝试 parse 后重新序列化以确保格式正确，
+ * 失败则保持原始内容写入
+ */
+function formatContentByFormat(content: string, format: ConfigFormat): string {
+  if (format === 'json' || format === 'yaml') {
+    try {
+      return JSON.stringify(JSON.parse(content), null, 2);
+    } catch {
+      // parse 失败则保持原始内容
+    }
+  }
+  return content;
+}
 
 export function createConfigFileService(
   db: Knex,

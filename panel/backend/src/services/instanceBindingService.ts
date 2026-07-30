@@ -36,6 +36,8 @@ import {
   PlayerBindingMismatchError,
 } from './errors.js';
 import type { VerifyCodeSummary } from '@public/schema/panel-api-types';
+// v4.38.0: verifyBindingByCode 事务提交后 emit Panel 内部事件 + RCON 广播 VIP 欢迎语
+import { eventBus, PLAYER_BINDING_VERIFIED } from './eventBus.js';
 
 // ----- 类型 -----
 
@@ -72,7 +74,11 @@ interface UserRow {
 
 /** instance_admin / server_admin / owner 在实例上的固定 VIP 等级 */
 const OWNER_VIP_LEVEL = 5;
-/** 新绑定的默认 VIP 等级 */
+/**
+ * 游戏角色验证通过后赋予的默认 VIP 等级（仅 verifyBindingByCode 使用）。
+ * v4.38.0 spec 决策 1：bindInstance 创建的账户级绑定 vip_level=0（无 VIP），
+ * VIP 仅在 verifyBindingByCode 游戏角色验证通过后赋予。
+ */
 const DEFAULT_BOUND_VIP_LEVEL = 1;
 
 /** 游戏内 !verify 验证码 TTL：5 分钟 */
@@ -113,16 +119,58 @@ interface BindingMetadata {
   [key: string]: unknown;
 }
 
+// ----- v4.38.0: verifyBindingByCode RCON 广播依赖（模块级 setter 注入） -----
+//
+// 依赖注入方式说明（tasks.md Task 3 步骤 2）：
+//   verifyBindingByCode 是模块级导出函数（非类方法，无构造器 DI）。
+//   playerService / daemonClientService 在 services-init.ts 中通过工厂函数实例化，
+//   非 module-level singleton，无法直接 import。采用模块级 setter 模式
+//   （services-init 注入的一种形式，tasks.md 明确允许并要求说明）：
+//   - services-init.ts 创建完 playerService / daemonClientService 后调用 setInstanceBindingServiceDeps
+//   - 测试通过 setInstanceBindingServiceDeps 注入 mock
+//   - 未注入时 _deps=null，verifyBindingByCode 静默跳过广播（不阻塞主流程）
+
+/** verifyBindingByCode 广播所需的下游服务（仅声明用到的子集方法，解耦具体类） */
+interface InstanceBindingServiceDeps {
+  playerService: {
+    getVipWelcomeMessage(serverId: string, vipLevel: number): Promise<string | null>;
+  };
+  daemonClientService: {
+    sendCommand(
+      nodeId: string,
+      serverId: string,
+      command: string,
+      requestId: string,
+    ): Promise<{ success: boolean; error?: string }>;
+  };
+}
+
+let _deps: InstanceBindingServiceDeps | null = null;
+
+/**
+ * 注入 verifyBindingByCode 广播所需的下游服务。
+ * 由 services-init.ts 在创建 playerService / daemonClientService 后调用。
+ * 传 null 重置（仅供测试隔离）。
+ */
+export function setInstanceBindingServiceDeps(deps: InstanceBindingServiceDeps | null): void {
+  _deps = deps;
+}
+
 // ----- 业务函数 -----
 
 /**
- * 绑定实例（user 调用），自动赋予 VIP1。
+ * 绑定实例（user 调用），创建账户级绑定（无 VIP）。
+ *
+ * v4.38.0 强制游戏角色绑定才能获得 VIP（spec 决策 1）：
+ *   - bindInstance 创建的账户级绑定 vip_level=0（不赋予 VIP）
+ *   - VIP 仅由 verifyBindingByCode 游戏角色验证路径赋予（vip_level=1）
+ *   - 直接绑定（公开实例）与审批通过（私有实例）均调用此函数，vip_level 行为统一为 0
  *
  * v4.17.0 实现：在 bindings 表中创建/复活 binding_type='account', scope_type='instance' 的记录。
  *
  * 逻辑：
- *   - 无记录 → INSERT (verify_status='verified', vip_level=1, verified_at=now)
- *   - 已有记录且 verify_status='revoked' → UPDATE 复活为 verified + vip_level=1
+ *   - 无记录 → INSERT (verify_status='verified', vip_level=0, verified_at=now)
+ *   - 已有记录且 verify_status='revoked' → UPDATE 复活为 verified + vip_level=0
  *   - 已有记录且 verify_status='verified' → 抛出 BindingAlreadyExistsError（路由层映射 409）
  *
  * 使用事务包裹 SELECT+INSERT/UPDATE，避免并发下的 TOCTOU 竞态。
@@ -158,7 +206,8 @@ export async function bindInstance(userId: string, serverId: string): Promise<vo
           scope_type: 'instance',
           scope_ref: serverId,
           player_name: null,
-          vip_level: DEFAULT_BOUND_VIP_LEVEL,
+          // v4.38.0 spec 决策 1：账户级绑定不赋予 VIP（vip_level=0），VIP 仅由 verifyBindingByCode 赋予
+          vip_level: 0,
           wallet_id: null,
           verify_status: 'verified',
           verify_code: null,
@@ -196,7 +245,8 @@ export async function bindInstance(userId: string, serverId: string): Promise<vo
       .where({ id: existing.id })
       .update({
         verify_status: 'verified',
-        vip_level: DEFAULT_BOUND_VIP_LEVEL,
+        // v4.38.0 spec 决策 1：账户级绑定不赋予 VIP（vip_level=0），VIP 仅由 verifyBindingByCode 赋予
+        vip_level: 0,
         verified_at: now,
         verify_code: null,
         verify_expires_at: null,
@@ -496,6 +546,12 @@ export async function generateVerifyCode(
  *   - 下游消费方已改为查 scope_type='instance', verify_status='verified'，step a 改 verified 的记录即可被查到
  *   - 不再需要查询 server.game_type（原用于全局绑定 scope_ref）
  *
+ * v4.38.0 改造（强制游戏角色绑定才能获得 VIP）：
+ *   - 事务提交后（非事务内），若为首次绑定或复活（existingAccountBinding.verify_status !== 'verified'），
+ *     emit Panel 内部事件 player.binding_verified + 调用 RCON say 广播 VIP 欢迎语
+ *   - 广播失败不阻塞 verify 主流程（仅记日志），详见 broadcastVipWelcome
+ *   - player.binding_verified 是 Panel 进程内事件，不进 public/schema/ws-events.ts 跨进程契约
+ *
  * @returns { success: true, message: '绑定验证成功' }
  */
 export async function verifyBindingByCode(
@@ -506,6 +562,8 @@ export async function verifyBindingByCode(
   const db = getDatabase();
   const now = new Date();
   const nowIso = now.toISOString();
+  // v4.38.0: 在事务内捕获是否需要广播（首次绑定 / 复活），事务外执行广播
+  let shouldBroadcast = false;
 
   // 分步校验：先按 code 查找 pending 记录，再逐项检查以提供精确错误信息
   const verifyRow = await db<BindingRow>('bindings')
@@ -591,6 +649,8 @@ export async function verifyBindingByCode(
           created_at: nowIso,
           updated_at: nowIso,
         });
+        // v4.38.0: 首次绑定 → 事务提交后广播 VIP 欢迎语
+        shouldBroadcast = true;
       } catch (err) {
         if (isUniqueConstraintError(err)) {
           // 并发场景下 partial UNIQUE 拒绝重复 verified 记录，幂等保留
@@ -617,11 +677,107 @@ export async function verifyBindingByCode(
           }),
           updated_at: nowIso,
         });
+      // v4.38.0: 复活绑定 → 事务提交后广播 VIP 欢迎语
+      shouldBroadcast = true;
     }
     // verify_status === 'verified' → 幂等保留，不抛错（验证路径应保证访问权）
+    // v4.38.0: 已 verified 不广播（避免重复广播）
   });
 
+  // v4.38.0: 事务提交后广播 VIP 欢迎语（非事务内，避免事务回滚导致假广播）
+  // 广播失败仅记日志，不阻塞 verify 主流程（verify 已成功）
+  if (shouldBroadcast) {
+    await broadcastVipWelcome(serverId, userId, gamePlayerName, DEFAULT_BOUND_VIP_LEVEL, nowIso);
+  }
+
   return { success: true, message: '绑定验证成功' };
+}
+
+/**
+ * v4.38.0: verifyBindingByCode 事务提交后广播 VIP 欢迎语。
+ *
+ * 调用链：
+ *   1. emit Panel 内部事件 player.binding_verified（审计/日志用，不进 public/ 契约）
+ *   2. 查询 servers.node_id（RCON 目标节点）
+ *   3. 调用 playerService.getVipWelcomeMessage 获取欢迎语模板
+ *   4. 模板变量替换 {player_name} / {vip_level}
+ *   5. 调用 daemonClient.sendCommand(nodeId, serverId, 'say ' + 欢迎语, requestId)
+ *
+ * 错误处理（不抛错，verify 已成功）：
+ *   - _deps 未注入 → 静默跳过
+ *   - servers.node_id 查询失败 → 记录 error 日志
+ *   - getVipWelcomeMessage 返回空 → 静默跳过（vip_welcome_messages 未配置）
+ *   - sendCommand 失败 → 记录 warning 日志
+ */
+async function broadcastVipWelcome(
+  serverId: string,
+  userId: string,
+  playerName: string,
+  vipLevel: number,
+  verifiedAt: string,
+): Promise<void> {
+  // 1. emit Panel 内部事件（审计/日志订阅用）
+  eventBus.emit(PLAYER_BINDING_VERIFIED, {
+    type: 'player.binding_verified',
+    server_id: serverId,
+    user_id: userId,
+    player_name: playerName,
+    vip_level: vipLevel,
+    verified_at: verifiedAt,
+  });
+
+  // _deps 未注入时静默跳过（测试环境 / services-init 未调用）
+  if (!_deps) {
+    return;
+  }
+
+  try {
+    // 2. 查询 servers.node_id
+    const db = getDatabase();
+    const server = await db<{ node_id: string }>('servers')
+      .select('node_id')
+      .where('id', serverId)
+      .first();
+    if (!server) {
+      console.error(
+        `[instanceBindingService] broadcastVipWelcome: server not found, cannot resolve node_id (server=${serverId})`,
+      );
+      return;
+    }
+    const nodeId = server.node_id;
+
+    // 3. 获取 VIP 欢迎语模板
+    const template = await _deps.playerService.getVipWelcomeMessage(serverId, vipLevel);
+    if (!template) {
+      // vip_welcome_messages 未配置或无匹配等级 → 静默跳过
+      return;
+    }
+
+    // 4. 模板变量替换
+    const message = template
+      .replaceAll('{player_name}', playerName)
+      .replaceAll('{vip_level}', String(vipLevel));
+
+    // 5. 发送 RCON say 命令（requestId 生成模式参考 backupService.ts#L576）
+    const requestId = `${serverId}-verify-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const result = await _deps.daemonClientService.sendCommand(
+      nodeId,
+      serverId,
+      `say ${message}`,
+      requestId,
+    );
+    if (!result.success) {
+      console.warn(
+        `[instanceBindingService] broadcastVipWelcome: sendCommand failed (server=${serverId}, error=${result.error ?? 'unknown'})`,
+      );
+    }
+  } catch (err) {
+    // node_id 查询失败或其他异常 → 记录 error 日志，不阻塞 verify 主流程
+    console.error(
+      `[instanceBindingService] broadcastVipWelcome: unexpected error (server=${serverId})`,
+      err,
+    );
+  }
 }
 
 /**

@@ -58,7 +58,7 @@ panel/backend/
 4. **WS 服务端**：`websocket/server.ts` 实现 Panel→Frontend WS，按 server_id 隔离订阅，JWT query 鉴权
 5. **预设 admin**：seed 脚本创建 system_admin 账号，无注册流程
 6. **Pack Registry**：从 `packs/` 目录加载 YAML，用 `public/schema/pack-schema.ts` 校验
-7. **端口**：Panel 后端监听 3000
+7. **端口**：Panel 后端监听 127.0.0.1:3002（仅本机，nginx 3001 反代，见 0.md）
 
 ## 依赖的契约入口
 
@@ -71,7 +71,7 @@ panel/backend/
 
 - `GET /api/health` 返回 200
 - `POST /api/auth/login` 返回 JWT
-- WS 连接 `ws://localhost:3000/ws?token=<jwt>` 成功
+- WS 连接 `ws://127.0.0.1:3002/ws?token=<jwt>` 成功（Panel 内部端口，见 0.md）
 - 无 token / 错误 token 访问受保护路由返回 401
 
 ## 失败回退

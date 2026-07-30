@@ -5,6 +5,7 @@
 //
 // 挂载前缀：/api/servers（index.ts 仅套 authenticateToken）
 //   GET    /:serverId/config-files           → listConfigFiles
+//   POST   /:serverId/config-files           → createConfigFile
 //   GET    /:serverId/config-files/:name      → readConfigFile
 //   PUT    /:serverId/config-files/:name      → writeConfigFile
 //   GET    /:serverId/config-files/:name/schema → getConfigFileSchema
@@ -21,6 +22,8 @@ import type {
   WriteConfigFileRequest,
   WriteConfigFileResponse,
   GetConfigFileSchemaResponse,
+  CreateConfigFileRequest,
+  CreateConfigFileResponse,
   PanelErrorResponse,
 } from '@public/schema/panel-api-types';
 
@@ -112,6 +115,39 @@ export function createConfigFilesRouter(): Router {
       const schema = await service.getConfigFileSchema(req.params.serverId, name);
       const response: GetConfigFileSchemaResponse = { name, schema };
       res.json(response);
+    } catch (err) {
+      handleConfigFileError(res, err);
+    }
+  });
+
+  // POST /api/servers/:serverId/config-files — 创建新配置文件
+  router.post('/:serverId/config-files', requireInstanceAdmin(), async (req, res) => {
+    try {
+      const service = req.app.locals.configFileService as ConfigFileServiceImpl;
+      const body = req.body as Partial<CreateConfigFileRequest>;
+      if (!body.name || typeof body.name !== 'string') {
+        const errBody: PanelErrorResponse = {
+          error: { code: 'PANEL_VALIDATION_ERROR', message: '缺少 name 字段' },
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      if (!body.format || !['json', 'yaml', 'properties', 'ini'].includes(body.format)) {
+        const errBody: PanelErrorResponse = {
+          error: { code: 'PANEL_VALIDATION_ERROR', message: 'format 必须为 json / yaml / properties / ini' },
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      const name = sanitizeFilename(body.name);
+      const configFile = await service.createConfigFile(
+        req.params.serverId,
+        name,
+        body.format as 'json' | 'yaml' | 'properties' | 'ini',
+        body.content,
+      );
+      const response: CreateConfigFileResponse = { config_file: configFile };
+      res.status(201).json(response);
     } catch (err) {
       handleConfigFileError(res, err);
     }

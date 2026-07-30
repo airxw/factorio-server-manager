@@ -1,5 +1,5 @@
 // ============================================================================
-// discover.ts — 服务器推荐位路由（v4.8.0 K1）
+// discover.ts — 服务器推荐位路由（v4.8.0 K1 / v4.38.0 权限下放）
 //
 // 导出两个路由工厂：
 //   1. createDiscoverRouter(db, logger) — 公开列表端点（无需认证，挂载 /api/discover）
@@ -8,23 +8,27 @@
 //      GET /recommended  — 推荐服（is_recommended=1，按 recommended_at DESC）
 //
 //   2. createDiscoverAdminRouter(db, logger) — 管理端点（挂载 /api/admin/servers）
-//      PUT /:serverId/visibility — 设置公开/私有（body: { is_public: boolean }）
-//      PUT /:serverId/recommend  — 设置/取消推荐（body: { is_recommended: boolean }）
-//      权限：requireAdmin（在 index.ts 挂载时套 authenticateToken + requireAdmin）
+//      PUT /:serverId/visibility                    — 设置公开/私有（v4.38.0 下放给 owner/instance_admin）
+//      PUT /:serverId/recommend                     — 设置/取消推荐（仅 server_admin）
+//      PUT /:serverId/binding-requests-settings     — 申请通道开关（v4.38.0 新增，owner/instance_admin）
+//      权限：路由内部逐端点校验（挂载层仅 authenticateToken）
 //
 // 说明：
 // - servers 表无 online_players 字段，响应中 online_players 固定为 0，
 //   热门排序降级为 is_recommended DESC, created_at DESC
-// - DB 以 INTEGER 0/1 存储 is_public/is_recommended，API 层转换为 boolean
+// - DB 以 INTEGER 0/1 存储 is_public/is_recommended/binding_requests_enabled/auto_approve_binding_requests，API 层转换为 boolean
 // ============================================================================
 
 import { Router, type Response } from 'express';
 import type { Knex } from 'knex';
 import type { Logger } from 'pino';
+import { requireAdmin, requireInstanceAdmin } from '../../middleware/auth.js';
 import type {
   DiscoverListResponse,
   DiscoverServer,
   PanelErrorResponse,
+  SetBindingRequestsSettingsRequest,
+  SetBindingRequestsSettingsResponse,
   SetServerRecommendRequest,
   SetServerVisibilityRequest,
 } from '@public/schema/panel-api-types';
@@ -175,8 +179,9 @@ export function createDiscoverAdminRouter(db: Knex, logger: Logger): Router {
 
   // ----------------------------------------------------------------
   // PUT /:serverId/visibility — 设置公开/私有
+  //   v4.38.0: 权限下放给 owner/instance_admin（原仅 server_admin）
   // ----------------------------------------------------------------
-  router.put('/:serverId/visibility', async (req, res) => {
+  router.put('/:serverId/visibility', requireInstanceAdmin('serverId'), async (req, res) => {
     try {
       const serverId = req.params.serverId;
       const body = req.body as Partial<SetServerVisibilityRequest>;
@@ -205,9 +210,9 @@ export function createDiscoverAdminRouter(db: Knex, logger: Logger): Router {
   });
 
   // ----------------------------------------------------------------
-  // PUT /:serverId/recommend — 设置/取消推荐
+  // PUT /:serverId/recommend — 设置/取消推荐（仅 server_admin）
   // ----------------------------------------------------------------
-  router.put('/:serverId/recommend', async (req, res) => {
+  router.put('/:serverId/recommend', requireAdmin, async (req, res) => {
     try {
       const serverId = req.params.serverId;
       const body = req.body as Partial<SetServerRecommendRequest>;
@@ -236,6 +241,69 @@ export function createDiscoverAdminRouter(db: Knex, logger: Logger): Router {
           recommended_at: body.is_recommended ? now : null,
         });
       res.json({ server_id: serverId, is_recommended: body.is_recommended });
+    } catch (err) {
+      handleError(res, err, logger);
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // PUT /:serverId/binding-requests-settings — 申请通道开关 + 自动审批开关（v4.38.0 / v4.38.1）
+  //   权限：owner/instance_admin/server_admin（requireInstanceAdmin）
+  //   语义：只对私有实例（is_public=0）有意义；公开实例调用此端点返回 200 但无实际效果
+  //   v4.38.1: 支持同时/单独设置 auto_approve_binding_requests 字段
+  // ----------------------------------------------------------------
+  router.put('/:serverId/binding-requests-settings', requireInstanceAdmin('serverId'), async (req, res) => {
+    try {
+      const serverId = req.params.serverId;
+      const body = req.body as Partial<SetBindingRequestsSettingsRequest>;
+
+      // 至少传一个字段；两者都为 undefined 时报校验错
+      const hasEnabled = typeof body.binding_requests_enabled === 'boolean';
+      const hasAutoApprove = typeof body.auto_approve_binding_requests === 'boolean';
+      if (!hasEnabled && !hasAutoApprove) {
+        const errBody: PanelErrorResponse = {
+          error: {
+            code: 'PANEL_VALIDATION_ERROR',
+            message: '至少传一个字段：binding_requests_enabled 或 auto_approve_binding_requests（必须为 boolean）',
+          },
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+
+      const exists = await db<{ id: string }>('servers').select('id').where('id', serverId).first();
+      if (!exists) {
+        const errBody: PanelErrorResponse = {
+          error: { code: 'SERVER_NOT_FOUND', message: `实例不存在: ${serverId}` },
+        };
+        res.status(404).json(errBody);
+        return;
+      }
+
+      // 取当前值（用于未传字段的回填 + 响应）
+      const current = await db<{ binding_requests_enabled: number; auto_approve_binding_requests: number }>('servers')
+        .select('binding_requests_enabled', 'auto_approve_binding_requests')
+        .where('id', serverId)
+        .first();
+      const finalEnabled = hasEnabled ? (body.binding_requests_enabled ? 1 : 0) : current!.binding_requests_enabled;
+      const finalAutoApprove = hasAutoApprove
+        ? (body.auto_approve_binding_requests ? 1 : 0)
+        : current!.auto_approve_binding_requests;
+
+      const updateFields: { binding_requests_enabled?: number; auto_approve_binding_requests?: number } = {};
+      if (hasEnabled) updateFields.binding_requests_enabled = body.binding_requests_enabled ? 1 : 0;
+      if (hasAutoApprove) updateFields.auto_approve_binding_requests = body.auto_approve_binding_requests ? 1 : 0;
+
+      if (Object.keys(updateFields).length > 0) {
+        await db('servers').where('id', serverId).update(updateFields);
+      }
+
+      const response: SetBindingRequestsSettingsResponse = {
+        server_id: serverId,
+        binding_requests_enabled: finalEnabled === 1,
+        auto_approve_binding_requests: finalAutoApprove === 1,
+      };
+      res.json(response);
     } catch (err) {
       handleError(res, err, logger);
     }

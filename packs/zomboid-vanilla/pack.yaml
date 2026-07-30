@@ -99,11 +99,11 @@ ui:
     - { tab: console,      group: runtime,  order: 10, require_state: [stopped, starting, running, stopping, error] }
     - { tab: config-files, group: config,   order: 10, require_state: [stopped, starting, running, error] }
     - { tab: players,      group: runtime,  order: 40, require_state: [stopped, running, stopping, error] }
-    - { tab: saves,        group: ops,      order: 10, require_state: [stopped, error] }
-    - { tab: mods,         group: ops,      order: 20, require_state: [stopped, error] }
+    - { tab: saves,        group: config,   order: 30, require_state: [stopped, error] }
+    - { tab: mods,         group: config,   order: 40, require_state: [stopped, error] }
     - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
     - { tab: shop-admin,   group: business, order: 10, require_state: [stopped, starting, running, stopping, error] }
-    - { tab: update,       group: ops,      order: 30, require_state: [stopped, error] }
+    - { tab: update,       group: config,   order: 50, require_state: [stopped, error] }
 
 resources:
   min_ram: '4G'

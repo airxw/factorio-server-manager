@@ -71,6 +71,8 @@ interface ShopOrderRow {
   expires_at: string;
   claimed_player: string | null;
   created_at: string;
+  /** v4.36.1: LEFT JOIN users.username 得到，用户被删除时为 null */
+  buyer_username?: string | null;
 }
 
 interface ShopOrderItemRow {
@@ -345,7 +347,11 @@ export class ShopServiceImpl {
     serverId: string,
     filter?: { userId?: string; status?: string },
   ): Promise<ShopOrderSummary[]> {
-    const q = this.db<ShopOrderRow>('shop_orders').where({ server_id: serverId });
+    // v4.36.1: LEFT JOIN users 取 buyer_username，供 admin「销售记录」展示
+    const q = this.db<ShopOrderRow>('shop_orders')
+      .leftJoin('users', 'shop_orders.user_id', 'users.id')
+      .select('shop_orders.*', 'users.username as buyer_username')
+      .where({ server_id: serverId });
     if (filter?.userId) {
       q.andWhere({ user_id: filter.userId });
     }
@@ -360,7 +366,10 @@ export class ShopServiceImpl {
     serverId: string,
     orderId: number,
   ): Promise<{ order: ShopOrderSummary; items: ShopOrderItemSummary[] }> {
+    // v4.36.1: LEFT JOIN users 取 buyer_username
     const orderRow = await this.db<ShopOrderRow>('shop_orders')
+      .leftJoin('users', 'shop_orders.user_id', 'users.id')
+      .select('shop_orders.*', 'users.username as buyer_username')
       .where({ server_id: serverId, id: orderId })
       .first();
     if (!orderRow) {
@@ -586,6 +595,8 @@ function toShopOrderSummary(row: ShopOrderRow): ShopOrderSummary {
     expires_at: row.expires_at,
     claimed_player: row.claimed_player,
     created_at: row.created_at,
+    // v4.36.1: LEFT JOIN 结果；未 join 时（如 createOrder 返回）为 null
+    buyer_username: row.buyer_username ?? null,
   };
 }
 

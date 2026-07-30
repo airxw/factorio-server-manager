@@ -383,7 +383,7 @@ export class OperationsService {
       for (const instanceId of instanceIds) {
         let lastBackupAt: string | null = null;
         try {
-          const row = (await this.db('backups')
+          const row = (await this.db('backup_records')
             .select('server_id', this.db.raw('MAX(created_at) as latest_backup'))
             .where('server_id', instanceId)
             .where('status', 'completed')

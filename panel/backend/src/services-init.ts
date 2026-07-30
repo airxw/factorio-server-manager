@@ -34,7 +34,7 @@ import { createVoteService } from './services/voteService.js';
 import { createPlayerService } from './services/playerService.js';
 import { createPeriodicMessageService } from './services/periodicMessageService.js';
 import { createInGameCommandService } from './services/inGameCommandService.js';
-import { verifyBindingByCode } from './services/instanceBindingService.js';
+import { verifyBindingByCode, setInstanceBindingServiceDeps } from './services/instanceBindingService.js';
 
 // P4 服务
 import { createModService } from './services/modService.js';
@@ -203,6 +203,9 @@ export async function initServices(
   const chatService = createChatService(db);
   const voteService = createVoteService(db);
   const playerService = createPlayerService(db);
+  // v4.38.0: 注入 verifyBindingByCode 广播所需的下游服务（playerService + daemonClientService）
+  // 使 verifyBindingByCode 事务提交后能调用 getVipWelcomeMessage + sendCommand 广播 VIP 欢迎语
+  setInstanceBindingServiceDeps({ playerService, daemonClientService });
   const periodicMessageService = createPeriodicMessageService(db);
   // 模块10 Task 6: 游戏内聊天命令服务（统一分发 !verify/!claim/!vk/!register/!help/!status/!players/!uptime）
   const inGameCommandService = createInGameCommandService(db, registry, {

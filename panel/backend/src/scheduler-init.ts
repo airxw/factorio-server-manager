@@ -543,7 +543,7 @@ export function initScheduler(deps: SchedulerDeps): void {
           for (const server of servers) {
             try {
               const cutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
-              const recentBackups = await db('backups')
+              const recentBackups = await db('backup_records')
                 .where('server_id', server.id)
                 .where('created_at', '>=', cutoff)
                 .select('status', 'created_at')

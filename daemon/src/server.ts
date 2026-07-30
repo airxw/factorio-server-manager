@@ -92,6 +92,8 @@ interface StartRequestBody {
     rcon_password: string;
     workdir: string;
   };
+  /** 可选：指定启动存档路径，覆盖默认的 saves/world.{ext} */
+  save_path?: string;
 }
 
 /** POST /api/instances/:id/command 请求体。 */
@@ -518,7 +520,12 @@ export function createDaemonServer(
     };
 
     try {
-      const pid = await manager.startInstance(instance, pack, makeCallbacks(id));
+      const pid = await manager.startInstance(
+        instance,
+        pack,
+        makeCallbacks(id),
+        body.save_path ? { savePath: body.save_path } : undefined,
+      );
       const response: StartInstanceResponse = { id, status: 'starting', pid };
       res.json(response);
     } catch (err) {

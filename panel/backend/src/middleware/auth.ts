@@ -423,8 +423,8 @@ async function getUnexpiredInstanceRole(
  * 实例访问鉴权中间件工厂：
  *   server_admin → 通过
  *   instance_roles 表存在未过期记录（任意角色） → 通过（实例级显式授权即访问权）
- *   instance_admin + owner 匹配 → 通过（兜底）
- *   instance_admins 共管记录 → 通过（兜底）
+ *   owner 匹配（任意角色） → 通过（兜底，v4.36.1: 从 instance_admin 分支提出）
+ *   instance_admins 共管记录（仅 instance_admin 角色） → 通过（兜底）
  *   存在 verified 绑定记录（bindings 表，v4.17.0 统一绑定） → 通过（兜底）
  *   否则 403
  *
@@ -503,12 +503,16 @@ export function requireInstanceAccess(serverIdParam = 'serverId'): RequestHandle
         return;
       }
 
-      // instance_admin + owner 匹配（兜底）
+      // owner 匹配（任意角色兜底）—— 实例 owner 在任意 active_role 下都拥有访问权
+      // 修复 v4.36.1: 原逻辑将 owner 校验嵌套在 instance_admin 分支内，导致多角色用户
+      //   切换到 user active_role 后，列表能见到自有实例但详情页 403（列表与鉴权不一致）
+      if (server.owner_user_id === user.userId) {
+        next();
+        return;
+      }
+
+      // instance_admin 共管记录（兜底）
       if (role === Role.INSTANCE_ADMIN) {
-        if (server.owner_user_id === user.userId) {
-          next();
-          return;
-        }
         // v4.5.0: 检查 instance_admins 共管关联表
         try {
           const adminRecord = await db('instance_admins')

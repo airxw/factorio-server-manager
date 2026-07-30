@@ -39,6 +39,7 @@ import { bindInstance, isBound } from './instanceBindingService.js';
 import type {
   CdkCodeItem,
   CdkCodeSummary,
+  CdkRedemptionRecord,
   CreateCdkCodesRequest,
   RedeemCdkRequest,
 } from '@public/schema/panel-api-types';
@@ -90,6 +91,11 @@ interface CdkCodeRow {
   refunded_at: string | null;
   /** 退费关联交易流水 ID（wallet_transactions.id） */
   refund_tx_id: number | null;
+  // ----- v4.37.0 可重复使用扩展列（migration 20260901000000） -----
+  /** 最大使用次数：1=一次性（默认）/ N>1=多次 / 0=无限 */
+  max_uses: number;
+  /** 已使用次数（一次性 CDK 兑换后为 1；多次用 CDK 随每次兑换递增） */
+  use_count: number;
 }
 
 /** cdk_code_items 子表行 */
@@ -100,6 +106,14 @@ interface CdkCodeItemRow {
   count: number;
   quality: string;
   sort_order: number;
+}
+
+/** cdk_redemptions 子表行（v4.37.0，多次用 CDK 的每次兑换记录） */
+interface CdkRedemptionRow {
+  id: number;
+  cdk_code_id: number;
+  player_name: string;
+  redeemed_at: string;
 }
 
 /** servers 表所需字段视图（仅 cdkService 关心的列） */
@@ -176,6 +190,8 @@ export interface CreateCdkCodeEntryExt {
   amount?: number;
   /** VIP 时长（type=vip 时必填） */
   vip_duration?: 'monthly' | 'lifetime';
+  /** 最大使用次数（v4.37.0，缺省 1）：1=一次性 / N>1=多次 / 0=无限。仅 item 类型生效 */
+  max_uses?: number;
 }
 
 /** 扩展后的批量创建请求（向后兼容：原 CreateCdkCodesRequest 可直接传入） */
@@ -302,6 +318,17 @@ export class CdkServiceImpl {
         return { codeRow: buildEconomicCodeRow(entryType, c, serverId, userId, code, expiresAt, nowIso), items: [] };
       }
 
+      // v4.37.0: 解析 max_uses（仅 item 类型生效；经济类型固定一次性）
+      // 缺省 1（一次性，向后兼容）；允许 0（无限）或正整数；禁止负数和非整数
+      let maxUses = 1;
+      if (c.max_uses !== undefined) {
+        const mu = c.max_uses;
+        if (typeof mu !== 'number' || !Number.isInteger(mu) || mu < 0) {
+          throw new ValidationError(`max_uses 必须为非负整数: ${String(c.max_uses)}`);
+        }
+        maxUses = mu;
+      }
+
       // 解析礼包物品列表
       let items: Array<{ item_name: string; count: number; quality: CdkQuality; sort_order: number }>;
       let primaryItemName: string;
@@ -371,6 +398,8 @@ export class CdkServiceImpl {
         creator_user_id: null,
         refunded_at: null,
         refund_tx_id: null,
+        max_uses: maxUses,
+        use_count: 0,
       };
 
       return { codeRow, items };
@@ -437,7 +466,7 @@ export class CdkServiceImpl {
   }
 
   /**
-   * 查询单条 CDK 兑换码
+   * 查询单条 CDK 兑换码（详情接口，填充 redemptions 兑换记录）
    */
   async getCode(serverId: string, id: number): Promise<CdkCodeSummary> {
     const row = await this.db<CdkCodeRow>('cdk_codes')
@@ -447,12 +476,15 @@ export class CdkServiceImpl {
       throw new CdkNotFoundError(`CDK not found: server=${serverId}, id=${id}`);
     }
     const items = await this.fetchItems(id);
-    return toSummary(row, items);
+    // v4.37.0: 多次用 CDK 详情返回兑换记录；一次性 CDK 返回空数组
+    const redemptions = row.max_uses !== 1 ? await this.fetchRedemptions(id) : [];
+    return toSummary(row, items, redemptions);
   }
 
   /**
-   * 删除 CDK 兑换码（仅 unused 可删）
-   * cdk_code_items 子表通过 ON DELETE CASCADE 自动删除
+   * 删除 CDK 兑换码（仅 unused 且无兑换记录可删）
+   * cdk_code_items / cdk_redemptions 子表通过 ON DELETE CASCADE 自动删除
+   * v4.37.0: 多次用 CDK 若已有玩家兑换（use_count>0）则禁止删除，避免兑换记录丢失
    */
   async deleteCode(serverId: string, id: number): Promise<void> {
     const row = await this.db<CdkCodeRow>('cdk_codes')
@@ -464,8 +496,11 @@ export class CdkServiceImpl {
     if (row.status !== 'unused') {
       throw new Error(`仅 unused 状态可删除，当前状态: ${row.status}`);
     }
+    if (row.use_count > 0) {
+      throw new Error(`已有 ${row.use_count} 次兑换记录，不允许删除（仅 unused 且 use_count=0 可删）`);
+    }
     await this.db<CdkCodeRow>('cdk_codes').where({ id }).delete();
-    // cdk_code_items 通过外键 ON DELETE CASCADE 自动清理
+    // cdk_code_items / cdk_redemptions 通过外键 ON DELETE CASCADE 自动清理
   }
 
   /**
@@ -489,7 +524,7 @@ export class CdkServiceImpl {
   async redeemGlobal(
     userId: string,
     req: { code: string; player_name?: string },
-  ): Promise<{ code: CdkCodeSummary; delivered: boolean; followed: boolean }> {
+  ): Promise<{ code: CdkCodeSummary; delivered: boolean; followed: boolean; remaining_uses: number | null }> {
     const trimmedCode = (req.code ?? '').trim();
     if (!trimmedCode) {
       throw new Error('code 不能为空');
@@ -519,7 +554,8 @@ export class CdkServiceImpl {
           // 关注失败不影响兑换结果
         }
       }
-      return { ...result, followed };
+      // 经济类型 CDK 固定一次性，remaining_uses=0
+      return { ...result, followed, remaining_uses: 0 };
     }
 
     const serverId = cdkRow.server_id;
@@ -568,21 +604,20 @@ export class CdkServiceImpl {
   }
 
   /**
-   * 兑换 CDK —— 两段事务实现（v2 支持多物品礼包）
+   * 兑换 CDK —— 按 max_uses 分支（v4.37.0）
    *
-   * 流程：
-   *   1. 条件 UPDATE 抢占 claiming（unused → claiming，需 expires_at > now）
-   *      影响行数 0 → 查当前状态抛对应错误
-   *   2. 读取 cdk_code_items 子表（若为空，降级用主物品 item_name/count/quality）
-   *   3. 为每个物品渲染 redeem_command 并入队命令队列
-   *      任一物品渲染/入队失败 → 回滚 status='unused'，抛错
-   *   4. 成功 → UPDATE status='claimed', claimed_at=now, claimed_player=?
-   *   5. 返回 {code, delivered: true}
+   * 一次性（max_uses=1）：原两段事务 unused→claiming→claimed
+   * 多次用（max_uses>1 或 0）：redemption 记录事务 + 命令派发 + use_count 递增
+   *
+   * 返回 remaining_uses：
+   *   - 一次性兑换后 = 0
+   *   - 多次用有限（max_uses>1）= max_uses - use_count
+   *   - 无限（max_uses=0）= null
    */
   async redeem(
     serverId: string,
     req: RedeemCdkRequest,
-  ): Promise<{ code: CdkCodeSummary; delivered: boolean }> {
+  ): Promise<{ code: CdkCodeSummary; delivered: boolean; remaining_uses: number | null }> {
     const code = (req.code ?? '').trim();
     const player = (req.player_name ?? '').trim();
     if (!code) {
@@ -592,9 +627,21 @@ export class CdkServiceImpl {
       throw new Error('player_name 不能为空');
     }
 
+    // v4.37.0: 预查 CDK 行以判定走一次性还是多次用分支
+    // （预查仅用于分支判定，真正的抢占仍在下方事务中原子完成）
+    const preRow = await this.db<CdkCodeRow>('cdk_codes')
+      .where({ code, server_id: serverId })
+      .first();
+    if (!preRow) {
+      throw new CdkNotFoundError(`CDK not found: code=${code}, server=${serverId}`);
+    }
+    if (preRow.max_uses !== 1) {
+      return this.redeemMultiUse(preRow, serverId, player);
+    }
+
     const nowIso = new Date().toISOString();
 
-    // ---- 第一段：条件 UPDATE 抢占 claiming ----
+    // ---- 一次性路径：第一段：条件 UPDATE 抢占 claiming ----
     let claimedRow: CdkCodeRow | undefined;
     await this.db.transaction(async (trx) => {
       const updated = await trx<CdkCodeRow>('cdk_codes')
@@ -632,7 +679,7 @@ export class CdkServiceImpl {
 
     const cdkRow = claimedRow;
 
-    // ---- 第二段：读取物品列表 + 逐物品命令渲染 + 发送 ----
+    // ---- 一次性路径：第二段：读取物品列表 + 逐物品命令渲染 + 发送 ----
     // 优先使用 cdk_code_items 子表（多物品礼包）；为空时降级用主物品（单物品礼包）
     const itemRows = await this.fetchItems(cdkRow.id);
     const itemsToDeliver: Array<{ item_name: string; count: number; quality: string }> =
@@ -672,7 +719,7 @@ export class CdkServiceImpl {
       throw err;
     }
 
-    // ---- 第三段：标记 claimed ----
+    // ---- 一次性路径：第三段：标记 claimed（v4.37.0 同步 use_count=1）----
     await this.db<CdkCodeRow>('cdk_codes')
       .where({ id: cdkRow.id })
       .update({
@@ -680,6 +727,7 @@ export class CdkServiceImpl {
         claimed_at: nowIso,
         claimed_player: player,
         claiming_at: null,
+        use_count: 1,
       });
 
     const finalRow = await this.db<CdkCodeRow>('cdk_codes')
@@ -690,7 +738,171 @@ export class CdkServiceImpl {
     }
 
     const finalItems = await this.fetchItems(cdkRow.id);
-    return { code: toSummary(finalRow, finalItems), delivered: true };
+    return { code: toSummary(finalRow, finalItems), delivered: true, remaining_uses: 0 };
+  }
+
+  /**
+   * 多次用 CDK 兑换（v4.37.0，max_uses>1 或 max_uses=0）
+   *
+   * 流程：
+   *   1. 事务（BEGIN IMMEDIATE 等价于 SQLite 默认事务 + 写锁）：
+   *      - 校验未过期、未达上限（max_uses>0 时 use_count < max_uses）
+   *      - 校验该玩家未兑换过（cdk_redemptions 唯一约束兜底竞态）
+   *      - INSERT cdk_redemptions（cdk_code_id, player_name, redeemed_at）
+   *      - UPDATE cdk_codes SET use_count = use_count + 1,
+   *          status = (max_uses>0 && use_count+1>=max_uses ? 'claimed' : 'unused')
+   *   2. 读取物品列表 + 逐物品命令渲染 + 入队
+   *      任一渲染/入队失败 → 回滚（删 redemption、减 use_count、恢复 status）
+   *   3. 返回 {code, delivered, remaining_uses}
+   *
+   * 并发说明：SQLite 写事务串行化，事务内的 use_count 读取与递增原子；
+   * cdk_redemptions 的 (cdk_code_id, player_name) 唯一索引兜底同玩家并发重入。
+   */
+  private async redeemMultiUse(
+    cdkRow: CdkCodeRow,
+    serverId: string,
+    player: string,
+  ): Promise<{ code: CdkCodeSummary; delivered: boolean; remaining_uses: number | null }> {
+    const nowIso = new Date().toISOString();
+    const cdkId = cdkRow.id;
+    const maxUses = cdkRow.max_uses; // 0=无限 / >1=有限
+
+    // ---- 第一段：事务抢占兑换名额 ----
+    const newUseCount = await this.db.transaction(async (trx) => {
+      // 重新读取最新行（事务内加写锁）
+      const row = await trx<CdkCodeRow>('cdk_codes').where({ id: cdkId }).first();
+      if (!row) {
+        throw new CdkNotFoundError(`CDK not found: id=${cdkId}`);
+      }
+      if (row.status === 'expired' || new Date(row.expires_at).getTime() <= Date.now()) {
+        throw new CdkExpiredError(`CDK expired: code=${row.code}, status=${row.status}`);
+      }
+      if (row.status === 'claimed') {
+        throw new CdkAlreadyClaimedError(`CDK already fully claimed: code=${row.code}`);
+      }
+      // 有限次数且已达上限
+      if (maxUses > 0 && row.use_count >= maxUses) {
+        throw new CdkAlreadyClaimedError(
+          `CDK uses exhausted: code=${row.code}, use_count=${row.use_count}, max_uses=${maxUses}`,
+        );
+      }
+
+      // 检查该玩家是否已兑换过（唯一索引兜底并发，此处提前给友好错误）
+      const existed = await trx<CdkRedemptionRow>('cdk_redemptions')
+        .where({ cdk_code_id: cdkId, player_name: player })
+        .first();
+      if (existed) {
+        throw new CdkAlreadyClaimedError(
+          `player already redeemed this CDK: code=${row.code}, player=${player}`,
+        );
+      }
+
+      // 插入兑换记录（唯一索引违反时抛 SQLITE_CONSTRAINT，转 CdkAlreadyClaimedError）
+      try {
+        await trx<CdkRedemptionRow>('cdk_redemptions').insert({
+          cdk_code_id: cdkId,
+          player_name: player,
+          redeemed_at: nowIso,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/UNIQUE|constraint/i.test(msg)) {
+          throw new CdkAlreadyClaimedError(
+            `player already redeemed this CDK (race): code=${row.code}, player=${player}`,
+          );
+        }
+        throw err;
+      }
+
+      // 递增 use_count，判断是否达上限
+      const nextCount = row.use_count + 1;
+      const reachLimit = maxUses > 0 && nextCount >= maxUses;
+      await trx<CdkCodeRow>('cdk_codes')
+        .where({ id: cdkId })
+        .update({
+          use_count: nextCount,
+          status: reachLimit ? 'claimed' : 'unused',
+          // 多次用 CDK 的 claimed_player/claimed_at 仅在达上限时填最后一个兑换者（便于列表展示）
+          ...(reachLimit ? { claimed_player: player, claimed_at: nowIso } : {}),
+        });
+      return nextCount;
+    });
+
+    // ---- 第二段：读取物品列表 + 命令渲染 + 入队 ----
+    const itemRows = await this.fetchItems(cdkId);
+    const itemsToDeliver: Array<{ item_name: string; count: number; quality: string }> =
+      itemRows.length > 0
+        ? itemRows.map((it) => ({
+            item_name: it.item_name,
+            count: it.count,
+            quality: it.quality,
+          }))
+        : [{
+            item_name: cdkRow.item_name,
+            count: cdkRow.count,
+            quality: cdkRow.quality,
+          }];
+
+    const renderedCommands: string[] = [];
+    try {
+      for (const item of itemsToDeliver) {
+        const cmd = await this.renderRedeemCommand(serverId, item, player);
+        renderedCommands.push(cmd);
+      }
+    } catch (err) {
+      await this.rollbackMultiUseRedemption(cdkId, player);
+      throw err;
+    }
+
+    try {
+      for (const cmd of renderedCommands) {
+        await this.commandDispatcher.enqueue(serverId, cmd, 'normal');
+      }
+    } catch (err) {
+      await this.rollbackMultiUseRedemption(cdkId, player);
+      throw err;
+    }
+
+    // ---- 第三段：返回最终状态 ----
+    const finalRow = await this.db<CdkCodeRow>('cdk_codes').where({ id: cdkId }).first();
+    if (!finalRow) {
+      throw new CdkNotFoundError(`CDK disappeared after multi-use redeem: id=${cdkId}`);
+    }
+    const finalItems = await this.fetchItems(cdkId);
+    const finalRedemptions = await this.fetchRedemptions(cdkId);
+    const remaining = maxUses > 0 ? Math.max(0, maxUses - newUseCount) : null;
+    return {
+      code: toSummary(finalRow, finalItems, finalRedemptions),
+      delivered: true,
+      remaining_uses: remaining,
+    };
+  }
+
+  /**
+   * 回滚多次用 CDK 的一次兑换（命令渲染/入队失败时调用）
+   * 删除 redemption 记录、递减 use_count、若 status 因此回到可兑换则恢复 'unused'
+   */
+  private async rollbackMultiUseRedemption(cdkId: number, player: string): Promise<void> {
+    try {
+      await this.db.transaction(async (trx) => {
+        const deleted = await trx<CdkRedemptionRow>('cdk_redemptions')
+          .where({ cdk_code_id: cdkId, player_name: player })
+          .delete();
+        if (deleted === 0) return; // 记录已不存在，无需回滚
+        const row = await trx<CdkCodeRow>('cdk_codes').where({ id: cdkId }).first();
+        if (!row) return;
+        const newCount = Math.max(0, row.use_count - 1);
+        const reachLimit = row.max_uses > 0 && newCount >= row.max_uses;
+        await trx<CdkCodeRow>('cdk_codes').where({ id: cdkId }).update({
+          use_count: newCount,
+          status: reachLimit ? 'claimed' : 'unused',
+          ...(newCount === 0 ? { claimed_player: null, claimed_at: null } : {}),
+        });
+      });
+    } catch (err) {
+      // 回滚失败不掩盖原始错误，仅记录日志
+      console.error(`[cdkService] rollbackMultiUseRedemption failed: cdkId=${cdkId}, player=${player}`, err);
+    }
   }
 
   /**
@@ -1081,6 +1293,23 @@ export class CdkServiceImpl {
   }
 
   /**
+   * 读取指定 CDK 的兑换记录（来自 cdk_redemptions 子表，v4.37.0）
+   * 按 redeemed_at 降序排列（最近的在前）
+   * 一次性 CDK（max_uses=1）不会在此表有记录，返回空数组
+   */
+  private async fetchRedemptions(cdkCodeId: number): Promise<CdkRedemptionRecord[]> {
+    const rows = await this.db<CdkRedemptionRow>('cdk_redemptions')
+      .where({ cdk_code_id: cdkCodeId })
+      .orderBy('redeemed_at', 'desc');
+    return rows.map((r) => ({
+      id: r.id,
+      cdk_code_id: r.cdk_code_id,
+      player_name: r.player_name,
+      redeemed_at: r.redeemed_at,
+    }));
+  }
+
+  /**
    * 渲染 redeem 命令模板（单个物品）
    * - 从 servers 表查 pack_id
    * - 从 registry 获取 pack.business.cdk.redeem_command
@@ -1220,6 +1449,9 @@ function buildEconomicCodeRow(
     creator_user_id: null,
     refunded_at: null,
     refund_tx_id: null,
+    // v4.37.0: 经济类型 CDK 固定一次性（兑换走 redeemEconomic，不进入多次用分支）
+    max_uses: 1,
+    use_count: 0,
   };
 }
 
@@ -1252,7 +1484,11 @@ function toItemSummary(row: CdkCodeItemRow): CdkCodeItem {
 }
 
 /** DB 行 + items 子表数据 → CdkCodeSummary（status / quality 收窄为联合类型） */
-function toSummary(row: CdkCodeRow, items: CdkCodeItem[]): CdkCodeSummary {
+function toSummary(
+  row: CdkCodeRow,
+  items: CdkCodeItem[],
+  redemptions: CdkRedemptionRecord[] = [],
+): CdkCodeSummary {
   return {
     id: row.id,
     server_id: row.server_id,
@@ -1263,6 +1499,9 @@ function toSummary(row: CdkCodeRow, items: CdkCodeItem[]): CdkCodeSummary {
     count: row.count,
     quality: row.quality as CdkQuality,
     items,
+    max_uses: row.max_uses,
+    use_count: row.use_count,
+    redemptions,
     status: row.status as CdkStatus,
     claimed_player: row.claimed_player,
     claimed_at: row.claimed_at,

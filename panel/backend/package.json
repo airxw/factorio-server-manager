@@ -1,6 +1,6 @@
 {
   "name": "@gameserver-panel/backend",
-  "version": "4.36.1",
+  "version": "4.39.1",
   "private": true,
   "description": "GameServer Panel 4.15.0 — Panel 后端（Express + Knex + SQLite + JWT + WS）",
   "type": "module",
@@ -8,6 +8,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "tsx src/index.ts",
+    "seed:dev": "tsx src/db/seed-dev.ts",
     "typecheck": "tsc --noEmit",
     "migrate": "npx --node-options=\"--import tsx\" knex migrate:latest --knexfile src/db/knexfile.ts",
     "migrate:rollback": "npx --node-options=\"--import tsx\" knex migrate:rollback --knexfile src/db/knexfile.ts",

@@ -45,7 +45,7 @@ DAEMON_PORT=8080  # 与 deploy.md 规则 #7 一致，8080 对公网禁用，仅 
 INSTALL_DIR="/opt/gameserver-panel"
 PANEL_USER="gameserver"
 NODE_VERSION="20"
-DEPLOY_VERSION="4.36.1"
+DEPLOY_VERSION="4.39.1"
 
 # 备份目录（P4: update 时备份代码 + DB 到此目录，失败时回滚）
 BACKUP_DIR="$INSTALL_DIR/.backup"
@@ -482,6 +482,8 @@ Type=simple
 User=$PANEL_USER
 Group=$PANEL_USER
 WorkingDirectory=$INSTALL_DIR/daemon
+# v4.39.0: tsx（非 watch）作为生产运行时合规——rules-0 §3.1.2 仅禁止 tsx watch / npm run dev
+# TODO: 迁移到 node dist/ 需先重构 build pipeline（rootDir + 路径别名解析 + .ts 扩展名解析）
 ExecStart=/usr/bin/npx tsx src/index.ts
 Restart=always
 RestartSec=5
@@ -502,6 +504,8 @@ Type=simple
 User=$PANEL_USER
 Group=$PANEL_USER
 WorkingDirectory=$INSTALL_DIR/panel/backend
+# v4.39.0: tsx（非 watch）作为生产运行时合规——rules-0 §3.1.2 仅禁止 tsx watch / npm run dev
+# TODO: 迁移到 node dist/ 需先重构 build pipeline（rootDir + 路径别名解析 + .ts 扩展名解析）
 ExecStart=/usr/bin/npx tsx src/index.ts
 Restart=always
 RestartSec=5
@@ -945,6 +949,9 @@ update() {
     fi
 
     npm run migrate || log_warn "迁移可能已完成或失败，请检查日志"
+
+    # v4.39.0: update 时刷新 systemd service 文件（确保 ExecStart 等配置最新）
+    create_systemd_services
 
     # v3.8.0-P4: 部署成功后标记为 last-good 备份
     rm -rf "$LAST_GOOD_BACKUP"

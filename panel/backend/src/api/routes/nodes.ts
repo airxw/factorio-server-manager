@@ -633,6 +633,9 @@ export function createNodesRouter(
             'servers.startup_config_set_at',
             'servers.expires_at', 'servers.expiry_status', 'servers.expiry_grace_until',
             'servers.created_at', 'servers.updated_at',
+            // v4.38.0: 平台级公开标记 + 绑定申请通道开关
+            // v4.38.1: 自动审批开关
+            'servers.is_public', 'servers.binding_requests_enabled', 'servers.auto_approve_binding_requests',
           )
           .leftJoin('users', 'servers.owner_user_id', 'users.id')
           .leftJoin('nodes', 'servers.node_id', 'nodes.id')
@@ -667,6 +670,11 @@ export function createNodesRouter(
           expires_at: row.expires_at ?? null,
           expiry_status: (row.expiry_status ?? 'permanent') as 'permanent' | 'active' | 'grace' | 'expired' | 'cleaned',
           node_name: row.node_name ?? null,
+          // v4.38.0: 平台级公开标记 + 绑定申请通道开关（DB 0/1 → boolean）
+          // v4.38.1: 自动审批开关
+          is_public: row.is_public === 1,
+          binding_requests_enabled: row.binding_requests_enabled === 1,
+          auto_approve_binding_requests: (row.auto_approve_binding_requests ?? 0) === 1,
           created_at: row.created_at,
           updated_at: row.updated_at,
         }));

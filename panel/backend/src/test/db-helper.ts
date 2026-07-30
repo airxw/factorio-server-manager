@@ -448,6 +448,9 @@ export async function createEconomyTables(db: Knex): Promise<void> {
       table.string('creator_user_id').nullable();
       table.text('refunded_at').nullable();
       table.integer('refund_tx_id').nullable();
+      // v4.37.0 可重复使用扩展列（migration 20260901000000）
+      table.integer('max_uses').notNullable().defaultTo(1);
+      table.integer('use_count').notNullable().defaultTo(0);
     });
   }
 
@@ -460,6 +463,17 @@ export async function createEconomyTables(db: Knex): Promise<void> {
       table.integer('count').notNullable();
       table.string('quality').notNullable().defaultTo('normal');
       table.integer('sort_order').notNullable().defaultTo(0);
+    });
+  }
+
+  // ----- cdk_redemptions（v4.37.0 多次用 CDK 兑换记录子表） -----
+  if (!(await db.schema.hasTable('cdk_redemptions'))) {
+    await db.schema.createTable('cdk_redemptions', (table) => {
+      table.increments('id').primary();
+      table.integer('cdk_code_id').notNullable();
+      table.string('player_name', 255).notNullable();
+      table.text('redeemed_at').notNullable();
+      table.unique(['cdk_code_id', 'player_name']);
     });
   }
 

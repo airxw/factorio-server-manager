@@ -102,6 +102,24 @@ export function createCdkRouter(): Router {
           res.status(400).json(errBody);
           return;
         }
+        // v4.37.0: max_uses 校验（仅 item 类型生效；非负整数；缺省 1）
+        if (entry?.max_uses !== undefined) {
+          const mu = entry.max_uses;
+          if (typeof mu !== 'number' || !Number.isInteger(mu) || mu < 0) {
+            const errBody: PanelErrorResponse = {
+              error: { code: 'PANEL_VALIDATION_ERROR', message: `max_uses 必须为非负整数: ${String(mu)}` },
+            };
+            res.status(400).json(errBody);
+            return;
+          }
+          if (entryType !== 'item' && mu !== 1) {
+            const errBody: PanelErrorResponse = {
+              error: { code: 'PANEL_VALIDATION_ERROR', message: `${entryType} 类型 CDK 仅支持一次性（max_uses=1）` },
+            };
+            res.status(400).json(errBody);
+            return;
+          }
+        }
       }
       const codes = await cdkService.createCodes(userId, serverId, body as CreateCdkCodesRequestExt);
       // v5 经济系统：管理员生成经济类型 CDK 写审计日志（运营工具，不扣余额；不阻塞主流程）
@@ -238,6 +256,7 @@ export function createCdkRouter(): Router {
       const response: RedeemCdkResponse = {
         code: result.code,
         delivered: result.delivered,
+        remaining_uses: result.remaining_uses,
       };
       res.json(response);
     } catch (err) {
@@ -296,6 +315,7 @@ export function createGlobalCdkRouter(): Router {
         return;
       }
       // 只返回安全的预览信息，不泄露敏感字段
+      // v4.37.0: 附加 max_uses/use_count，供前端预览展示「可兑换 N 次 / 剩余 M 次」
       res.json({
         code: {
           gift_name: cdkCode.gift_name,
@@ -307,6 +327,8 @@ export function createGlobalCdkRouter(): Router {
           expires_at: cdkCode.expires_at,
           status: cdkCode.status,
           server_id: cdkCode.server_id,
+          max_uses: cdkCode.max_uses,
+          use_count: cdkCode.use_count,
         },
       });
     } catch (err) {
@@ -436,6 +458,7 @@ export function createGlobalCdkRouter(): Router {
         code: result.code,
         delivered: result.delivered,
         followed: result.followed,
+        remaining_uses: result.remaining_uses,
       });
     } catch (err) {
       if (err instanceof AppError) {

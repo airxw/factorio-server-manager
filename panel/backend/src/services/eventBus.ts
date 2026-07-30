@@ -18,6 +18,21 @@ export const CDK_REDEEMED = 'cdk.redeemed' as const;
 export const VOTE_STARTED = 'vote.started' as const;
 export const VOTE_THRESHOLD_MET = 'vote.threshold_met' as const;
 
+// v4.38.0: Panel 内部事件（不进 public/schema/ws-events.ts 跨进程契约）
+// 仅供 Panel 进程内审计/日志订阅，player.binding_verified 由 verifyBindingByCode
+// 在事务提交后 emit，触发 VIP 欢迎消息 RCON 广播。
+export const PLAYER_BINDING_VERIFIED = 'player.binding_verified' as const;
+
+/** player.binding_verified 事件 payload（Panel 内部，不进 public/ 契约） */
+export interface PlayerBindingVerifiedEvent {
+  type: 'player.binding_verified';
+  server_id: string;
+  user_id: string;
+  player_name: string;
+  vip_level: number; // 验证后获得的 VIP 等级
+  verified_at: string; // ISO 8601
+}
+
 export type { PredefinedEventType } from '@public/interface_stub/event-bus';
 
 /**

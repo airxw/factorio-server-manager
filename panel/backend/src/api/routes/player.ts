@@ -115,6 +115,110 @@ export function createPlayerRouter(): Router {
         return;
       }
 
+      // 校验 P3 回归礼包字段（若提供）
+      if (
+        body.relogin_cooldown_hours !== undefined &&
+        body.relogin_cooldown_hours !== null &&
+        (!Number.isInteger(body.relogin_cooldown_hours) || body.relogin_cooldown_hours < 0)
+      ) {
+        const errBody: PanelErrorResponse = {
+          error: {
+            code: 'PANEL_VALIDATION_ERROR',
+            message: 'relogin_cooldown_hours 需为非负整数或 null',
+          },
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      if (
+        body.relogin_daily_limit !== undefined &&
+        body.relogin_daily_limit !== null &&
+        (!Number.isInteger(body.relogin_daily_limit) || body.relogin_daily_limit < 0)
+      ) {
+        const errBody: PanelErrorResponse = {
+          error: {
+            code: 'PANEL_VALIDATION_ERROR',
+            message: 'relogin_daily_limit 需为非负整数或 null',
+          },
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      if (
+        body.relogin_total_limit !== undefined &&
+        body.relogin_total_limit !== null &&
+        (!Number.isInteger(body.relogin_total_limit) || body.relogin_total_limit < 0)
+      ) {
+        const errBody: PanelErrorResponse = {
+          error: {
+            code: 'PANEL_VALIDATION_ERROR',
+            message: 'relogin_total_limit 需为非负整数或 null',
+          },
+        };
+        res.status(400).json(errBody);
+        return;
+      }
+      if (body.relogin_gift_items !== undefined && body.relogin_gift_items !== null) {
+        for (const item of body.relogin_gift_items) {
+          if (typeof item.item !== 'string' || !item.item.trim()) {
+            const errBody: PanelErrorResponse = {
+              error: {
+                code: 'PANEL_VALIDATION_ERROR',
+                message: '回归礼包物品名不能为空',
+              },
+            };
+            res.status(400).json(errBody);
+            return;
+          }
+          if (!Number.isInteger(item.count) || item.count <= 0) {
+            const errBody: PanelErrorResponse = {
+              error: {
+                code: 'PANEL_VALIDATION_ERROR',
+                message: `回归礼包物品 ${item.item} 的数量需为正整数`,
+              },
+            };
+            res.status(400).json(errBody);
+            return;
+          }
+          if (item.quality !== undefined && !isValidQuality(item.quality)) {
+            const errBody: PanelErrorResponse = {
+              error: {
+                code: 'PANEL_VALIDATION_ERROR',
+                message: `回归礼包物品 ${item.item} 的品质无效`,
+              },
+            };
+            res.status(400).json(errBody);
+            return;
+          }
+        }
+      }
+
+      // 校验 P4 VIP 专属欢迎语（若提供）
+      if (body.vip_welcome_messages !== undefined && body.vip_welcome_messages !== null) {
+        for (const m of body.vip_welcome_messages) {
+          if (!Number.isInteger(m.min_vip_level) || m.min_vip_level < 0) {
+            const errBody: PanelErrorResponse = {
+              error: {
+                code: 'PANEL_VALIDATION_ERROR',
+                message: 'VIP 欢迎语的最低 VIP 等级需为非负整数',
+              },
+            };
+            res.status(400).json(errBody);
+            return;
+          }
+          if (typeof m.message !== 'string' || !m.message.trim()) {
+            const errBody: PanelErrorResponse = {
+              error: {
+                code: 'PANEL_VALIDATION_ERROR',
+                message: 'VIP 欢迎语内容不能为空',
+              },
+            };
+            res.status(400).json(errBody);
+            return;
+          }
+        }
+      }
+
       const patch: UpsertPlayerJoinSettingsRequest = {};
       if (body.welcome_message !== undefined)
         patch.welcome_message = body.welcome_message;
@@ -127,6 +231,20 @@ export function createPlayerRouter(): Router {
       // Task 1 新增字段：leave_message
       if (body.leave_message !== undefined)
         patch.leave_message = body.leave_message;
+      // P3 回归礼包字段
+      if (body.relogin_gift_enabled !== undefined)
+        patch.relogin_gift_enabled = body.relogin_gift_enabled;
+      if (body.relogin_gift_items !== undefined)
+        patch.relogin_gift_items = body.relogin_gift_items;
+      if (body.relogin_cooldown_hours !== undefined)
+        patch.relogin_cooldown_hours = body.relogin_cooldown_hours;
+      if (body.relogin_daily_limit !== undefined)
+        patch.relogin_daily_limit = body.relogin_daily_limit;
+      if (body.relogin_total_limit !== undefined)
+        patch.relogin_total_limit = body.relogin_total_limit;
+      // P4 VIP 专属欢迎语
+      if (body.vip_welcome_messages !== undefined)
+        patch.vip_welcome_messages = body.vip_welcome_messages;
 
       const settings = await playerService.upsertJoinSettings(
         req.params.serverId,

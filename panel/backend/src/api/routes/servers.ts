@@ -30,10 +30,12 @@ import { QuotaService } from '../../services/quotaService.js';
 // v4.17.0: 权限点鉴权中间件（POST / 创建实例要求 instance.create 权限点）
 import { requirePermission } from '../../middleware/auth.js';
 import type {
+  BindableServer,
   CreateServerRequest,
   CreateServerResponse,
   DeleteServerResponse,
   GetStartupGuideResponse,
+  ListBindableServersResponse,
   ListServersResponse,
   PanelErrorResponse,
   SaveStartupConfigRequest,
@@ -80,6 +82,10 @@ interface ServerRow {
   expires_at: string | null;
   expiry_status: string;
   expiry_grace_until: string | null;
+  // v4.38.0: 平台级公开标记 + 绑定申请通道开关 + v4.38.1 自动审批开关
+  is_public: number;
+  binding_requests_enabled: number;
+  auto_approve_binding_requests: number;
   created_at: string;
   updated_at: string;
 }
@@ -207,6 +213,150 @@ export function createServersRouter(
       }
       const servers: ServerSummary[] = rows.map(toSummary);
       const response: ListServersResponse = { servers };
+      res.json(response);
+    } catch (err) {
+      handleInternal(res, err, logger);
+    }
+  });
+
+  // ----------------------------------------------------------------
+  // GET /api/servers/bindable — 可绑定实例市场列表（v4.38.0）
+  //   返回 is_public=1 的所有实例 + owner_user_id=userId 的实例（合并去重）
+  //   附带 is_owner/is_bound/has_pending_request/can_direct_bind/can_request_bind 字段
+  //   注：必须定义在 GET /:id 之前，否则 'bindable' 会被当作 :id 参数匹配
+  // ----------------------------------------------------------------
+  router.get('/bindable', async (req, res) => {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        const body: PanelErrorResponse = {
+          error: { code: 'PANEL_UNAUTHORIZED', message: '未认证' },
+        };
+        res.status(401).json(body);
+        return;
+      }
+
+      // 解析查询参数
+      const limit = parseBindableLimit(req.query.limit);
+      const offset = parseBindableOffset(req.query.offset);
+      const gameType = typeof req.query.game_type === 'string' ? req.query.game_type.trim() : null;
+      const keyword = typeof req.query.keyword === 'string' ? req.query.keyword.trim() : null;
+
+      // 基础查询：is_public=1 OR owner_user_id=userId，排除 deleted/removing
+      let query = db<{
+        id: string;
+        name: string;
+        game_type: string;
+        pack_id: string;
+        status: string;
+        is_public: number;
+        binding_requests_enabled: number;
+        auto_approve_binding_requests: number;
+        owner_user_id: string;
+        owner_username: string | null;
+        created_at: string;
+        is_bound: number | null;
+        has_pending_request: number | null;
+      }>('servers as s')
+        .select(
+          's.id',
+          's.name',
+          's.game_type',
+          's.pack_id',
+          's.status',
+          's.is_public',
+          's.binding_requests_enabled',
+          's.auto_approve_binding_requests',
+          's.owner_user_id',
+          'u.username as owner_username',
+          's.created_at',
+        )
+        .select(function (this: Knex.QueryBuilder) {
+          // is_bound：当前用户是否有 verified 账户级绑定
+          this.select(db.raw('1'))
+            .from('bindings as b')
+            .whereRaw('b.scope_ref = s.id')
+            .andWhere('b.user_id', userId)
+            .andWhere('b.binding_type', 'account')
+            .andWhere('b.scope_type', 'instance')
+            .andWhere('b.verify_status', 'verified')
+            .limit(1)
+            .as('is_bound');
+        })
+        .select(function (this: Knex.QueryBuilder) {
+          // has_pending_request：当前用户是否有 pending 申请
+          this.select(db.raw('1'))
+            .from('binding_requests as br')
+            .whereRaw('br.server_id = s.id')
+            .andWhere('br.requester_user_id', userId)
+            .andWhere('br.status', 'pending')
+            .limit(1)
+            .as('has_pending_request');
+        })
+        .leftJoin('users as u', 's.owner_user_id', 'u.id')
+        .where(function () {
+          this.where('s.is_public', 1).orWhere('s.owner_user_id', userId);
+        })
+        .whereNotIn('s.status', ['deleted', 'removing'])
+        .orderBy('s.is_public', 'desc') // 公开优先
+        .orderBy('s.created_at', 'desc')
+        .limit(limit)
+        .offset(offset);
+
+      if (gameType) {
+        query = query.where('s.game_type', gameType);
+      }
+      if (keyword) {
+        query = query.where('s.name', 'like', `%${keyword}%`);
+      }
+
+      const rows = await query;
+
+      // 计算 total（不带 limit/offset，用于分页）
+      // SQLite count() 返回 number/string 因驱动而异，统一用 Number() 兜底
+      const countQuery = db('servers as s')
+        .count('* as count')
+        .leftJoin('users as u', 's.owner_user_id', 'u.id')
+        .where(function () {
+          this.where('s.is_public', 1).orWhere('s.owner_user_id', userId);
+        })
+        .whereNotIn('s.status', ['deleted', 'removing']);
+      if (gameType) {
+        countQuery.where('s.game_type', gameType);
+      }
+      if (keyword) {
+        countQuery.where('s.name', 'like', `%${keyword}%`);
+      }
+      const countRow = (await countQuery.first()) as { count: number | string } | undefined;
+      const total = Number(countRow?.count ?? 0);
+
+      const servers: BindableServer[] = rows.map((row) => {
+        const isOwner = row.owner_user_id === userId;
+        const isPublic = row.is_public === 1;
+        const isBound = !!row.is_bound;
+        const hasPending = !!row.has_pending_request;
+        const requestsEnabled = row.binding_requests_enabled === 1;
+        const autoApprove = (row.auto_approve_binding_requests ?? 0) === 1;
+        return {
+          id: row.id,
+          name: row.name,
+          game_type: row.game_type,
+          pack_id: row.pack_id,
+          status: row.status,
+          is_public: isPublic,
+          owner_username: row.owner_username,
+          is_owner: isOwner,
+          is_bound: isBound,
+          has_pending_request: hasPending,
+          can_direct_bind: isPublic || isOwner,
+          can_request_bind: !isPublic && !isOwner && requestsEnabled && !isBound,
+          binding_requests_enabled: requestsEnabled,
+          auto_approve_binding_requests: autoApprove,
+          created_at: row.created_at,
+        };
+      });
+
+      const response: ListBindableServersResponse = { servers, total };
       res.json(response);
     } catch (err) {
       handleInternal(res, err, logger);
@@ -566,7 +716,23 @@ export function createServersRouter(
       // v4.16.1: 只读访问判定（owner/admin 之外，追加放行 active 绑定玩家）
       const readErr = await checkReadAccess(db, row, req.user!);
       if (readErr) {
-        res.status(403).json(readErr);
+        // v4.38.0: 403 响应 error.details 附带 can_request_binding + binding_requests_enabled，
+        //          提示前端可走"申请绑定"流程（私有实例 + 申请通道开启时）
+        //          放在 error.details 内以便前端 PanelApiError.details 透传
+        const serverRow = row as ServerRow & { is_public: number; binding_requests_enabled: number };
+        const isPublic = serverRow.is_public === 1;
+        const requestsEnabled = serverRow.binding_requests_enabled === 1;
+        res.status(403).json({
+          error: {
+            code: readErr.error.code,
+            message: readErr.error.message,
+            details: {
+              can_request_binding: !isPublic && requestsEnabled,
+              binding_requests_enabled: requestsEnabled,
+              is_public: isPublic,
+            },
+          },
+        });
         return;
       }
 
@@ -741,7 +907,7 @@ export function createServersRouter(
       const workdir = `${instancesDir}/${row.id}`;
 
       try {
-        const startResp = await daemonClient.startInstance(row.id, {
+        const startBody: { pack: typeof renderedPack; instance: { name: string; port: number; rcon_port: number; rcon_password: string; workdir: string }; save_path?: string } = {
           pack: renderedPack,
           instance: {
             name: row.name,
@@ -750,7 +916,13 @@ export function createServersRouter(
             rcon_password: rconPassword,
             workdir,
           },
-        });
+        };
+        // 从请求体获取可选的 save_path（用于启动时选择存档）
+        const reqSavePath = (req.body as { save_path?: string } | undefined)?.save_path;
+        if (typeof reqSavePath === 'string' && reqSavePath.length > 0) {
+          startBody.save_path = reqSavePath;
+        }
+        const startResp = await daemonClient.startInstance(row.id, startBody);
 
         // 启动请求已被 Daemon 接受：订阅该实例的 WS 事件流，
         // 以便接收后续 state.change（starting → running）事件并同步到 DB
@@ -1718,6 +1890,11 @@ function toSummary(row: ServerRowWithOwner): ServerSummary {
     expiry_status: (row.expiry_status ?? 'permanent') as 'permanent' | 'active' | 'grace' | 'expired' | 'cleaned',
     // v4.31.0: 部署节点名称（LEFT JOIN nodes 未匹配时为 null）
     node_name: row.node_name ?? null,
+    // v4.38.0: 平台级公开标记 + 绑定申请通道开关（DB 中为 0/1 整数，转为 boolean）
+    // v4.38.1: 追加 auto_approve_binding_requests 自动审批开关
+    is_public: row.is_public === 1,
+    binding_requests_enabled: row.binding_requests_enabled === 1,
+    auto_approve_binding_requests: (row.auto_approve_binding_requests ?? 0) === 1,
     created_at: row.created_at,
     updated_at: row.updated_at,
   };
@@ -1917,6 +2094,34 @@ function handleInternal(res: Response, err: unknown, logger: Logger): void {
     error: { code: 'PANEL_INTERNAL_ERROR', message: `内部错误: ${message}` },
   };
   res.status(500).json(body);
+}
+
+/** v4.38.0: 解析 GET /bindable 的 limit 参数：默认 50，范围 1-200 */
+function parseBindableLimit(raw: unknown): number {
+  if (typeof raw === 'string') {
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n)) {
+      return Math.max(1, Math.min(n, 200));
+    }
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw)) {
+    return Math.max(1, Math.min(Math.floor(raw), 200));
+  }
+  return 50;
+}
+
+/** v4.38.0: 解析 GET /bindable 的 offset 参数：默认 0，>= 0 */
+function parseBindableOffset(raw: unknown): number {
+  if (typeof raw === 'string') {
+    const n = parseInt(raw, 10);
+    if (Number.isFinite(n) && n >= 0) {
+      return n;
+    }
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw >= 0) {
+    return Math.floor(raw);
+  }
+  return 0;
 }
 
 function handleDaemonOrInternal(

@@ -30,6 +30,8 @@ export interface StartInstanceBody {
     rcon_password: string;
     workdir: string;
   };
+  /** 可选：指定启动存档路径，覆盖默认的 saves/world.{ext} */
+  save_path?: string;
 }
 
 /**

@@ -82,6 +82,8 @@ import { createPlatformStatsRouter } from './api/routes/platform-stats.js';
 import { createInstanceRolesRouter } from './api/routes/instanceRoles.js';
 import { createBatchRouter } from './api/routes/batch.js';
 import { createDiscoverRouter, createDiscoverAdminRouter } from './api/routes/discover.js';
+// v4.38.0: 绑定申请审批路由
+import { createBindingRequestsRouter } from './api/routes/bindingRequests.js';
 import { createFriendsRouter } from './api/routes/friends.js';
 import { createPlayerProfileRouter } from './api/routes/playerProfile.js';
 import { createAlertSettingsRouter } from './api/routes/alertSettings.js';
@@ -1260,12 +1262,15 @@ export function registerRoutes(deps: RouteDeps): RouteResult {
     createBatchRouter(db, registry, daemonClient, logger),
   );
   app.use('/api/discover', createDiscoverRouter(db, logger));
+  // v4.38.0: 移除挂载层 requireAdmin——visibility/binding-requests-settings 下放给 owner/instance_admin，
+  //   recommend 保持仅 server_admin；权限改由 discover.ts 路由内部逐端点校验
   app.use(
     '/api/admin/servers',
     authenticateToken(JWT_SECRET),
-    requireAdmin,
     createDiscoverAdminRouter(db, logger),
   );
+  // v4.38.0: 绑定申请审批路由（/servers/:serverId/binding-requests / /binding-requests/:id / /my/binding-requests）
+  app.use('/api', authenticateToken(JWT_SECRET), createBindingRequestsRouter(db, logger));
 
   // ----- friends / player profile -----
   app.use(

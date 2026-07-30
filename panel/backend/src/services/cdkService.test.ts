@@ -300,4 +300,117 @@ describe('cdkService 资金核心路径', () => {
       expect(r2.refunded).toBe(0);
     });
   });
+
+  // v4.37.0: 可重复使用 CDK 测试
+  describe('redeem（多次用 CDK：max_uses > 1）', () => {
+    /** 创建限 N 次的 item CDK */
+    async function seedMultiUseCdk(code: string, maxUses: number): Promise<void> {
+      await svc.createCodes(ADMIN, SERVER, {
+        codes: [{ code, item_name: '钻石', count: 1, max_uses: maxUses }],
+        expires_in_days: 30,
+      });
+    }
+
+    it('多次用 CDK：不同玩家可分别兑换，use_count 递增，remaining_uses 递减', async () => {
+      await seedMultiUseCdk('MULTI-3', 3);
+
+      const r1 = await svc.redeem(SERVER, { code: 'MULTI-3', player_name: 'Steve' });
+      expect(r1.delivered).toBe(true);
+      expect(r1.code.use_count).toBe(1);
+      expect(r1.code.status).toBe('unused'); // 未达上限仍 unused
+      expect(r1.remaining_uses).toBe(2);
+
+      const r2 = await svc.redeem(SERVER, { code: 'MULTI-3', player_name: 'Alex' });
+      expect(r2.code.use_count).toBe(2);
+      expect(r2.code.status).toBe('unused');
+      expect(r2.remaining_uses).toBe(1);
+
+      // 第 3 次达到上限 → status='claimed'
+      const r3 = await svc.redeem(SERVER, { code: 'MULTI-3', player_name: 'Notch' });
+      expect(r3.code.use_count).toBe(3);
+      expect(r3.code.status).toBe('claimed');
+      expect(r3.remaining_uses).toBe(0);
+
+      // 命令入队 3 次（每个玩家一次）
+      expect(dispatcher.enqueued).toHaveLength(3);
+    });
+
+    it('同一玩家重复兑换多次用 CDK → CdkAlreadyClaimedError', async () => {
+      await seedMultiUseCdk('MULTI-DUP', 5);
+      await svc.redeem(SERVER, { code: 'MULTI-DUP', player_name: 'Steve' });
+
+      // 同一玩家再次兑换 → 拒绝
+      await expect(
+        svc.redeem(SERVER, { code: 'MULTI-DUP', player_name: 'Steve' }),
+      ).rejects.toBeInstanceOf(CdkAlreadyClaimedError);
+
+      // use_count 不变
+      const row = await db('cdk_codes').where({ code: 'MULTI-DUP' }).first();
+      expect(row.use_count).toBe(1);
+    });
+
+    it('多次用 CDK 达上限后 → CdkAlreadyClaimedError，新玩家不可兑换', async () => {
+      await seedMultiUseCdk('MULTI-FULL', 1); // max_uses=1 走一次性路径
+      await svc.redeem(SERVER, { code: 'MULTI-FULL', player_name: 'Steve' });
+
+      await expect(
+        svc.redeem(SERVER, { code: 'MULTI-FULL', player_name: 'Alex' }),
+      ).rejects.toBeInstanceOf(CdkAlreadyClaimedError);
+    });
+
+    it('多次用 CDK 命令失败 → 回滚 use_count 与 redemption 记录', async () => {
+      await seedMultiUseCdk('MULTI-FAIL', 3);
+      (dispatcher.stub.enqueue as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error('queue full'),
+      );
+
+      await expect(
+        svc.redeem(SERVER, { code: 'MULTI-FAIL', player_name: 'Steve' }),
+      ).rejects.toThrow('queue full');
+
+      // 回滚：use_count 不变，无 redemption 记录
+      const row = await db('cdk_codes').where({ code: 'MULTI-FAIL' }).first();
+      expect(row.use_count).toBe(0);
+      const redemptions = await db('cdk_redemptions').where({ cdk_code_id: row.id });
+      expect(redemptions).toHaveLength(0);
+
+      // 重试成功
+      const r = await svc.redeem(SERVER, { code: 'MULTI-FAIL', player_name: 'Steve' });
+      expect(r.delivered).toBe(true);
+      expect(r.code.use_count).toBe(1);
+    });
+
+    it('无限次 CDK（max_uses=0）：任意数量不同玩家可兑换，remaining_uses=null', async () => {
+      await svc.createCodes(ADMIN, SERVER, {
+        codes: [{ code: 'UNLIM-1', item_name: '面包', count: 1, max_uses: 0 }],
+        expires_in_days: 30,
+      });
+
+      for (let i = 0; i < 5; i++) {
+        const r = await svc.redeem(SERVER, { code: 'UNLIM-1', player_name: `player${i}` });
+        expect(r.delivered).toBe(true);
+        expect(r.code.use_count).toBe(i + 1);
+        expect(r.code.status).toBe('unused'); // 无限次永不过 claimed
+        expect(r.remaining_uses).toBe(null);
+      }
+
+      expect(dispatcher.enqueued).toHaveLength(5);
+    });
+
+    it('deleteCode 拒绝删除已有兑换记录的多次用 CDK', async () => {
+      await seedMultiUseCdk('MULTI-DEL', 3);
+      await svc.redeem(SERVER, { code: 'MULTI-DEL', player_name: 'Steve' });
+
+      // 已有兑换记录 → 拒绝删除
+      const row = await db('cdk_codes').where({ code: 'MULTI-DEL' }).first();
+      await expect(svc.deleteCode(SERVER, row.id)).rejects.toThrow('不允许删除');
+
+      // 未兑换的可删
+      await seedMultiUseCdk('MULTI-OK', 3);
+      const row2 = await db('cdk_codes').where({ code: 'MULTI-OK' }).first();
+      await svc.deleteCode(SERVER, row2.id);
+      const gone = await db('cdk_codes').where({ code: 'MULTI-OK' }).first();
+      expect(gone).toBeUndefined();
+    });
+  });
 });

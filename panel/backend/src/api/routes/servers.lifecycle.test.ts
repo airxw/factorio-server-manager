@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import express, { Request, Response, NextFunction } from 'express';
 import request from 'supertest';
 import type { Knex } from 'knex';
-import { createTestDb, destroyTestDb } from '../test/db-helper.js';
-import { createServersRouter } from '../api/routes/servers.js';
-import { mockLogger, mockDaemonClient } from '../test/mock-factory.js';
+import { createTestDb, destroyTestDb } from '../../test/db-helper.js';
+import { createServersRouter } from './servers.js';
+import { mockLogger, mockDaemonClient } from '../../test/mock-factory.js';
 
-describe('ServerService / ServerRouter - Lifecycle Core Flow', () => {
+describe('ServersRouter - Lifecycle Core Flow', () => {
   let db: Knex;
   let app: express.Express;
   let daemonClientMock: any;
