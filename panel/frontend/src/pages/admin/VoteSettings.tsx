@@ -180,14 +180,16 @@ export default function VoteSettings({ serverId }: { serverId: string }) {
             {settings ? `编辑设置 (${settings.server_id})` : '新建设置'}
           </h3>
 
-          <label className="form-field">
-            <span className="form-label">启用投票踢人</span>
+          <label className="form-checkbox-label">
             <input
               type="checkbox"
               checked={form.enabled}
               onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))}
             />
-            <span className="form-hint">开启后玩家可在游戏内使用 !vk 命令发起投票</span>
+            <span className="checkbox-label-text">
+              启用投票踢人
+              <small className="checkbox-label-desc">开启后玩家可在游戏内使用 !vk 命令发起投票</small>
+            </span>
           </label>
 
           <div className="form-row">
@@ -263,14 +265,16 @@ export default function VoteSettings({ serverId }: { serverId: string }) {
           </div>
 
           <div className="form-row">
-            <label className="form-field">
-              <span className="form-label">管理员免疫</span>
+            <label className="form-checkbox-label">
               <input
                 type="checkbox"
                 checked={form.admin_immune}
                 onChange={(e) => setForm((f) => ({ ...f, admin_immune: e.target.checked }))}
               />
-              <span className="form-hint">开启后管理员不能被投票踢出</span>
+              <span className="checkbox-label-text">
+                管理员免疫
+                <small className="checkbox-label-desc">开启后管理员不能被投票踢出</small>
+              </span>
             </label>
             <label className="form-field">
               <span className="form-label">VIP 免疫最低等级</span>

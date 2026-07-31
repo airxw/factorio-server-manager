@@ -6,7 +6,8 @@
 # verified: 2026-07-24 https://terraria.wiki.gg/ (Steam App ID 105600)
 #
 # 重要说明:
-#   - 原版 Terraria 服务端 give 命令使用数字 Item ID(如铜阔剑=1)
+#   - 原版 Terraria 服务端无 give 命令(仅 TShock 支持 /give)
+#   - shop/cdk/welcome 设为 disabled(对齐 palworld 范式)
 #   - 版本号格式为 1.4.4.x(非 v5.2.0)
 # ============================================================================
 
@@ -50,7 +51,7 @@ protocol:
   auth: none
   encrypt: none
 
-# v4.12.0 步骤6: Terraria 原版 give 命令使用数字 Item ID
+# v4.39.3: Terraria 原版服务端无 give 命令(仅 TShock 支持 /give)，give_item 留空占位
 commands:
   broadcast: 'say {{message}}'
   kick_player: 'kick {{player}}'
@@ -58,8 +59,8 @@ commands:
   unban_player: 'unban {{player}}'
   list_players: 'playing'
   save_world: 'save'
-  # Terraria 原版 give 命令: give <player> <item-id-numeric> <count>
-  give_item: 'give {{player}} {{item}} {{count}}'
+  # Terraria 原版无 give 命令 — give_item 留空占位，business.shop.enabled=false
+  give_item: ''
 
 versions:
   # v4.12.0 步骤1/3: 版本源改为 steamcmd:// 协议 + official-site provider
@@ -93,7 +94,7 @@ ui:
     - { tab: saves,        group: config,   order: 30, require_state: [stopped, error] }
     - { tab: mods,         group: config,   order: 40, require_state: [stopped, error] }
     - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
-    - { tab: shop-admin,   group: business, order: 10, require_state: [stopped, starting, running, stopping, error] }
+    # v4.39.3: shop-admin 移除(原版无 give 命令)
     - { tab: update,       group: config,   order: 50, require_state: [stopped, error] }
 
 resources:
@@ -235,19 +236,17 @@ event_parsers:
     player_group: 1
 
 # ---- 业务能力声明 ----
+# v4.39.3: 原版 Terraria 服务端无 give 命令，shop/cdk/welcome 设为 disabled
 business:
   shop:
-    enabled: true
-    give_command: 'give {{player}} {{item}} {{count}}'
+    enabled: false                 # 原版无 give 命令
     quality_tiers: 0
     support_quality: false
   cdk:
-    enabled: true
-    redeem_command: 'give {{player}} {{item}} {{count}}'
+    enabled: false                 # 原版无 give 命令，CDK 兑换无意义
   chat_enhancement:
     welcome:
-      enabled: true
-      first_gift_command: 'give {{player}} copper_pickaxe 1'
+      enabled: false               # 无法发放欢迎礼物
     periodic_messages:
       enabled: true
       broadcast_command: 'say {{message}}'

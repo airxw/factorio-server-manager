@@ -171,7 +171,7 @@ ui:
     - { tab: config-files, group: config,   order: 10, require_state: [stopped, starting, running, error] }
     - { tab: players,      group: runtime,  order: 40, require_state: [stopped, running, stopping, error] }
     - { tab: saves,        group: config,   order: 30, require_state: [stopped, error] }
-    - { tab: mods,         group: config,   order: 40, require_state: [stopped, error] }
+    # v4.39.3: mods tab 移除(vanilla 服务端不加载 mods/ 目录，需 Forge/Fabric 才支持)
     - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
     - { tab: shop-admin,   group: business, order: 10, require_state: [stopped, starting, running, stopping, error] }
     - { tab: update,       group: config,   order: 50, require_state: [stopped, error] }
@@ -391,18 +391,11 @@ chat_log:
   storage_enabled: true
   retention_days: 30
 
-# ---- Mod 管理（Minecraft 也支持 mod，通过 Forge/Fabric 加载 .jar 文件到 mods/ 文件夹） ----
-# Forge mod 元数据位于 jar 内 META-INF/mods.toml；Fabric 位于 fabric.mod.json
-# 这里 mods.list_file 是 Panel 自维护的 mod 清单（用于前端展示 + 启用/禁用切换）
-mods:
-  list_file: '{{instance_root}}/mods/mod-list.json'
-  list_format: json
-  dependency_check: true                 # Forge/Fabric 有强依赖关系，必须检查
-  download_enabled: false                 # P0 不开放自动下载（涉及 CurseForge/Modrinth API key）
-  download_source: 'https://api.modrinth.com/v2/'
-  mechanism: jar-rename
-  file_extensions: ['.jar']
-  mods_dir: 'mods'
+# ---- Mod 管理 ----
+# v4.39.3: vanilla 服务端不加载 mods/ 目录（需 Forge/Fabric modloader 才支持）。
+# 此处不再声明 mods 字段（原 mechanism: jar-rename 对 vanilla 无意义，属虚标，已移除）。
+# Forge/Fabric variant 应单独创建 pack（如 minecraft-forge）并在其中声明 mods 配置。
+# mods: （省略，schema optional）
 
 # ---- 启动前置引导（首次启动前向导，v4.x 新增）----
 startup_guide:

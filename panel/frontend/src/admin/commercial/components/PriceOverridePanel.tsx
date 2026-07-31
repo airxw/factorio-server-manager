@@ -57,16 +57,15 @@ export const PriceOverridePanel: React.FC<PriceOverridePanelProps> = ({ asset, o
 
       <label
         htmlFor="isActive"
-        className="flex cursor-pointer items-center gap-3 rounded-[18px] border border-slate-200 bg-white/80 px-4 py-3"
+        className="form-checkbox-label"
       >
         <input
           id="isActive"
           type="checkbox"
           checked={isActive}
           onChange={(e) => setIsActive(e.target.checked)}
-          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-300"
         />
-        <span className="text-sm text-slate-700">是否启用（在该实例上架）</span>
+        <span>是否启用（在该实例上架）</span>
       </label>
 
       <div className="flex justify-end gap-2 pt-2">

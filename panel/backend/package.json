@@ -1,6 +1,6 @@
 {
   "name": "@gameserver-panel/backend",
-  "version": "4.39.2",
+  "version": "4.39.3",
   "private": true,
   "description": "GameServer Panel 4.15.0 — Panel 后端（Express + Knex + SQLite + JWT + WS）",
   "type": "module",

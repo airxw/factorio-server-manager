@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import express, { Request, Response, NextFunction } from 'express';
 import request from 'supertest';
 import type { Knex } from 'knex';
-import { createTestDb, destroyTestDb } from '../../test/db-helper.js';
+import { createTestDb, destroyTestDb, createEconomyTables } from '../../test/db-helper.js';
 import { createServersRouter } from './servers.js';
 import { mockLogger, mockDaemonClient } from '../../test/mock-factory.js';
 
@@ -158,6 +158,95 @@ describe('ServersRouter - Lifecycle Core Flow', () => {
     // 验证数据库中已删除
     const rowAfterDelete = await db('servers').where({ id: serverId }).first();
     expect(rowAfterDelete).toBeUndefined();
+  });
+
+  // v4.39.3: 级联清理 instance-scoped 关联表
+  it('Delete 级联清理 instance_points / shop_items / cdk_codes 等关联表', async () => {
+    // 建经济系统表（instance_points / cdk_codes 等）
+    await createEconomyTables(db);
+    // 建 list_entries 表（白名单/黑名单）
+    if (!(await db.schema.hasTable('list_entries'))) {
+      await db.schema.createTable('list_entries', (table) => {
+        table.increments('id').primary();
+        table.string('server_id').notNullable();
+        table.string('list_type').notNullable();
+        table.string('player_name').notNullable();
+        table.text('added_at').notNullable();
+        table.string('added_by').notNullable();
+        table.text('reason').nullable();
+      });
+    }
+
+    // 1. Create
+    const createRes = await request(app)
+      .post('/api/servers')
+      .send({ name: 'Cascade Cleanup Test', pack_id: 'minecraft-vanilla', node_id: 'node-local' });
+    const serverId = createRes.body.server.id;
+
+    // 2. 在关联表插入测试数据
+    await db('instance_points').insert({
+      user_id: 'user-1',
+      server_id: serverId,
+      balance: 100,
+      total_earned: 200,
+      total_spent: 100,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    await db('shop_items').insert({
+      server_id: serverId,
+      item_name: 'test-item',
+      quality: 'normal',
+      vip_level_required: 0,
+      daily_limit: null,
+      enabled: true,
+      price: 10,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+    await db('cdk_codes').insert({
+      server_id: serverId,
+      code: 'CASCADE-TEST-001',
+      item_name: 'diamond',
+      count: 1,
+      quality: 'normal',
+      status: 'unused',
+      claimed_player: null,
+      claimed_at: null,
+      expires_at: new Date(Date.now() + 86400000).toISOString(),
+      created_by: 'test',
+      created_at: new Date().toISOString(),
+    });
+    await db('list_entries').insert({
+      server_id: serverId,
+      list_type: 'whitelist',
+      player_name: 'TestPlayer',
+      added_at: new Date().toISOString(),
+      added_by: 'test',
+      reason: null,
+    });
+
+    // 3. 删除实例
+    const deleteRes = await request(app).delete(`/api/servers/${serverId}`).send();
+    expect(deleteRes.status).toBe(200);
+    expect(deleteRes.body.deleted).toBe(true);
+
+    // 4. 验证 servers 行已删
+    const rowAfterDelete = await db('servers').where({ id: serverId }).first();
+    expect(rowAfterDelete).toBeUndefined();
+
+    // 5. 验证关联表已级联清理（无孤儿残留）
+    const pointsLeft = await db('instance_points').where({ server_id: serverId }).first();
+    expect(pointsLeft).toBeUndefined();
+
+    const shopItemsLeft = await db('shop_items').where({ server_id: serverId }).first();
+    expect(shopItemsLeft).toBeUndefined();
+
+    const cdkLeft = await db('cdk_codes').where({ server_id: serverId }).first();
+    expect(cdkLeft).toBeUndefined();
+
+    const listEntriesLeft = await db('list_entries').where({ server_id: serverId }).first();
+    expect(listEntriesLeft).toBeUndefined();
   });
 
   it('Delete (仅 stopped/error 状态可删除)', async () => {

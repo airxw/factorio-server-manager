@@ -3,7 +3,7 @@
 # 依据：public/schema/pack-schema.ts（必须通过 zod 校验）
 # 协议：RCON（Palworld 支持标准 Source RCON 协议）
 # 参考：https://tech.palworldgame.com/ + Palworld Wiki
-# verified: 2026-07-24 https://tech.palworldgame.com/ (v1.0 正式版,App ID 2374020)
+# verified: 2026-07-31 https://docs.palworldgame.com/getting-started/deploy-dedicated-server/ (App ID 2394010)
 #
 # 重要说明:
 #   - Palworld 原版 RCON 不支持发放物品(无 give_item 命令),shop/cdk 设为 disabled
@@ -19,7 +19,7 @@ pack:
   version: '1.0'
 
 startup:
-  # Linux 专用服务端启动脚本（Steam App ID: 2374020）
+  # Linux 专用服务端启动脚本（Steam App ID: 2394010）
   binary: './PalServer.sh'
   args:
     - '-port={{game_port}}'
@@ -43,7 +43,7 @@ startup:
   # v4.12.0 步骤8: 端口声明
   required_ports:
     - { port: 8211, protocol: udp, name: game, primary: true }
-    - { port: 25575, protocol: tcp, name: rcon, primary: false }
+    - { port: 25585, protocol: tcp, name: rcon, primary: false }
   # v4.12.0 步骤9: 停止方法
   stop_method: rcon
   failure_pattern: 'FATAL|Failed to start|Segmentation fault'
@@ -74,7 +74,7 @@ commands:
 
 versions:
   # v4.12.0 步骤1/3: 版本源改为 steamcmd:// 协议 + official-site provider
-  source: 'steamcmd://2374020'
+  source: 'steamcmd://2394010'
   type: steamcmd
   eula_required: true
   eula_file: eula.txt

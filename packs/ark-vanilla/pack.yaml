@@ -28,9 +28,9 @@ startup:
   working_dir: '{{instance_root}}'
   # ARK 就绪日志：Primal Game Data 加载完成
   ready_pattern: 'Primal Game Data loaded|Setting breakpad minidump AppType=Server'
-  # stop_command 单命令限制：最终 quit 停止进程；存档保存由 backupService 在备份前发送 SaveWorld。
-  # 如需停服前手动保存，建议通过控制台先执行 SaveWorld 再停止。
-  stop_command: 'quit'
+  # v4.39.3: stop_command 改为 DoExit（保存并退出），原 quit 不触发存档保存。
+  # DoExit = SaveWorld + 退出，确保停服时不丢失进度。
+  stop_command: 'DoExit'
   stop_timeout: 60
   stop_method: rcon
   # ARK 默认游戏端口（UDP，贴近实际游戏端口）
@@ -56,9 +56,9 @@ protocol:
 # ARK 不使用旧版 config 字段，用 config_files 代替
 commands:
   broadcast: 'broadcast {{message}}'
-  # ARK GiveItem 命令：GiveItem <BlueprintPath> <Quantity> <Quality> <Force>
-  # 给当前执行命令的玩家（管理员自己），无 player 参数；物品用 Blueprint 路径（含空格/特殊字符，带引号）
-  give_item: 'GiveItem "{{item}}" {{count}} {{quality}} 0'
+  # v4.39.3: GiveItem 需完整蓝图路径过长，改用 GFI <ItemName> <Quantity> <Quality> <Blueprint>
+  # GFI 使用物品短名（与 static_list.name 一致），品质 0-5 对应 Primitive → Ascendant
+  give_item: 'GFI {{item}} {{count}} {{quality}} 0'
   kick_player: 'KickPlayer {{player}}'
   ban_player: 'BanPlayer {{player}}'
   list_players: 'ListPlayers'
@@ -262,20 +262,20 @@ event_parsers:
     player_group: 1
 
 # ---- 业务能力声明 ----
-# ARK GiveItem 给当前管理员自己，无 player 参数；物品发放走管理员在线模式
+# v4.39.3: GFI 使用物品短名发放（与 static_list.name 对应），无需完整蓝图路径
 business:
   shop:
     enabled: true
-    give_command: 'GiveItem "{{item}}" {{count}} {{quality}} 0'
+    give_command: 'GFI {{item}} {{count}} {{quality}} 0'
     quality_tiers: 5                  # 0-5 对应 Primitive → Ascendant
     support_quality: true             # ARK 支持品质选择
   cdk:
     enabled: true
-    redeem_command: 'GiveItem "{{item}}" {{count}} 0 0'
+    redeem_command: 'GFI {{item}} {{count}} 0 0'
   chat_enhancement:
     welcome:
       enabled: true
-      first_gift_command: 'GiveItem "stone" 50 0 0'
+      first_gift_command: 'GFI stone 50 0 0'
     periodic_messages:
       enabled: true
       broadcast_command: 'broadcast {{message}}'

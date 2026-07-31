@@ -235,6 +235,8 @@ export function createUserCenterRouter(deps: UserCenterRouterDeps): Router {
       if (!userId) return;
 
       const balance = await balanceService.getBalance(userId);
+      // v4.39.3: innerJoin 防御——实例删除后 instance_points 可能残留孤儿记录，
+      // innerJoin 过滤掉 servers 表已不存在的实例，避免跨实例汇总显示已删除实例的 UUID
       const pointsRows = (await db('instance_points')
         .select(
           'instance_points.server_id',
@@ -243,7 +245,7 @@ export function createUserCenterRouter(deps: UserCenterRouterDeps): Router {
           'instance_points.total_spent',
           'servers.name as server_name',
         )
-        .leftJoin('servers', 'instance_points.server_id', 'servers.id')
+        .innerJoin('servers', 'instance_points.server_id', 'servers.id')
         .where('instance_points.user_id', userId)) as unknown as InstancePointsJoinRow[];
 
       const instances: BalanceSummaryInstance[] = [];

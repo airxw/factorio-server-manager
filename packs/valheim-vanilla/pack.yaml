@@ -68,10 +68,10 @@ protocol:
   encrypt: none
 
 commands:
-  # v4.1.0: Valheim 原版 stdin 控制台命令
+  # v4.39.3: Valheim 原版服务端 stdin 仅支持 say/kick/ban/unban/info/save
+  # spawn 是客户端 devcommands 指令，服务端 stdin 不支持，give_item 留空占位
   broadcast: 'say {{message}}'
-  # spawn 命令在玩家附近生成物品（非直接入背包），需玩家在线；物品用 Prefab 名（大小写敏感）
-  give_item: 'spawn {{item}} {{count}}'
+  give_item: ''
   kick_player: 'kick {{player}}'
   ban_player: 'ban {{player}}'
   unban_player: 'unban {{player}}'
@@ -116,7 +116,7 @@ ui:
     - { tab: saves,        group: config,   order: 30, require_state: [stopped, error] }
     - { tab: mods,         group: config,   order: 40, require_state: [stopped, error] }
     - { tab: chat-logs,    group: runtime,  order: 30, require_state: [stopped, running, stopping, error] }
-    - { tab: shop-admin,   group: business, order: 10, require_state: [stopped, starting, running, stopping, error] }
+    # v4.39.3: shop-admin 移除(原版服务端无 spawn 命令通道)
     - { tab: update,       group: config,   order: 50, require_state: [stopped, error] }
 
 resources:
@@ -278,20 +278,18 @@ event_parsers:
     player_group: 1
 
 # ---- 业务能力声明 ----
-# Valheim spawn 命令模板不含品质参数，support_quality=false
+# v4.39.3: Valheim 原版服务端 stdin 无 spawn 命令（spawn 是客户端 devcommands），
+# shop/cdk/welcome 设为 disabled
 business:
   shop:
-    enabled: true
-    give_command: 'spawn {{item}} {{count}}'
+    enabled: false                 # 原版服务端无 spawn 命令
     quality_tiers: 0
     support_quality: false
   cdk:
-    enabled: true
-    redeem_command: 'spawn {{item}} {{count}}'
+    enabled: false                 # 原版服务端无 spawn 命令
   chat_enhancement:
     welcome:
-      enabled: true
-      first_gift_command: 'spawn Wood 20'
+      enabled: false               # 无法发放欢迎礼物
     periodic_messages:
       enabled: true
       broadcast_command: 'say {{message}}'

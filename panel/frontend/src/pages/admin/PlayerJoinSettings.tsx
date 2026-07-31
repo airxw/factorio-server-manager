@@ -361,13 +361,13 @@ export default function PlayerJoinSettings({ serverId, packId }: { serverId: str
             </span>
           </label>
 
-          <label className="form-field" style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <span className="form-label">启用入服礼包</span>
+          <label className="form-checkbox-label">
             <input
               type="checkbox"
               checked={form.gift_enabled}
               onChange={(e) => setForm((f) => ({ ...f, gift_enabled: e.target.checked }))}
             />
+            <span className="checkbox-label-text">启用入服礼包</span>
           </label>
 
           <div className="form-row">
@@ -434,8 +434,7 @@ export default function PlayerJoinSettings({ serverId, packId }: { serverId: str
             回归礼包（按离线时长触发）
           </h3>
 
-          <label className="form-field" style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <span className="form-label">启用回归礼包</span>
+          <label className="form-checkbox-label">
             <input
               type="checkbox"
               checked={form.relogin_gift_enabled}
@@ -446,8 +445,9 @@ export default function PlayerJoinSettings({ serverId, packId }: { serverId: str
                 }))
               }
             />
-            <span className="form-hint">
-              玩家离线超过冷却时数后再次上线时，自动发放此处配置的物品列表
+            <span className="checkbox-label-text">
+              启用回归礼包
+              <small className="checkbox-label-desc">玩家离线超过冷却时数后再次上线时，自动发放此处配置的物品列表</small>
             </span>
           </label>
 

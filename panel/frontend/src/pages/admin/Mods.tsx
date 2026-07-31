@@ -294,13 +294,13 @@ export default function Mods() {
                 placeholder="留空表示无"
               />
             </label>
-            <label className="form-field">
-              <span className="form-label">启用</span>
+            <label className="form-checkbox-label">
               <input
                 type="checkbox"
                 checked={form.enabled}
                 onChange={(e) => setForm((f) => ({ ...f, enabled: e.target.checked }))}
               />
+              <span className="checkbox-label-text">启用</span>
             </label>
           </div>
           <div className="form-actions">

@@ -47,7 +47,7 @@ export const STATIC_VERSION_SOURCES: Record<string, StaticVersionSource> = {
     ],
   },
 
-  // 幻兽帕鲁 (App ID 2374020;v4.12.0 修正:原注释 2394010 错误)
+  // 幻兽帕鲁 (App ID 2394010;v4.39.3 修正:原 2374020 不存在,官方实锤 2394010)
   'palworld-vanilla': {
     latest: { release: 'v0.3.3.54124' },
     versions: [

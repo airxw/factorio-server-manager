@@ -189,13 +189,13 @@ export default function ChatSettings() {
             {settings ? `编辑设置 (${settings.server_id})` : '新建设置'}
           </h3>
 
-          <label className="form-field">
-            <span className="form-label">启用聊天功能</span>
+          <label className="form-checkbox-label">
             <input
               type="checkbox"
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
             />
+            <span className="checkbox-label-text">启用聊天功能</span>
           </label>
 
           <label className="form-field">

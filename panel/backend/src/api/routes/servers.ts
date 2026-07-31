@@ -746,6 +746,10 @@ export function createServersRouter(
   // ----------------------------------------------------------------
   // DELETE /api/servers/:id — 删除（stopped 或 error 状态可删除；
   //   error 状态下 best-effort 调 daemon 清理残留进程，失败仅日志不阻断）
+  // v4.39.3: 级联清理 instance-scoped 关联表，避免孤儿数据残留
+  //   （历史 bug：仅删 servers 行，instance_points/shop_items/cdk_codes 等残留，
+  //    导致个人中心跨实例汇总显示已删除实例的 UUID）
+  //   保留：wallet_transactions / audit_logs / shop_orders（财务/审计历史）
   // ----------------------------------------------------------------
   router.delete('/:id', async (req, res) => {
     try {
@@ -797,7 +801,13 @@ export function createServersRouter(
         }
       }
 
-      await db<ServerRow>('servers').where({ id: row.id }).delete();
+      // v4.39.3: 事务级联清理 instance-scoped 关联表 + servers 行
+      //   保留 wallet_transactions/audit_logs/shop_orders（财务/审计历史）
+      //   bindings 按 scope_type='instance' AND scope_ref=server_id 清理
+      await db.transaction(async (trx) => {
+        await cleanupInstanceScopedData(trx, row.id, logger);
+        await trx<ServerRow>('servers').where({ id: row.id }).delete();
+      });
       const response: DeleteServerResponse = { id: row.id, deleted: true };
       res.json(response);
     } catch (err) {
@@ -1973,6 +1983,105 @@ async function updateStatus(db: Knex, id: string, status: InstanceState): Promis
     status,
     updated_at: new Date().toISOString(),
   });
+}
+
+/**
+ * v4.39.3: 级联清理 instance-scoped 关联表（在事务内调用）
+ *
+ * 背景：DELETE /api/servers/:id 历史 bug——仅删 servers 行，关联表残留孤儿数据，
+ *   导致个人中心跨实例汇总（/me/balance/summary）显示已删除实例的 UUID。
+ *
+ * 清理范围（instance-scoped 配置/运营数据）：
+ *   instance_points / user_vip_status / user_wallets / user_integrals
+ *   shop_items / cdk_codes / chat_trigger_responses / chat_settings
+ *   player_join_settings / periodic_messages / vote_settings / votes
+ *   mod_records / save_records / list_entries / webhooks
+ *   instance_pricing / instance_shop_configs / instance_billing_settings / instance_assets
+ *   instance_renewals / backup_records / gift_claims / command_queue
+ *   player_histories / player_sessions / binding_requests
+ *   bindings（scope_type='instance' AND scope_ref=server_id）
+ *
+ * 保留（财务/审计历史，不删除）：
+ *   wallet_transactions / audit_logs / shop_orders / chat_logs / monitor_snapshots
+ *
+ * @param trx Knex 事务句柄
+ * @param serverId 实例 ID
+ * @param logger 日志器
+ */
+async function cleanupInstanceScopedData(
+  trx: Knex,
+  serverId: string,
+  logger: Logger,
+): Promise<void> {
+  // server_id 列的关联表（直接 WHERE server_id = ?）
+  const serverIdTables = [
+    'instance_points',
+    'user_vip_status',
+    'user_wallets',
+    'user_integrals',
+    'shop_items',
+    'cdk_codes',
+    'chat_trigger_responses',
+    'chat_settings',
+    'player_join_settings',
+    'periodic_messages',
+    'vote_settings',
+    'votes',
+    'mod_records',
+    'save_records',
+    'list_entries',
+    'webhooks',
+    'instance_pricing',
+    'instance_shop_configs',
+    'backup_records',
+    'gift_claims',
+    'command_queue',
+    'player_histories',
+    'binding_requests',
+  ];
+  for (const table of serverIdTables) {
+    try {
+      await trx(table).where({ server_id: serverId }).delete();
+    } catch (err) {
+      // 表可能不存在（老库未迁移）或列名不同——记日志不阻断，保证 servers 行能删
+      logger.warn(
+        { err: err instanceof Error ? err.message : String(err), table, serverId },
+        'cleanupInstanceScopedData: 跳过表清理（可能不存在或列名不同）',
+      );
+    }
+  }
+
+  // bindings 表：scope_type='instance' AND scope_ref=server_id
+  try {
+    await trx('bindings')
+      .where({ scope_type: 'instance', scope_ref: serverId })
+      .delete();
+  } catch (err) {
+    logger.warn(
+      { err: err instanceof Error ? err.message : String(err), serverId },
+      'cleanupInstanceScopedData: bindings 表清理跳过',
+    );
+  }
+
+  // instance_id 列的关联表（FK CASCADE 但 SQLite 默认不启用 PRAGMA foreign_keys）
+  const instanceIdTables = [
+    'instance_admins',
+    'instance_roles',
+    'instance_billing_settings',
+    'instance_assets',
+    'instance_renewals',
+    'player_sessions',
+  ];
+  for (const table of instanceIdTables) {
+    try {
+      await trx(table).where({ instance_id: serverId }).delete();
+    } catch (err) {
+      logger.warn(
+        { err: err instanceof Error ? err.message : String(err), table, serverId },
+        'cleanupInstanceScopedData: 跳过 instance_id 表清理',
+      );
+    }
+  }
 }
 
 /**

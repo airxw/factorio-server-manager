@@ -303,13 +303,13 @@ export default function Saves() {
                 onChange={(e) => setForm((f) => ({ ...f, modified_at: e.target.value }))}
               />
             </label>
-            <label className="form-field">
-              <span className="form-label">设为激活</span>
+            <label className="form-checkbox-label">
               <input
                 type="checkbox"
                 checked={form.is_active}
                 onChange={(e) => setForm((f) => ({ ...f, is_active: e.target.checked }))}
               />
+              <span className="checkbox-label-text">设为激活</span>
             </label>
           </div>
           <div className="form-actions">

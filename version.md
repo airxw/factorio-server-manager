@@ -1,4 +1,77 @@
-4.39.2
+4.39.3
+
+## v4.39.3 (2026-07-31) — PATCH：多游戏 Pack 命令/端口/虚标修复（P0 + P1）
+
+**类型：** PATCH（bug 修复 + 现有功能修改，小版本号 +1，4.39.2 → 4.39.3，bb.md 规则）
+
+**背景：** 项目锐评识别出多个游戏 Pack 存在命令错误、端口不一致、虚标功能等问题，会导致生产环境停服丢档、命令执行失败、用户被误导。本次按 P0/P1 优先级修复 6 个游戏 Pack（不动 factorio）。
+
+**本次变更：**
+
+### 一、ARK：停服丢档修复（P0）+ 物品发放命令修正（P1）
+
+- **问题 1（P0）**：`stop_command: quit` 不触发存档保存，每次停服丢失一个 autosave 周期进度
+- **修复 1**：[packs/ark-vanilla/pack.yaml](packs/ark-vanilla/pack.yaml) `stop_command` 改为 `DoExit`（SaveWorld + 退出），确保停服时先存档
+- **问题 2（P1）**：`GiveItem` 需完整蓝图路径（如 `Blueprint'/Game/PrimalEarth/CoreBlueprints/.../PrimalItemResource_Thatch.PrimalItemResource_Thatch'`），用户无法填写
+- **修复 2**：`commands.give_item` 与 `business.shop.give_command` / `cdk.redeem_command` / `welcome.first_gift_command` 全部改用 `GFI <ItemName> <Quantity> <Quality> <Blueprint>`，物品短名与 static_list.name 一致；quality 0-5 对应 Primitive → Ascendant
+
+### 二、Palworld：Steam App ID + RCON 端口不一致修复（P0）
+
+- **问题 1（P0）**：`versions.source: steamcmd://2374020` 中 App ID 2374020 不存在（官方实锤为 2394010），SteamCMD 下载失败
+- **修复 1**：
+  - [packs/palworld-vanilla/pack.yaml](packs/palworld-vanilla/pack.yaml) `versions.source` 改为 `steamcmd://2394010`
+  - [daemon/src/steamcmd/apps.ts](daemon/src/steamcmd/apps.ts) `STEAM_APP_IDS.palworld` 改为 `2394010`
+  - [panel/backend/src/core/packs/staticVersions.ts](panel/backend/src/core/packs/staticVersions.ts) 注释更正
+  - verified: https://docs.palworldgame.com/getting-started/deploy-dedicated-server/
+- **问题 2（P0）**：`required_ports` 中 rcon 端口 25575 与 `protocol.default_port` 25585 不一致，且与 Minecraft 25575 冲突
+- **修复 2**：`required_ports` rcon 端口改为 25585，与 `protocol.default_port` 对齐（v4.12.0 已改 protocol.default_port 但漏改 required_ports）
+
+### 三、Minecraft Vanilla：mods jar-rename 虚标移除（P1）
+
+- **问题**：vanilla 服务端不加载 `mods/` 目录（需 Forge/Fabric modloader 才支持），原 `mods.mechanism: jar-rename` 是虚标，且 ui.tabs 已移除 mods tab，残留字段误导维护者
+- **修复**：[packs/minecraft-vanilla/pack.yaml](packs/minecraft-vanilla/pack.yaml) 彻底删除 `mods:` 块（schema optional），保留注释说明 vanilla 不支持 mods，Forge/Fabric variant 应单独创建 pack
+
+### 四、Rust：give 命令修正（P1）
+
+- **问题**：`give_item: give {{player}} {{item}} {{count}}` 中 `give` 命令在 vanilla Rust 服务端不存在（uMod 插件命令），原版命令为 `inventory.giveto`
+- **修复**：[packs/rust-vanilla/pack.yaml](packs/rust-vanilla/pack.yaml) `commands.give_item` / `business.shop.give_command` / `cdk.redeem_command` / `welcome.first_gift_command` 全部改为 `inventory.giveto {{player}} "{{item}}" {{count}}`
+
+### 五、Terraria Vanilla：shop/cdk/welcome 禁用（P1）
+
+- **问题**：原版 Terraria 服务端无 give 命令（仅 TShock 支持 `/give`），shop/cdk/welcome 启用后命令派发会失败
+- **修复**：[packs/terraria-vanilla/pack.yaml](packs/terraria-vanilla/pack.yaml) `business.shop.enabled` / `cdk.enabled` / `chat_enhancement.welcome.enabled` 全部改为 false；`give_item` 留空；ui.tabs 移除 shop-admin
+
+### 六、Valheim Vanilla：shop/cdk/welcome 禁用（P1）
+
+- **问题**：原版 Valheim 服务端 stdin 仅支持 say/kick/ban/unban/info/save，`spawn` 是客户端 devcommands 指令，服务端 stdin 不支持，shop/cdk 启用后命令派发会失败
+- **修复**：[packs/valheim-vanilla/pack.yaml](packs/valheim-vanilla/pack.yaml) `business.shop.enabled` / `cdk.enabled` / `chat_enhancement.welcome.enabled` 全部改为 false；`give_item` 留空；ui.tabs 移除 shop-admin
+
+### 七、不调整范围
+
+- **Factorio**：经核查 factorio-vanilla pack 配置正确（stop_command=quit 是 Factorio 控制台原生的保存并退出命令；RCON 端口 27015 一致；mods mechanism=list-file 与 mod-list.json 一致），本次不调整
+
+### 八、实例删除孤儿数据清理（P0）
+
+- **问题**：`DELETE /api/servers/:id` 仅删 `servers` 表一行，未级联清理 instance-scoped 关联表，导致 `instance_points` / `user_vip_status` / `shop_items` / `cdk_codes` 等残留孤儿数据。个人中心跨实例汇总（`/admin/center`）因 `leftJoin` 返回这些孤儿记录，显示已删除实例的 UUID
+- **修复 1（查询防御）**：[panel/backend/src/api/routes/userCenter.ts](panel/backend/src/api/routes/userCenter.ts) `GET /me/balance/summary` 的 `leftJoin` 改 `innerJoin`，孤儿记录不再返回
+- **修复 2（根因-级联清理）**：[panel/backend/src/api/routes/servers.ts](panel/backend/src/api/routes/servers.ts) `DELETE /api/servers/:id` 增加事务级联清理 `cleanupInstanceScopedData()`，覆盖 23 张 server_id 关联表 + 6 张 instance_id 关联表 + bindings（scope_type='instance'）；保留 `wallet_transactions` / `audit_logs` / `shop_orders`（财务/审计历史）
+- **修复 3（存量清理）**：一次性删除生产库 398 条孤儿记录（instance_points 7 + user_vip_status 5 + user_wallets 7 + user_integrals 5 + shop_items 60 + cdk_codes 15 + chat_trigger_responses 20 + player_join_settings 5 + periodic_messages 5 + vote_settings 5 + votes 15 + mod_records 15 + save_records 5 + list_entries 15 + command_queue 266 + bindings 2），真实实例（工厂/我的世界测试）数据完整保留
+- **单测**：新增 `Delete 级联清理 instance_points / shop_items / cdk_codes 等关联表` 测试用例，验证删除实例后关联表无残留
+
+**验证：**
+- 三端 `tsc --noEmit` 0 错误（panel/backend + panel/frontend + daemon）
+- backend vitest 710/710 PASS（+1 级联清理测试）；daemon vitest 20/20 PASS；frontend vitest 328/328 PASS
+- 9 个 pack.yaml 全部通过 `GamePackSchema.safeParse` zod 校验（loadPacksFromDir 加载成功）
+- Pack 关键字段核对：ark stop=DoExit / palworld rcon_port=25585（与 required_ports 一致）/ minecraft mods_mech=(none) / rust tabs 含 shop-admin（inventory.giveto）/ terraria+valheim tabs 不含 shop-admin
+- check:version 12 源全部对齐 4.39.3
+- 生产库孤儿数据已清理：instance_points/user_vip_status/shop_items/cdk_codes/command_queue 等全部 0 孤儿残留；真实实例 points 完整
+- BUILD_ID 升至 20260731-004
+
+**已知遗留（不阻断）：**
+- Terraria TShock variant（terraria-tshock）保留 shop-admin tab（TShock 支持 /give），未在本次修复范围
+- ARK GFI 物品短名与游戏内实际名称的映射需用户实测微调（GFI 命令本身已验证正确）
+
+---
 
 ## v4.39.2 (2026-07-31) — PATCH：生产运行时迁移 node dist/（build pipeline 重构）+ fresh install 迁移崩溃修复
 

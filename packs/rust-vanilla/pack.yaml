@@ -57,8 +57,8 @@ protocol:
 # Rust 不使用旧版 config 字段，用 config_files 代替
 commands:
   broadcast: 'say {{message}}'
-  # Rust give 命令：give <player> "item shortname" amount（物品用 shortname，带引号）
-  give_item: 'give {{player}} "{{item}}" {{count}}'
+  # Rust 发货命令：inventory.giveto <player> "item shortname" amount（vanilla 服务端命令，非 give）
+  give_item: 'inventory.giveto {{player}} "{{item}}" {{count}}'
   kick_player: 'kick {{player}}'
   ban_player: 'ban {{player}} {{reason}}'
   list_players: 'players'
@@ -293,16 +293,16 @@ event_parsers:
 business:
   shop:
     enabled: true
-    give_command: 'give {{player}} "{{item}}" {{count}}'
+    give_command: 'inventory.giveto {{player}} "{{item}}" {{count}}'
     quality_tiers: 0
     support_quality: false
   cdk:
     enabled: true
-    redeem_command: 'give {{player}} "{{item}}" {{count}}'
+    redeem_command: 'inventory.giveto {{player}} "{{item}}" {{count}}'
   chat_enhancement:
     welcome:
       enabled: true
-      first_gift_command: 'give {{player}} "wood" 100'
+      first_gift_command: 'inventory.giveto {{player}} "wood" 100'
     periodic_messages:
       enabled: true
       broadcast_command: 'say {{message}}'

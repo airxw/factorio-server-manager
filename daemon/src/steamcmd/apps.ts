@@ -14,7 +14,7 @@ export const STEAM_APP_IDS: Record<string, number> = {
   factorio: 427520,   // Factorio Dedicated Server (anonymous)
   ark: 376030,        // ARK: Survival Evolved Dedicated Server (anonymous)
   rust: 258550,       // Rust Dedicated Server (anonymous)
-  palworld: 2374020,  // Palworld Dedicated Server (anonymous)
+  palworld: 2394010,  // Palworld Dedicated Server (anonymous)
   terraria: 105600,    // Terraria（与游戏本体共用 App ID，anonymous）
   valheim: 896660,     // Valheim Dedicated Server (anonymous)
   zomboid: 380870,     // Project Zomboid Dedicated Server (anonymous)
